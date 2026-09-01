@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean
+  image         String?
+  role          UserRole  @default(ADMIN)
+  createdAt     DateTime
+  updatedAt     DateTime
+  accounts      Account[]
+  sessions      Session[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  image       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
+model Product {
+  id                String      @id @default(cuid())
+  name              String
+  slug              String      @unique
+  description       String
+  benefits          String?
+  usageInstructions String?
+  ingredients       String?
+  price             Float
+  stockQuantity     Int         @default(0)
+  image             String?
+  isFeatured        Boolean     @default(false)
+  isActive          Boolean     @default(true)
+  categoryId        String
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  orderItems        OrderItem[]
+  category          Category    @relation(fields: [categoryId], references: [id])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  email     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+
+  @@index([phone])
+}
+
+model Order {
+  id                     String               @id @default(cuid())
+  orderNumber            String               @unique
+  status                 OrderStatus          @default(PENDING)
+  customerId             String
+  customerName           String
+  customerPhone          String
+  customerEmail          String?
+  deliveryMethod         DeliveryMethod
+  deliveryLocation       String?
+  deliveryNotes          String?
+  deliveryFee            Float?
+  deliveryQuoteNotes     String?
+  deliveryConfirmedAt    DateTime?
+  subtotalAmount         Float
+  totalAmount            Float?
+  preferredPaymentMethod PaymentMethod?
+  customerNotes          String?
+  whatsappMessage        String?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  customer               Customer             @relation(fields: [customerId], references: [id])
+  items                  OrderItem[]
+  OrderStatusHistory     OrderStatusHistory[]
+  payments               Payment[]
+
+  @@index([status])
+  @@index([customerPhone])
+}
+
+model OrderItem {
+  id              String   @id @default(cuid())
+  orderId         String
+  productId       String
+  productName     String
+  productSlug     String
+  quantity        Int
+  priceAtPurchase Float
+  lineTotal       Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  orderId        String
+  method         PaymentMethod
+  status         PaymentStatus @default(PENDING)
+  amount         Float?
+  transactionRef String?
+  notes          String?
+  verifiedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  order          Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([transactionRef])
+}
+
+model OrderStatusHistory {
+  id        String   @id @default(cuid())
+  orderId   String
+  status    String
+  createdAt DateTime @default(now())
+  Order     Order    @relation(fields: [orderId], references: [id])
+}
+
+enum UserRole {
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  REVIEWING_DELIVERY
+  AWAITING_PAYMENT
+  PAID
+  PROCESSING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum DeliveryMethod {
+  PICKUP
+  LOCAL_DELIVERY
+  COUNTRYWIDE_DELIVERY
+}
+
+enum PaymentMethod {
+  MPESA_BUY_GOODS
+  BANK_TRANSFER
+  CASH_ON_PICKUP
+  CASH_ON_DELIVERY
+}
+
+enum PaymentStatus {
+  PENDING
+  AWAITING_VERIFICATION
+  VERIFIED
+  FAILED
+  REFUNDED
+}
