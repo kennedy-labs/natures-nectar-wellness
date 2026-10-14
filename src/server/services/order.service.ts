@@ -158,7 +158,7 @@ export async function updateOrderStatus(orderId: string, status: string) {
   }
 
   const normalizedStatus: OrderStatus =
-    isPaid && validStatus === "PENDING" ? "PROCESSING" : validStatus;
+    isPaid && validStatus === "PENDING" ? ("PROCESSING" as OrderStatus) : validStatus;
 
   await db.orderStatusHistory.create({
     data: {
