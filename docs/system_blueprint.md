@@ -778,352 +778,336 @@ Contain unfinished fake features
 REQUIRED V1 SYSTEMS
 
 1. FOUNDATION SYSTEM
-Must Exist
-Plain text
-Next.js App Router
-TypeScript
-Tailwind
-Prisma
-PostgreSQL
-Feature-oriented architecture
-Environment variable validation
-Reusable UI system
-Completion Criteria
-Plain text
-Project builds successfully
-No TypeScript errors
-No Prisma schema errors
-No broken imports
-Clean folder structure
-Production-ready repository
-
+   Must Exist
+   Plain text
+   Next.js App Router
+   TypeScript
+   Tailwind
+   Prisma
+   PostgreSQL
+   Feature-oriented architecture
+   Environment variable validation
+   Reusable UI system
+   Completion Criteria
+   Plain text
+   Project builds successfully
+   No TypeScript errors
+   No Prisma schema errors
+   No broken imports
+   Clean folder structure
+   Production-ready repository
 
 2. DATABASE SYSTEM
-Required Models
-Plain text
-User
-Session
-Account
-Category
-Product
-Customer
-Order
-OrderItem
-Payment
-Completion Criteria
-Plain text
-Migrations work
-Relationships valid
-Indexes exist
-Order history preserved
-Soft deletion supported
-
+   Required Models
+   Plain text
+   User
+   Session
+   Account
+   Category
+   Product
+   Customer
+   Order
+   OrderItem
+   Payment
+   Completion Criteria
+   Plain text
+   Migrations work
+   Relationships valid
+   Indexes exist
+   Order history preserved
+   Soft deletion supported
 
 3. AUTHENTICATION SYSTEM
-Required
-Plain text
-Admin authentication only
-Protected admin routes
-Session handling
-Role-based access
-NOT Required For V1
-Plain text
-Customer authentication
-Social login
-Multi-role complexity
-Completion Criteria
-Plain text
-Unauthorized users cannot access admin area
-Admin sessions persist correctly
-Protected APIs are secure
-
+   Required
+   Plain text
+   Admin authentication only
+   Protected admin routes
+   Session handling
+   Role-based access
+   NOT Required For V1
+   Plain text
+   Customer authentication
+   Social login
+   Multi-role complexity
+   Completion Criteria
+   Plain text
+   Unauthorized users cannot access admin area
+   Admin sessions persist correctly
+   Protected APIs are secure
 
 4. PRODUCT SYSTEM
-Required Features
-Plain text
-Create product
-Update product
-Deactivate product
-View products
-View product details
-Featured products
-Category assignment
-Stock tracking
-Slug generation
-Product Data Requirements
-Each product must support:
-Plain text
-Name
-Description
-Benefits
-Ingredients
-Usage instructions
-Price
-Stock quantity
-Category
-Image
-Featured status
-Active status
-Completion Criteria
-Plain text
-Products render dynamically
-Admin CRUD works
-Validation exists
-Out-of-stock products handled
-SEO-friendly slugs work
-
+   Required Features
+   Plain text
+   Create product
+   Update product
+   Deactivate product
+   View products
+   View product details
+   Featured products
+   Category assignment
+   Stock tracking
+   Slug generation
+   Product Data Requirements
+   Each product must support:
+   Plain text
+   Name
+   Description
+   Benefits
+   Ingredients
+   Usage instructions
+   Price
+   Stock quantity
+   Category
+   Image
+   Featured status
+   Active status
+   Completion Criteria
+   Plain text
+   Products render dynamically
+   Admin CRUD works
+   Validation exists
+   Out-of-stock products handled
+   SEO-friendly slugs work
 
 5. CATEGORY SYSTEM
-Required
-Plain text
-Create category
-Update category
-View category pages
-Assign products to categories
-Completion Criteria
-Plain text
-Category filtering works
-Product-category relationships valid
-
+   Required
+   Plain text
+   Create category
+   Update category
+   View category pages
+   Assign products to categories
+   Completion Criteria
+   Plain text
+   Category filtering works
+   Product-category relationships valid
 
 6. INVENTORY SYSTEM
-Required
-Plain text
-Track stock quantity
-Detect out-of-stock products
-Low-stock visibility
-Prevent invalid stock states
-NOT Required For V1
-Plain text
-Warehouse systems
-Supplier systems
-Inventory forecasting
-Completion Criteria
-Plain text
-Inventory updates correctly
-Products reflect availability state
-
+   Required
+   Plain text
+   Track stock quantity
+   Detect out-of-stock products
+   Low-stock visibility
+   Prevent invalid stock states
+   NOT Required For V1
+   Plain text
+   Warehouse systems
+   Supplier systems
+   Inventory forecasting
+   Completion Criteria
+   Plain text
+   Inventory updates correctly
+   Products reflect availability state
 
 7. CART SYSTEM
-Required
-Plain text
-Add to cart
-Remove from cart
-Update quantity
-Persist cart locally
-Calculate subtotal
-Completion Criteria
-Plain text
-Cart works reliably on refresh
-Mobile cart UX works
-
+   Required
+   Plain text
+   Add to cart
+   Remove from cart
+   Update quantity
+   Persist cart locally
+   Calculate subtotal
+   Completion Criteria
+   Plain text
+   Cart works reliably on refresh
+   Mobile cart UX works
 
 8. CHECKOUT SYSTEM
-Required Inputs
-Plain text
-Customer name
-Phone number
-Optional email
-Delivery method
-Delivery location
-Order notes
-Preferred payment method
-Delivery Methods
-Plain text
-Pickup
-Local delivery
-Countrywide delivery
-Payment Methods
-Plain text
-Mpesa Buy Goods
-Bank transfer
-Cash on pickup
-Cash on delivery
-Completion Criteria
-Plain text
-Orders can be submitted successfully
-Validation exists
-Customer flow is simple
-
+   Required Inputs
+   Plain text
+   Customer name
+   Phone number
+   Optional email
+   Delivery method
+   Delivery location
+   Order notes
+   Preferred payment method
+   Delivery Methods
+   Plain text
+   Pickup
+   Local delivery
+   Countrywide delivery
+   Payment Methods
+   Plain text
+   Mpesa Buy Goods
+   Bank transfer
+   Cash on pickup
+   Cash on delivery
+   Completion Criteria
+   Plain text
+   Orders can be submitted successfully
+   Validation exists
+   Customer flow is simple
 
 9. WHATSAPP INTEGRATION
-This is CORE infrastructure.
-Required
-Plain text
-WhatsApp CTA buttons
-WhatsApp order continuation
-Product inquiry messaging
-Order summary messaging
-Completion Criteria
-Plain text
-Customer can continue conversation seamlessly through WhatsApp
-Messages contain useful order information
-
+   This is CORE infrastructure.
+   Required
+   Plain text
+   WhatsApp CTA buttons
+   WhatsApp order continuation
+   Product inquiry messaging
+   Order summary messaging
+   Completion Criteria
+   Plain text
+   Customer can continue conversation seamlessly through WhatsApp
+   Messages contain useful order information
 
 10. ORDER SYSTEM
-Required
-Plain text
-Create orders
-Create order items
-Store customer snapshot
-Track statuses
-Admin order management
-Required Statuses
-Plain text
-PENDING
-REVIEWING_DELIVERY
-AWAITING_PAYMENT
-PAID
-PROCESSING
-OUT_FOR_DELIVERY
-DELIVERED
-CANCELLED
-Completion Criteria
-Plain text
-Orders persist correctly
-Admin can manage workflow
-Historical purchase data preserved
-
+    Required
+    Plain text
+    Create orders
+    Create order items
+    Store customer snapshot
+    Track statuses
+    Admin order management
+    Required Statuses
+    Plain text
+    PENDING
+    REVIEWING_DELIVERY
+    AWAITING_PAYMENT
+    PAID
+    PROCESSING
+    OUT_FOR_DELIVERY
+    DELIVERED
+    CANCELLED
+    Completion Criteria
+    Plain text
+    Orders persist correctly
+    Admin can manage workflow
+    Historical purchase data preserved
 
 11. PAYMENT WORKFLOW
-Required
-Plain text
-Manual payment confirmation
-Payment references
-Payment status updates
-NOT Required For V1
-Plain text
-Automated Mpesa STK push
-Complex financial systems
-Subscription billing
-Completion Criteria
-Plain text
-Admin can track payment progress
-Payment states are clear
-
+    Required
+    Plain text
+    Manual payment confirmation
+    Payment references
+    Payment status updates
+    NOT Required For V1
+    Plain text
+    Automated Mpesa STK push
+    Complex financial systems
+    Subscription billing
+    Completion Criteria
+    Plain text
+    Admin can track payment progress
+    Payment states are clear
 
 12. ADMIN DASHBOARD
-Required
-Plain text
-Product management
-Category management
-Order management
-Inventory management
-Completion Criteria
-Plain text
-Admin workflows are usable on mobile
-Operational tasks are simple
-
+    Required
+    Plain text
+    Product management
+    Category management
+    Order management
+    Inventory management
+    Completion Criteria
+    Plain text
+    Admin workflows are usable on mobile
+    Operational tasks are simple
 
 13. UI / DESIGN SYSTEM
-Required
-Plain text
-Reusable components
-Consistent spacing
-Responsive layouts
-Accessible interactions
-Visual Requirements
-Plain text
-Soft wellness aesthetic
-Natural color palette
-Whitespace-heavy layouts
-Clean typography
-Completion Criteria
-Plain text
-UI consistency maintained across pages
-Mobile UX polished
-No broken layouts
-
+    Required
+    Plain text
+    Reusable components
+    Consistent spacing
+    Responsive layouts
+    Accessible interactions
+    Visual Requirements
+    Plain text
+    Soft wellness aesthetic
+    Natural color palette
+    Whitespace-heavy layouts
+    Clean typography
+    Completion Criteria
+    Plain text
+    UI consistency maintained across pages
+    Mobile UX polished
+    No broken layouts
 
 14. API ARCHITECTURE
-Required
-Plain text
-Thin API routes
-Service layer
-Repository layer
-Validation layer
-Consistent responses
-Error handling
-Completion Criteria
-Plain text
-API responsibilities separated correctly
-Validation centralized
-Errors handled safely
-
+    Required
+    Plain text
+    Thin API routes
+    Service layer
+    Repository layer
+    Validation layer
+    Consistent responses
+    Error handling
+    Completion Criteria
+    Plain text
+    API responsibilities separated correctly
+    Validation centralized
+    Errors handled safely
 
 15. SECURITY
-Required
-Plain text
-Protected admin routes
-Server-side validation
-Secure environment variables
-Authenticated admin APIs
-Completion Criteria
-Plain text
-Unauthorized modification impossible through normal requests
-
+    Required
+    Plain text
+    Protected admin routes
+    Server-side validation
+    Secure environment variables
+    Authenticated admin APIs
+    Completion Criteria
+    Plain text
+    Unauthorized modification impossible through normal requests
 
 16. SEO & PERFORMANCE
-Required
-Plain text
-Metadata
-Semantic structure
-Optimized images
-Fast mobile loading
-SEO-friendly URLs
-Completion Criteria
-Plain text
-Pages load quickly on mobile
-Product pages indexable
-
+    Required
+    Plain text
+    Metadata
+    Semantic structure
+    Optimized images
+    Fast mobile loading
+    SEO-friendly URLs
+    Completion Criteria
+    Plain text
+    Pages load quickly on mobile
+    Product pages indexable
 
 17. DEPLOYMENT
-Required
-Plain text
-Production deployment
-Environment variables configured
-Database connected
-Build passes
-Hosting Stack
-Plain text
-Vercel
-Neon/Supabase PostgreSQL
-Cloudinary
-Completion Criteria
-Plain text
-Website accessible publicly
-Admin system operational
-No critical production crashes
-V1 IS CONSIDERED COMPLETE WHEN
-ALL of the following are true:
-Plain text
-Business can realistically operate through the platform
-Customers can place orders successfully
-Admin can manage operations successfully
-Mobile UX is polished
-Core workflows are stable
-Architecture remains maintainable
-System deploys successfully
-V1 IS NOT BLOCKED BY
-These are FUTURE FEATURES:
-Plain text
-Customer accounts
-AI recommendations
-Advanced analytics
-Automated Mpesa
-Email automation
-SMS systems
-Coupon systems
-Wishlist
-Reviews
-Native mobile app
-Microservices
-Advanced delivery integrations
-FINAL ENGINEERING RULE
-An AI system should consider V1 complete when:
-Plain text
-The platform solves the real operational problems
-of Nature’s Nectar Wellness
-without architectural instability,
-without fake complexity,
-and without unfinished critical workflows.
+    Required
+    Plain text
+    Production deployment
+    Environment variables configured
+    Database connected
+    Build passes
+    Hosting Stack
+    Plain text
+    Vercel
+    Neon/Supabase PostgreSQL
+    Cloudinary
+    Completion Criteria
+    Plain text
+    Website accessible publicly
+    Admin system operational
+    No critical production crashes
+    V1 IS CONSIDERED COMPLETE WHEN
+    ALL of the following are true:
+    Plain text
+    Business can realistically operate through the platform
+    Customers can place orders successfully
+    Admin can manage operations successfully
+    Mobile UX is polished
+    Core workflows are stable
+    Architecture remains maintainable
+    System deploys successfully
+    V1 IS NOT BLOCKED BY
+    These are FUTURE FEATURES:
+    Plain text
+    Customer accounts
+    AI recommendations
+    Advanced analytics
+    Automated Mpesa
+    Email automation
+    SMS systems
+    Coupon systems
+    Wishlist
+    Reviews
+    Native mobile app
+    Microservices
+    Advanced delivery integrations
+    FINAL ENGINEERING RULE
+    An AI system should consider V1 complete when:
+    Plain text
+    The platform solves the real operational problems
+    of Nature’s Nectar Wellness
+    without architectural instability,
+    without fake complexity,
+    and without unfinished critical workflows.

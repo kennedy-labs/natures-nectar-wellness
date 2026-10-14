@@ -7,6 +7,7 @@ import {
 import { submitOrderSchema } from "@/features/orders/validations/order.validation";
 import { db } from "@/server/db/prisma";
 import { ApiError } from "@/server/http/api-error";
+import type { OrderStatus as PrismaOrderStatus } from "@prisma/client";
 
 /**
  * ADMIN ORDERS
@@ -120,7 +121,7 @@ const ALLOWED_ORDER_STATUSES = [
   "CANCELLED",
 ] as const;
 
-type OrderStatus = (typeof ALLOWED_ORDER_STATUSES)[number];
+type OrderStatus = PrismaOrderStatus;
 
 export async function updateOrderStatus(orderId: string, status: string) {
   if (!orderId) {
@@ -134,6 +135,8 @@ export async function updateOrderStatus(orderId: string, status: string) {
       "Order status is not allowed."
     );
   }
+
+  const validStatus = status as OrderStatus;
 
   const order = await db.order.findUnique({
     where: { id: orderId },
@@ -154,8 +157,8 @@ export async function updateOrderStatus(orderId: string, status: string) {
     );
   }
 
-  const normalizedStatus =
-    isPaid && status === "PENDING" ? "PROCESSING" : status;
+  const normalizedStatus: OrderStatus =
+    isPaid && validStatus === "PENDING" ? "PROCESSING" : validStatus;
 
   await db.orderStatusHistory.create({
     data: {

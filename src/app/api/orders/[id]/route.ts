@@ -1,5 +1,5 @@
 import { requireAdminRequest } from "@/server/auth/admin-auth";
-import { updateOrderStatus } from "@/server/services/order.service";
+import { confirmDeliveryQuote, updateOrderStatus } from "@/server/services/order.service";
 import { ApiError } from "@/server/http/api-error";
 
 export async function PATCH(req: Request) {
@@ -7,11 +7,6 @@ export async function PATCH(req: Request) {
     await requireAdminRequest(req);
 
     const body = await req.json().catch(() => null);
-
-    if (!body?.status) {
-      throw new ApiError(400, "INVALID_STATUS", "Status is required.");
-    }
-
     const url = new URL(req.url);
     const orderId = url.pathname.split("/").at(-1);
 
@@ -19,9 +14,19 @@ export async function PATCH(req: Request) {
       throw new ApiError(400, "INVALID_ORDER_ID", "Order ID is missing.");
     }
 
-    const updated = await updateOrderStatus(orderId, body.status);
+    // Handle delivery quote confirmation
+    if (body && typeof body.fee === 'number') {
+      const updated = await confirmDeliveryQuote(orderId, body.fee, body.notes || "");
+      return Response.json(updated);
+    }
 
-    return Response.json(updated);
+    // Handle status update
+    if (body?.status) {
+      const updated = await updateOrderStatus(orderId, body.status);
+      return Response.json(updated);
+    }
+
+    throw new ApiError(400, "INVALID_REQUEST", "Either fee or status is required.");
 
   } catch (error) {
     const err = error as { code?: string; message?: string; statusCode?: number; status?: number };

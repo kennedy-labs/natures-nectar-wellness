@@ -1,0 +1,46 @@
+
+> natures-nectar-wellness@0.1.0 build
+> next build
+
+▲ Next.js 16.2.6 (Turbopack)
+- Environments: .env.production, .env
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 68s
+  Running TypeScript ...
+  Finished TypeScript in 63s ...
+  Collecting page data using 3 workers ...
+  Generating static pages using 3 workers (0/11) ...
+  Generating static pages using 3 workers (2/11) 
+  Generating static pages using 3 workers (5/11) 
+  Generating static pages using 3 workers (8/11) 
+✓ Generating static pages using 3 workers (11/11) in 2.8s
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /admin
+├ ƒ /admin/login
+├ ƒ /admin2
+├ ƒ /admin2/orders
+├ ƒ /admin2/orders/[id]
+├ ƒ /api/admin2/dashboard
+├ ƒ /api/auth/[...all]
+├ ƒ /api/categories
+├ ƒ /api/categories/[id]
+├ ƒ /api/orders
+├ ƒ /api/orders/[id]
+├ ƒ /api/payments/[id]/verify
+├ ƒ /api/products
+├ ƒ /api/products/[id]
+├ ƒ /categories
+├ ƒ /categories/[slug]
+├ ○ /checkout
+├ ƒ /products
+└ ƒ /products/[slug]
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
