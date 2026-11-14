@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { getWhatsAppUrl } from "@/config/env.client";
 
 type CheckoutSuccessProps = {
   orderNumber: string;
@@ -13,14 +14,9 @@ export function CheckoutSuccess({
   orderNumber,
   whatsappMessage,
 }: CheckoutSuccessProps) {
-  function openWhatsapp() {
-  const encodedMessage = encodeURIComponent(whatsappMessage);
-
-  window.open(
-    `https://wa.me/254757122299?text=${encodedMessage}`,
-    "_blank"
-  );
-}
+  const whatsappUrl =
+    getWhatsAppUrl(whatsappMessage) ??
+    `https://wa.me/254757122299?text=${encodeURIComponent(whatsappMessage)}`;
 
   return (
     <div className="rounded-xl border bg-card p-8 text-center">
@@ -47,12 +43,10 @@ export function CheckoutSuccess({
           </p>
         </div>
 
-        <Button
-          type="button"
-          className="w-full"
-          onClick={openWhatsapp}
-        >
-          Continue on WhatsApp
+        <Button asChild className="w-full">
+          <a href={whatsappUrl} rel="noopener noreferrer" target="_blank">
+            Continue on WhatsApp
+          </a>
         </Button>
 
         <Button

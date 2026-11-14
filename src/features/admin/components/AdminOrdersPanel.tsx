@@ -49,6 +49,7 @@ export function AdminOrdersPanel() {
       body: JSON.stringify({ status }),
     });
 
+    if (!res.ok) return;
     await load();
   }
 

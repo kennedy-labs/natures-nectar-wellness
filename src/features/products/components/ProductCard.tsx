@@ -39,14 +39,25 @@ export function ProductCard({
 
   return (
     <Card className="h-full overflow-hidden rounded-lg shadow-sm">
-      <div className="aspect-[4/3] bg-muted relative">
+      <div className="relative aspect-[4/3] bg-muted">
         {image ? (
-          <Image
-            src={image}
-            alt={name}
-            fill
-            className="h-full w-full object-cover"
-          />
+          image.startsWith("data:") ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={image}
+              alt={name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <Image
+              src={image}
+              alt={name}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              referrerPolicy="no-referrer"
+              className="h-full w-full object-cover"
+            />
+          )
         ) : (
           <div className="flex h-full items-center justify-center px-6 text-center text-sm font-medium text-muted-foreground">
             Nature&apos;s Nectar
@@ -75,7 +86,7 @@ export function ProductCard({
       </CardHeader>
 
       <CardContent className="px-4 pb-4 pt-0">
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <p className="line-clamp-3 text-sm text-muted-foreground">{description}</p>
       </CardContent>
 
       <CardFooter className="flex items-center justify-between px-4 pb-4 pt-0">

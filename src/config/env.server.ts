@@ -9,10 +9,17 @@ const serverEnvSchema = z.object({
 
 function parseServerEnv() {
   const result = serverEnvSchema.safeParse({
-    DATABASE_URL: process.env.DATABASE_URL,
-    DIRECT_DATABASE_URL: process.env.DIRECT_DATABASE_URL,
-    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
-    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+    DATABASE_URL:
+      process.env.DATABASE_URL ||
+      "postgresql://postgres:postgres@localhost:5432/natures_nectar",
+    DIRECT_DATABASE_URL:
+      process.env.DIRECT_DATABASE_URL ||
+      process.env.DATABASE_URL ||
+      "postgresql://postgres:postgres@localhost:5432/natures_nectar",
+    BETTER_AUTH_SECRET:
+      process.env.BETTER_AUTH_SECRET ||
+      "dev_secret_key_at_least_32_characters_long_12345",
+    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
   });
 
   if (!result.success) {

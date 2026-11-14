@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+const imageValueSchema = z
+  .string()
+  .trim()
+  .refine(
+    (val) =>
+      val.startsWith("/") ||
+      val.startsWith("https://") ||
+      val.startsWith("http://") ||
+      val.startsWith("data:image/"),
+    "Must be a valid image URL, uploaded photo, or /images/ path"
+  )
+  .optional();
+
 export const createProductSchema = z.object({
   name: z.string().min(3),
   description: z.string().min(10),
@@ -8,7 +21,7 @@ export const createProductSchema = z.object({
   ingredients: z.string().min(3).optional(),
   price: z.number().positive(),
   stockQuantity: z.number().min(0),
-  image: z.string().url().optional(),
+  image: imageValueSchema,
   isFeatured: z.boolean().optional(),
   isActive: z.boolean().optional(),
   categoryId: z.string().min(1),
@@ -30,7 +43,7 @@ export const updateProductSchema = z
       .max(1000000, "Stock value too large")
       .optional(),
 
-    image: z.string().url().optional(),
+    image: imageValueSchema,
     isFeatured: z.boolean().optional(),
     isActive: z.boolean().optional(),
     categoryId: z.string().min(1).optional(),

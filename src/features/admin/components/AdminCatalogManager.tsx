@@ -1,7 +1,7 @@
 "use client";
 
-import { Plus, RotateCcw, Save, Trash2 } from "lucide-react";
-import { FormEvent, useMemo, useState } from "react";
+import { Plus, RotateCcw, Save, Trash2, Upload } from "lucide-react";
+import { ChangeEvent, FormEvent, useMemo, useState } from "react";
 
 import { formatKes } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -226,6 +226,34 @@ export function AdminCatalogManager({
     setProductForm(emptyProductForm);
   }
 
+  function handleProductImageUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        const maxWidth = 800;
+        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressed = canvas.toDataURL("image/jpeg", 0.82);
+        setProductForm((current) => ({ ...current, image: compressed }));
+        setMessage("Photo ready. Save product to apply.");
+      };
+      if (typeof reader.result === "string") {
+        img.src = reader.result;
+      }
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  }
+
   return (
     <div>
       <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -438,17 +466,46 @@ export function AdminCatalogManager({
                   required
                 />
 
-                <Input
-                  className="md:col-span-2"
-                  placeholder="Image URL"
-                  value={productForm.image}
-                  onChange={(event) =>
-                    setProductForm((current) => ({
-                      ...current,
-                      image: event.target.value,
-                    }))
-                  }
-                />
+                <div className="space-y-2 md:col-span-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      className="flex-1"
+                      placeholder="Image URL (https://... or /images/...)"
+                      value={productForm.image}
+                      onChange={(event) =>
+                        setProductForm((current) => ({
+                          ...current,
+                          image: event.target.value,
+                        }))
+                      }
+                    />
+                    <label className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent">
+                      <Upload className="h-4 w-4" />
+                      Upload photo
+                      <input
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={handleProductImageUpload}
+                        type="file"
+                      />
+                    </label>
+                  </div>
+                  {productForm.image ? (
+                    <div className="flex items-center gap-3 rounded-md border bg-muted/30 p-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        alt="Product preview"
+                        className="h-12 w-16 rounded object-cover"
+                        src={productForm.image}
+                      />
+                      <span className="truncate text-xs text-muted-foreground">
+                        {productForm.image.startsWith("data:")
+                          ? "Uploaded image attached"
+                          : productForm.image}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
 
                 <label className="flex items-center gap-2 text-sm">
                   <input

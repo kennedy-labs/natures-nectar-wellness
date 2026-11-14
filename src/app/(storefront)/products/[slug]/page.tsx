@@ -54,6 +54,7 @@ export default async function ProductPage(props: ProductPageProps) {
               <img
                 alt={product.name}
                 className="h-full w-full object-cover"
+                referrerPolicy="no-referrer"
                 src={product.image}
               />
             ) : (

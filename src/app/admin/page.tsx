@@ -11,10 +11,11 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: { tab?: string };
+  searchParams: Promise<{ tab?: string }>;
 }) {
   await requireAdminPage();
-  const tab = searchParams.tab || "overview";
+  const resolvedSearchParams = await searchParams;
+  const tab = resolvedSearchParams.tab || "overview";
 
   const [categories, products, orders] = await Promise.all([
     getAllCategories(),
