@@ -5,6 +5,8 @@ import { ProductGrid } from "@/features/products/components/ProductGrid";
 import { getCategoryBySlug } from "@/server/services/category.service";
 import { getProductsByCategorySlug } from "@/server/services/product.service";
 
+export const dynamic = "force-dynamic";
+
 type CategoryPageProps = {
   params: Promise<{
     slug: string;

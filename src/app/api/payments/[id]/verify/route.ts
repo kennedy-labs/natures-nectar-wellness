@@ -1,39 +1,19 @@
-import { db } from "@/server/db/prisma";
 import { apiFail, apiOk } from "@/server/http/api-response";
 import { requireAdminRequest } from "@/server/auth/admin-auth";
+import { verifyPaymentAndMarkPaid } from "@/server/services/order.service";
 
-export async function PATCH(req: Request) {
+export async function PATCH(
+  req: Request,
+  context: RouteContext<"/api/payments/[id]/verify">
+) {
   try {
     await requireAdminRequest(req);
 
-    const url = new URL(req.url);
-    const paymentId = url.pathname.split("/").at(-2);
+    const { id: paymentId } = await context.params;
+    const body = await req.json().catch(() => ({}));
+    const result = await verifyPaymentAndMarkPaid(paymentId, body);
 
-    if (!paymentId) {
-      throw new Error("Payment ID is required.");
-    }
-
-    const existingPayment = await db.payment.findUnique({
-      where: {
-        id: paymentId,
-      },
-    });
-
-    if (!existingPayment) {
-      throw new Error("Payment not found.");
-    }
-
-    const payment = await db.payment.update({
-      where: {
-        id: paymentId,
-      },
-      data: {
-        status: "VERIFIED",
-        verifiedAt: new Date(),
-      },
-    });
-
-    return apiOk(payment);
+    return apiOk(result);
   } catch (error) {
     return apiFail(error);
   }

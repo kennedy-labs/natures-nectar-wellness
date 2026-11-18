@@ -1,42 +1,52 @@
+import { NextResponse } from "next/server";
 import { requireAdminRequest } from "@/server/auth/admin-auth";
-import { confirmDeliveryQuote, updateOrderStatus } from "@/server/services/order.service";
-import { ApiError } from "@/server/http/api-error";
+import {
+  confirmDeliveryQuote,
+  updateOrderStatus,
+} from "@/server/services/order.service";
+import { ApiError, getApiErrorResponse } from "@/server/http/api-error";
 
-export async function PATCH(req: Request) {
+export async function PATCH(
+  req: Request,
+  context: RouteContext<"/api/orders/[id]">
+) {
   try {
     await requireAdminRequest(req);
 
     const body = await req.json().catch(() => null);
-    const url = new URL(req.url);
-    const orderId = url.pathname.split("/").at(-1);
+    const { id: orderId } = await context.params;
 
     if (!orderId) {
       throw new ApiError(400, "INVALID_ORDER_ID", "Order ID is missing.");
     }
 
-    // Handle delivery quote confirmation
-    if (body && typeof body.fee === 'number') {
-      const updated = await confirmDeliveryQuote(orderId, body.fee, body.notes || "");
-      return Response.json(updated);
+    if (body && typeof body.fee === "number") {
+      const updated = await confirmDeliveryQuote(
+        orderId,
+        body.fee,
+        body.notes || ""
+      );
+      return NextResponse.json(updated);
     }
 
-    // Handle status update
     if (body?.status) {
       const updated = await updateOrderStatus(orderId, body.status);
-      return Response.json(updated);
+      return NextResponse.json(updated);
     }
 
-    throw new ApiError(400, "INVALID_REQUEST", "Either fee or status is required.");
-
+    throw new ApiError(
+      400,
+      "INVALID_REQUEST",
+      "Either fee or status is required."
+    );
   } catch (error) {
-    const err = error as { code?: string; message?: string; statusCode?: number; status?: number };
-
-    return Response.json(
+    const response = getApiErrorResponse(error);
+    return NextResponse.json(
       {
-        code: err?.code || "UNKNOWN_ERROR",
-        message: err?.message || "Something went wrong",
+        code: response.body.error.code,
+        message: response.body.error.message,
       },
-      { status: err?.statusCode || err?.status || 500 }
+      { status: response.status }
     );
   }
 }

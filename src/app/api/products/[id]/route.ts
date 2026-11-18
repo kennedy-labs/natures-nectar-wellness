@@ -1,3 +1,5 @@
+import { revalidatePath } from "next/cache";
+
 import { requireAdminRequest } from "@/server/auth/admin-auth";
 import { apiFail, apiOk, readJson } from "@/server/http/api-response";
 import {
@@ -16,6 +18,13 @@ export async function PATCH(
     const body = await readJson(req);
     const product = await updateProduct(id, body);
 
+    revalidatePath("/");
+    revalidatePath("/products");
+    revalidatePath("/categories");
+    if (product?.slug) {
+      revalidatePath(`/products/${product.slug}`);
+    }
+
     return apiOk(product);
   } catch (error) {
     return apiFail(error);
@@ -31,6 +40,10 @@ export async function DELETE(
 
     const { id } = await context.params;
     const product = await deleteProduct(id);
+
+    revalidatePath("/");
+    revalidatePath("/products");
+    revalidatePath("/categories");
 
     return apiOk(product);
   } catch (error) {

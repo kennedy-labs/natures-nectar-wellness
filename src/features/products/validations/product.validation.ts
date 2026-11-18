@@ -43,7 +43,7 @@ export const updateProductSchema = z
       .max(1000000, "Stock value too large")
       .optional(),
 
-    image: imageValueSchema,
+    image: imageValueSchema.nullable(),
     isFeatured: z.boolean().optional(),
     isActive: z.boolean().optional(),
     categoryId: z.string().min(1).optional(),

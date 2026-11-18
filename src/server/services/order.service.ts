@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { createOrderRequest } from "@/server/repositories/order.repository";
 import { findActiveProductsByIds } from "@/server/repositories/product.repository";
 import {
@@ -37,13 +38,13 @@ export async function submitOrder(input: unknown) {
   const productsById = new Map(products.map((p) => [p.id, p]));
 
   const orderItems: Array<{
-      productId: string;
-      productName: string;
-      productSlug: string;
-      quantity: number;
-      priceAtPurchase: number;
-      lineTotal: number;
-    }> = [];
+    productId: string;
+    productName: string;
+    productSlug: string;
+    quantity: number;
+    priceAtPurchase: number;
+    lineTotal: number;
+  }> = [];
 
   for (const item of data.items) {
     const product = productsById.get(item.productId);
@@ -101,7 +102,6 @@ export async function submitOrder(input: unknown) {
     whatsappMessage,
     items: orderItems,
   });
-  
 
   return order;
 }
@@ -109,7 +109,6 @@ export async function submitOrder(input: unknown) {
 /**
  * ORDER STATUS + PAYMENT SAFETY
  */
-
 const ALLOWED_ORDER_STATUSES = [
   "PENDING",
   "REVIEWING_DELIVERY",
@@ -119,6 +118,12 @@ const ALLOWED_ORDER_STATUSES = [
   "OUT_FOR_DELIVERY",
   "DELIVERED",
   "CANCELLED",
+] as const;
+
+const FULFILLMENT_STATUSES = [
+  "PROCESSING",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
 ] as const;
 
 type OrderStatus = PrismaOrderStatus;
@@ -136,6 +141,10 @@ export async function updateOrderStatus(orderId: string, status: string) {
     );
   }
 
+  if (status === "CANCELLED") {
+    return cancelOrder(orderId);
+  }
+
   const validStatus = status as OrderStatus;
 
   const order = await db.order.findUnique({
@@ -147,18 +156,51 @@ export async function updateOrderStatus(orderId: string, status: string) {
     throw new ApiError(404, "ORDER_NOT_FOUND", "Order not found.");
   }
 
-  const isPaid = order.payments?.some((p) => p.status === "VERIFIED");
+  if (order.status === "CANCELLED") {
+    throw new ApiError(
+      400,
+      "ORDER_CANCELLED",
+      "Cancelled orders cannot be transitioned to another status."
+    );
+  }
 
-  if (status === "PAID" && !isPaid) {
+  if (order.status === "DELIVERED" && validStatus !== "DELIVERED") {
+    throw new ApiError(
+      400,
+      "ORDER_ALREADY_DELIVERED",
+      "Delivered orders cannot be moved backward."
+    );
+  }
+
+  const isPaid = order.payments?.some((p) => p.status === "VERIFIED");
+  const isCashOnFulfillment =
+    order.preferredPaymentMethod === "CASH_ON_PICKUP" ||
+    order.preferredPaymentMethod === "CASH_ON_DELIVERY";
+
+  if (validStatus === "PAID" && !isPaid) {
     throw new ApiError(
       400,
       "PAYMENT_NOT_VERIFIED",
-      "Cannot mark order as PAID without verified payment."
+      "Cannot mark order as PAID without a verified payment."
+    );
+  }
+
+  if (
+    (FULFILLMENT_STATUSES as readonly string[]).includes(validStatus) &&
+    !isPaid &&
+    !isCashOnFulfillment
+  ) {
+    throw new ApiError(
+      400,
+      "PAYMENT_REQUIRED",
+      "Payment must be verified before processing or delivering this order."
     );
   }
 
   const normalizedStatus: OrderStatus =
-    isPaid && validStatus === "PENDING" ? ("PROCESSING" as OrderStatus) : validStatus;
+    isPaid && validStatus === "PENDING"
+      ? ("PROCESSING" as OrderStatus)
+      : validStatus;
 
   await db.orderStatusHistory.create({
     data: {
@@ -197,15 +239,15 @@ export async function cancelOrder(orderId: string) {
     throw new ApiError(404, "ORDER_NOT_FOUND", "Order not found.");
   }
 
-  if (["COMPLETED", "REFUNDED", "CANCELLED"].includes(order.status)) {
+  if (["DELIVERED", "CANCELLED"].includes(order.status)) {
     throw new ApiError(
       400,
       "CANNOT_CANCEL_ORDER",
-      "This order cannot be cancelled."
+      "Delivered or already cancelled orders cannot be cancelled."
     );
   }
 
-  await db.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     for (const item of order.items) {
       await tx.product.update({
         where: { id: item.productId },
@@ -217,10 +259,28 @@ export async function cancelOrder(orderId: string) {
       });
     }
 
-    await tx.order.update({
+    await tx.payment.updateMany({
+      where: {
+        orderId,
+        status: {
+          in: ["PENDING", "AWAITING_VERIFICATION"],
+        },
+      },
+      data: {
+        status: "FAILED",
+        notes: "Order cancelled; pending payment voided.",
+      },
+    });
+
+    const updated = await tx.order.update({
       where: { id: orderId },
       data: {
         status: "CANCELLED",
+      },
+      include: {
+        customer: true,
+        items: true,
+        payments: true,
       },
     });
 
@@ -230,15 +290,65 @@ export async function cancelOrder(orderId: string) {
         status: "CANCELLED",
       },
     });
+
+    return updated;
   });
+}
+
+export async function expireStaleUnpaidOrders(hours = 24) {
+  const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+  const staleOrders = await db.order.findMany({
+    where: {
+      status: {
+        in: ["PENDING", "REVIEWING_DELIVERY", "AWAITING_PAYMENT"],
+      },
+      createdAt: {
+        lt: cutoff,
+      },
+      payments: {
+        none: {
+          status: "VERIFIED",
+        },
+      },
+    },
+    select: {
+      id: true,
+      orderNumber: true,
+    },
+  });
+
+  const cancelledOrderNumbers: string[] = [];
+
+  for (const stale of staleOrders) {
+    await cancelOrder(stale.id);
+    cancelledOrderNumbers.push(stale.orderNumber);
+  }
+
+  return {
+    cancelledCount: cancelledOrderNumbers.length,
+    orderNumbers: cancelledOrderNumbers,
+  };
 }
 
 /**
  * DELIVERY QUOTE
  */
-export async function confirmDeliveryQuote(orderId: string, fee: number, notes: string) {
+export async function confirmDeliveryQuote(
+  orderId: string,
+  fee: number,
+  notes: string
+) {
   if (!orderId) {
     throw new ApiError(400, "INVALID_ORDER_ID", "Missing order ID.");
+  }
+
+  if (!Number.isFinite(fee) || fee < 0) {
+    throw new ApiError(
+      400,
+      "INVALID_DELIVERY_FEE",
+      "Delivery fee must be 0 or greater."
+    );
   }
 
   const order = await db.order.findUnique({
@@ -247,6 +357,14 @@ export async function confirmDeliveryQuote(orderId: string, fee: number, notes: 
 
   if (!order) {
     throw new ApiError(404, "ORDER_NOT_FOUND", "Order not found.");
+  }
+
+  if (["DELIVERED", "CANCELLED"].includes(order.status)) {
+    throw new ApiError(
+      400,
+      "ORDER_CLOSED",
+      "Cannot quote delivery for a closed order."
+    );
   }
 
   return db.$transaction(async (tx) => {
@@ -274,5 +392,121 @@ export async function confirmDeliveryQuote(orderId: string, fee: number, notes: 
     });
 
     return updatedOrder;
+  });
+}
+
+/**
+ * PAYMENT VERIFICATION
+ */
+const verifyPaymentInputSchema = z.object({
+  transactionRef: z.string().trim().optional(),
+  amount: z.number().positive().optional(),
+  notes: z.string().trim().max(500).optional(),
+});
+
+export async function verifyPaymentAndMarkPaid(
+  paymentId: string,
+  rawInput: unknown
+) {
+  if (!paymentId) {
+    throw new ApiError(400, "INVALID_PAYMENT_ID", "Payment ID is required.");
+  }
+
+  const parsed = verifyPaymentInputSchema.parse(rawInput ?? {});
+
+  const existingPayment = await db.payment.findUnique({
+    where: { id: paymentId },
+    include: { order: true },
+  });
+
+  if (!existingPayment) {
+    throw new ApiError(404, "PAYMENT_NOT_FOUND", "Payment not found.");
+  }
+
+  if (existingPayment.order.status === "CANCELLED") {
+    throw new ApiError(
+      400,
+      "ORDER_CANCELLED",
+      "Cannot verify payment for a cancelled order."
+    );
+  }
+
+  const requiresExternalRef =
+    existingPayment.method === "MPESA_BUY_GOODS" ||
+    existingPayment.method === "BANK_TRANSFER";
+
+  const normalizedRef = parsed.transactionRef?.trim().toUpperCase();
+
+  if (requiresExternalRef && (!normalizedRef || normalizedRef.length < 4)) {
+    throw new ApiError(
+      400,
+      "TRANSACTION_REF_REQUIRED",
+      "Enter a valid M-Pesa or bank transaction reference (at least 4 characters)."
+    );
+  }
+
+  if (normalizedRef) {
+    const duplicate = await db.payment.findFirst({
+      where: {
+        id: { not: paymentId },
+        status: "VERIFIED",
+        transactionRef: normalizedRef,
+      },
+      include: { order: { select: { orderNumber: true } } },
+    });
+
+    if (duplicate) {
+      throw new ApiError(
+        409,
+        "DUPLICATE_TRANSACTION_REF",
+        `Transaction reference ${normalizedRef} is already verified on order ${duplicate.order.orderNumber}.`
+      );
+    }
+  }
+
+  const verifiedAmount =
+    parsed.amount ??
+    existingPayment.amount ??
+    existingPayment.order.totalAmount ??
+    existingPayment.order.subtotalAmount;
+
+  return db.$transaction(async (tx) => {
+    const payment = await tx.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: "VERIFIED",
+        transactionRef: normalizedRef || `CASH-${existingPayment.order.orderNumber}`,
+        amount: verifiedAmount,
+        notes: parsed.notes || existingPayment.notes,
+        verifiedAt: new Date(),
+      },
+    });
+
+    const nextOrderStatus = ["PENDING", "REVIEWING_DELIVERY", "AWAITING_PAYMENT"].includes(
+      existingPayment.order.status
+    )
+      ? "PAID"
+      : existingPayment.order.status;
+
+    const order = await tx.order.update({
+      where: { id: existingPayment.orderId },
+      data: { status: nextOrderStatus },
+      include: {
+        customer: true,
+        items: true,
+        payments: true,
+      },
+    });
+
+    if (nextOrderStatus === "PAID" && existingPayment.order.status !== "PAID") {
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: existingPayment.orderId,
+          status: "PAID",
+        },
+      });
+    }
+
+    return { payment, order };
   });
 }

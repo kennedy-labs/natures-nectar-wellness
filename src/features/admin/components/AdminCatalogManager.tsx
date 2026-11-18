@@ -168,7 +168,8 @@ export function AdminCatalogManager({
     setIsSaving(true);
     setMessage(null);
 
-    const payload = {
+    const trimmedImage = productForm.image.trim();
+    const basePayload = {
       name: productForm.name,
       description: productForm.description,
       benefits: normalizeOptional(productForm.benefits),
@@ -176,7 +177,6 @@ export function AdminCatalogManager({
       ingredients: normalizeOptional(productForm.ingredients),
       price: Number(productForm.price),
       stockQuantity: Number(productForm.stockQuantity),
-      image: normalizeOptional(productForm.image),
       categoryId: productForm.categoryId,
       isFeatured: productForm.isFeatured,
       isActive: productForm.isActive,
@@ -184,9 +184,15 @@ export function AdminCatalogManager({
 
     try {
       if (editingProductId) {
-        await updateProductFromClient(editingProductId, payload);
+        await updateProductFromClient(editingProductId, {
+          ...basePayload,
+          image: trimmedImage ? trimmedImage : null,
+        });
       } else {
-        await createProductFromClient(payload);
+        await createProductFromClient({
+          ...basePayload,
+          image: trimmedImage ? trimmedImage : undefined,
+        });
       }
 
       setProductForm(emptyProductForm);
@@ -491,18 +497,33 @@ export function AdminCatalogManager({
                     </label>
                   </div>
                   {productForm.image ? (
-                    <div className="flex items-center gap-3 rounded-md border bg-muted/30 p-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        alt="Product preview"
-                        className="h-12 w-16 rounded object-cover"
-                        src={productForm.image}
-                      />
-                      <span className="truncate text-xs text-muted-foreground">
-                        {productForm.image.startsWith("data:")
-                          ? "Uploaded image attached"
-                          : productForm.image}
-                      </span>
+                    <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 p-2">
+                      <div className="flex min-w-0 items-center gap-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          alt="Product preview"
+                          className="h-12 w-16 shrink-0 rounded object-cover"
+                          src={productForm.image}
+                        />
+                        <span className="truncate text-xs text-muted-foreground">
+                          {productForm.image.startsWith("data:")
+                            ? "Image ready to store in database"
+                            : productForm.image}
+                        </span>
+                      </div>
+                      <Button
+                        onClick={() =>
+                          setProductForm((current) => ({
+                            ...current,
+                            image: "",
+                          }))
+                        }
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                      >
+                        Remove
+                      </Button>
                     </div>
                   ) : null}
                 </div>
@@ -534,6 +555,12 @@ export function AdminCatalogManager({
                   />
                   Active
                 </label>
+
+                {message ? (
+                  <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm md:col-span-2">
+                    {message}
+                  </p>
+                ) : null}
 
                 <Button
                   className="md:col-span-2"

@@ -1,3 +1,5 @@
+import { revalidatePath } from "next/cache";
+
 import {
   createProduct,
   getAllProducts,
@@ -31,6 +33,10 @@ export async function POST(req: Request) {
 
     const body = await readJson(req);
     const product = await createProduct(body);
+
+    revalidatePath("/");
+    revalidatePath("/products");
+    revalidatePath("/categories");
 
     return apiCreated(product);
   } catch (error) {

@@ -85,7 +85,7 @@ type CreateProductData = {
   ingredients?: string;
   price: number;
   stockQuantity: number;
-  image?: string;
+  image?: string | null;
   isFeatured?: boolean;
   isActive?: boolean;
   categoryId: string;
