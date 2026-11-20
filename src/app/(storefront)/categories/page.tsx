@@ -1,13 +1,33 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { DEFAULT_OG_IMAGE } from "@/config/site";
 import { getAllCategories } from "@/server/services/category.service";
 
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "Categories | Nature's Nectar Wellness",
-  description: "Browse wellness products by category.",
+  title: "Wellness Categories",
+  description:
+    "Explore natural wellness categories including herbal teas, supplements, tinctures, and mineral resins.",
+  alternates: {
+    canonical: "/categories",
+  },
+  openGraph: {
+    title: "Wellness Categories | Nature's Nectar Wellness",
+    description:
+      "Explore natural wellness categories including herbal teas, supplements, tinctures, and mineral resins.",
+    url: "/categories",
+    type: "website",
+    images: [{ url: DEFAULT_OG_IMAGE }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Wellness Categories | Nature's Nectar Wellness",
+    description:
+      "Explore natural wellness categories including herbal teas, supplements, tinctures, and mineral resins.",
+    images: [DEFAULT_OG_IMAGE],
+  },
 };
 
 export default async function CategoriesPage() {

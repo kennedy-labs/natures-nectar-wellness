@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { DEFAULT_OG_IMAGE, SITE_NAME, getAbsoluteUrl } from "@/config/site";
 import { formatKes } from "@/lib/format";
 import { getProductBySlug } from "@/server/services/product.service";
 import { getInventoryStatus, getInventoryStatusLabel } from "@/features/inventory/utils/inventory.utils";
@@ -26,12 +27,36 @@ export async function generateMetadata(
   if (!product) {
     return {
       title: "Product not found",
+      robots: { index: false, follow: false },
     };
   }
 
+  const description = (product.benefits ?? product.description).slice(0, 160);
+  const canonicalPath = `/products/${product.slug}`;
+  const ogImage =
+    product.image && !product.image.startsWith("data:")
+      ? product.image
+      : DEFAULT_OG_IMAGE;
+
   return {
-    title: `${product.name}`,
-    description: product.benefits ?? product.description,
+    title: product.name,
+    description,
+    alternates: {
+      canonical: canonicalPath,
+    },
+    openGraph: {
+      title: `${product.name} | ${SITE_NAME}`,
+      description,
+      url: canonicalPath,
+      type: "website",
+      images: [{ url: ogImage, alt: product.name }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${product.name} | ${SITE_NAME}`,
+      description,
+      images: [ogImage],
+    },
   };
 }
 
@@ -45,9 +70,75 @@ export default async function ProductPage(props: ProductPageProps) {
 
   const inventoryStatus = getInventoryStatus(product.stockQuantity);
   const whatsappUrl = getProductInquiryUrl(product.name);
+  const productUrl = getAbsoluteUrl(`/products/${product.slug}`);
+  const schemaImage =
+    product.image && !product.image.startsWith("data:")
+      ? getAbsoluteUrl(product.image)
+      : getAbsoluteUrl(DEFAULT_OG_IMAGE);
+
+  const productSchema = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.description,
+    image: [schemaImage],
+    sku: product.id,
+    brand: {
+      "@type": "Brand",
+      name: SITE_NAME,
+    },
+    offers: {
+      "@type": "Offer",
+      url: productUrl,
+      priceCurrency: "KES",
+      price: String(product.price),
+      availability:
+        product.stockQuantity > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+      itemCondition: "https://schema.org/NewCondition",
+    },
+  };
+
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: getAbsoluteUrl("/"),
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Products",
+        item: getAbsoluteUrl("/products"),
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: product.name,
+        item: productUrl,
+      },
+    ],
+  };
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-10">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(productSchema),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbSchema),
+        }}
+      />
       <div className="grid gap-8 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.3fr)]">
         <div className="overflow-hidden rounded-xl border bg-card">
           <div className="aspect-[4/3] bg-muted">
@@ -149,4 +240,3 @@ export default async function ProductPage(props: ProductPageProps) {
     </section>
   );
 }
-

@@ -3,14 +3,19 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 
 import { serverEnv } from "@/config/env.server";
+import { getSiteUrl } from "@/config/site";
 import { db } from "@/server/db/prisma";
 
-const trustedOrigins = [
-  "http://localhost:3000",
-  "https://*.run.app",
-  serverEnv.BETTER_AUTH_URL,
-  ...(process.env.APP_URL ? [process.env.APP_URL] : []),
-];
+const trustedOrigins = Array.from(
+  new Set([
+    "http://localhost:3000",
+    "https://*.run.app",
+    "https://*.vercel.app",
+    serverEnv.BETTER_AUTH_URL,
+    getSiteUrl(),
+    ...(process.env.APP_URL ? [process.env.APP_URL] : []),
+  ])
+);
 
 export const auth = betterAuth({
   baseURL: serverEnv.BETTER_AUTH_URL,
