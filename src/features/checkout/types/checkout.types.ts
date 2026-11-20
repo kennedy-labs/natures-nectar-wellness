@@ -37,6 +37,60 @@ export type CheckoutSubmitResponse = {
   id: string;
   orderNumber: string;
   whatsappMessage: string;
+  subtotalAmount: number;
+  totalAmount?: number | null;
+  customerPhone: string;
+  customerEmail?: string | null;
+  preferredPaymentMethod?: PaymentMethod | null;
+};
+
+export type GatewayAvailability = {
+  darajaEnabled: boolean;
+  paystackEnabled: boolean;
+  darajaEnv: "sandbox" | "production";
+};
+
+export type PaystackReturnParams = {
+  reference: string;
+  orderId: string;
+  orderNumber: string;
+};
+
+export type MpesaStkInitiateResponse = {
+  paymentId: string;
+  checkoutRequestId: string;
+  merchantRequestId: string | null;
+  customerMessage: string;
+  amount: number;
+  phone: string;
+};
+
+export type PaymentStatusPollResponse = {
+  orderStatus: string;
+  paymentStatus:
+    | "PENDING"
+    | "AWAITING_VERIFICATION"
+    | "VERIFIED"
+    | "FAILED"
+    | "REFUNDED";
+  transactionRef: string | null;
+  amount: number;
+  message: string;
+};
+
+export type PaystackInitializeResponse = {
+  reference: string;
+  authorizationUrl: string;
+  accessCode: string | null;
+  amount: number;
+};
+
+export type PaystackVerifyResponse = {
+  orderNumber: string;
+  whatsappMessage: string;
+  paymentStatus: "VERIFIED";
+  transactionRef: string | null;
+  amount: number;
 };
 
 export type CheckoutSubmissionState =
