@@ -8,6 +8,7 @@ import { CartDrawer } from "@/features/cart/components/CartDrawer";
 const navLinks = [
   { href: "/products", label: "Products" },
   { href: "/categories", label: "Categories" },
+  { href: "/track", label: "Track Order" },
 ];
 
 export function Navbar() {

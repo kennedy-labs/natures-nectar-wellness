@@ -20,6 +20,9 @@ export function Footer() {
           <Link className="hover:text-foreground" href="/products">
             Browse products
           </Link>
+          <Link className="hover:text-foreground" href="/track">
+            Track your order
+          </Link>
           {whatsappUrl ? (
             <a
               className="inline-flex items-center gap-1 hover:text-foreground"

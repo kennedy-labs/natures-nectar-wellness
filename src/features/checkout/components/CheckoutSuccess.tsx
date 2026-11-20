@@ -389,6 +389,12 @@ export function CheckoutSuccess({
           </Button>
 
           <Button asChild variant="outline" className="w-full">
+            <Link href={`/track?order=${encodeURIComponent(orderNumber)}`}>
+              Track order status anytime
+            </Link>
+          </Button>
+
+          <Button asChild variant="outline" className="w-full">
             <Link href="/products">Continue shopping</Link>
           </Button>
         </div>
