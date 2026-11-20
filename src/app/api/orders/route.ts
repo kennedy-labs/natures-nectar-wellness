@@ -7,6 +7,7 @@ import {
   apiOk,
   readJson,
 } from "@/server/http/api-response";
+import { enforceRateLimit } from "@/server/http/rate-limit";
 import {
   getOrdersForAdmin,
   submitOrder,
@@ -27,6 +28,13 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    enforceRateLimit(req, {
+      keyPrefix: "orders-create",
+      limit: 12,
+      windowMs: 10 * 60_000,
+      message: "Too many orders submitted quickly. Please wait a few minutes and try again.",
+    });
+
     const body = await readJson(req);
 
     if (!body) {
