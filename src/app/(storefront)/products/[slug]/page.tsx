@@ -9,7 +9,7 @@ import { AddToCartButton } from "@/features/cart/components/AddToCartButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 type ProductPageProps = {
   params: Promise<{

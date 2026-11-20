@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { getAllCategories } from "@/server/services/category.service";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "Categories | Nature's Nectar Wellness",

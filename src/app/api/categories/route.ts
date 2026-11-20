@@ -1,3 +1,5 @@
+import { revalidatePath } from "next/cache";
+
 import { requireAdminRequest } from "@/server/auth/admin-auth";
 import { apiCreated, apiFail, apiOk, readJson } from "@/server/http/api-response";
 import {
@@ -21,6 +23,9 @@ export async function POST(req: Request) {
 
     const body = await readJson(req);
     const category = await createCategory(body);
+
+    revalidatePath("/categories");
+    revalidatePath("/products");
 
     return apiCreated(category);
   } catch (error) {

@@ -1,3 +1,5 @@
+import { revalidatePath } from "next/cache";
+
 import { requireAdminRequest } from "@/server/auth/admin-auth";
 import {
   apiCreated,
@@ -32,6 +34,9 @@ export async function POST(req: Request) {
     }
 
     const order = await submitOrder(body);
+
+    revalidatePath("/products");
+    revalidatePath("/categories");
 
     return apiCreated(order);
   } catch (error) {

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { ProductGrid } from "@/features/products/components/ProductGrid";
 import { getAllProducts } from "@/server/services/product.service";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "Products | Nature's Nectar Wellness",
