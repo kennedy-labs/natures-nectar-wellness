@@ -9,7 +9,9 @@ import {
 } from "@/config/site";
 
 export const metadata: Metadata = {
-  title: SITE_TITLE,
+  title: {
+    absolute: SITE_TITLE,
+  },
   description: SITE_DESCRIPTION,
   alternates: {
     canonical: "/",
