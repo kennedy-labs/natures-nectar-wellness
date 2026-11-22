@@ -1,41 +1,44 @@
 "use client";
 
-import { Plus, RotateCcw, Save, Trash2, Upload } from "lucide-react";
-import { ChangeEvent, FormEvent, useMemo, useState } from "react";
-
-import { formatKes } from "@/lib/format";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useMemo, useState, type FormEvent } from "react";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  ArrowLeft,
+  FolderPlus,
+  ImageOff,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Category } from "@/features/categories/types/category.types";
+import { AdminImageDropzone } from "@/features/admin/components/AdminImageDropzone";
 import {
   createCategoryFromClient,
   deleteCategoryFromClient,
   getCategoriesForClient,
+  updateCategoryFromClient,
 } from "@/features/categories/services/category-client.service";
-import { getInventoryStatusLabel } from "@/features/inventory/utils/inventory.utils";
+import type { Category } from "@/features/categories/types/category.types";
 import { getInventoryStatus } from "@/features/inventory/utils/inventory.utils";
-import { Product } from "@/features/products/types/product.types";
 import {
   createProductFromClient,
   deleteProductFromClient,
   getAdminProductsForClient,
   updateProductFromClient,
 } from "@/features/products/services/product-client.service";
-
-import { AdminOrdersPanel } from "@/features/admin/components/AdminOrdersPanel";
+import type { Product } from "@/features/products/types/product.types";
+import { formatKes } from "@/lib/format";
 
 type AdminCatalogManagerProps = {
   initialCategories: Category[];
   initialProducts: Product[];
 };
+
+type CatalogSection = "products" | "categories";
+type ProductFilter = "all" | "active" | "missing_photo" | "low_stock" | "inactive";
 
 type CategoryFormState = {
   name: string;
@@ -93,6 +96,14 @@ function toProductForm(product: Product): ProductFormState {
   };
 }
 
+function toCategoryForm(category: Category): CategoryFormState {
+  return {
+    name: category.name,
+    description: category.description ?? "",
+    image: category.image ?? "",
+  };
+}
+
 function normalizeOptional(value: string) {
   return value.trim() ? value.trim() : undefined;
 }
@@ -101,77 +112,110 @@ export function AdminCatalogManager({
   initialCategories,
   initialProducts,
 }: AdminCatalogManagerProps) {
+  const [section, setSection] = useState<CatalogSection>("products");
   const [categories, setCategories] = useState(initialCategories);
   const [products, setProducts] = useState(initialProducts);
-  const [categoryForm, setCategoryForm] = useState(emptyCategoryForm);
-  const [productForm, setProductForm] = useState(emptyProductForm);
-  const [editingProductId, setEditingProductId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
 
-  const categoryById = useMemo(() => {
-    return new Map(categories.map((category) => [category.id, category]));
-  }, [categories]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [productFilter, setProductFilter] = useState<ProductFilter>("all");
+
+  const [isProductEditorOpen, setIsProductEditorOpen] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [productForm, setProductForm] =
+    useState<ProductFormState>(emptyProductForm);
+
+  const [isCategoryEditorOpen, setIsCategoryEditorOpen] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
+    null
+  );
+  const [categoryForm, setCategoryForm] =
+    useState<CategoryFormState>(emptyCategoryForm);
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  const categoryById = useMemo(
+    () => new Map(categories.map((c) => [c.id, c])),
+    [categories]
+  );
+
+  const productCountByCategory = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of products) {
+      counts.set(p.categoryId, (counts.get(p.categoryId) ?? 0) + 1);
+    }
+    return counts;
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return products.filter((p) => {
+      if (productFilter === "active" && !p.isActive) return false;
+      if (productFilter === "inactive" && p.isActive) return false;
+      if (productFilter === "missing_photo" && p.image) return false;
+      if (
+        productFilter === "low_stock" &&
+        (!p.isActive || p.stockQuantity > 5)
+      ) {
+        return false;
+      }
+
+      if (!query) return true;
+      const catName = categoryById.get(p.categoryId)?.name ?? "";
+      return (
+        p.name.toLowerCase().includes(query) ||
+        catName.toLowerCase().includes(query) ||
+        p.description.toLowerCase().includes(query)
+      );
+    });
+  }, [products, productFilter, searchQuery, categoryById]);
 
   async function refreshCatalog() {
     const [nextCategories, nextProducts] = await Promise.all([
       getCategoriesForClient(),
       getAdminProductsForClient(),
     ]);
-
     setCategories(nextCategories);
     setProducts(nextProducts);
   }
 
-  async function handleCreateCategory(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsSaving(true);
-    setMessage(null);
-
-    try {
-      await createCategoryFromClient({
-        name: categoryForm.name,
-        description: normalizeOptional(categoryForm.description),
-        image: normalizeOptional(categoryForm.image),
-      });
-      setCategoryForm(emptyCategoryForm);
-      await refreshCatalog();
-      setMessage("Category saved.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Category failed.");
-    } finally {
-      setIsSaving(false);
-    }
+  function openNewProductEditor() {
+    setFeedback(null);
+    setEditingProductId(null);
+    setProductForm({
+      ...emptyProductForm,
+      categoryId: categories[0]?.id ?? "",
+    });
+    setIsProductEditorOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function handleDeleteCategory(id: string) {
-    setIsSaving(true);
-    setMessage(null);
+  function openEditProductEditor(product: Product) {
+    setFeedback(null);
+    setEditingProductId(product.id);
+    setProductForm(toProductForm(product));
+    setIsProductEditorOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
-    try {
-      await deleteCategoryFromClient(id);
-      await refreshCatalog();
-      setMessage("Category deleted.");
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Category could not be deleted."
-      );
-    } finally {
-      setIsSaving(false);
-    }
+  function closeProductEditor() {
+    setIsProductEditorOpen(false);
+    setEditingProductId(null);
+    setProductForm(emptyProductForm);
   }
 
   async function handleSaveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSaving(true);
-    setMessage(null);
+    setFeedback(null);
 
     const trimmedImage = productForm.image.trim();
     const basePayload = {
-      name: productForm.name,
-      description: productForm.description,
+      name: productForm.name.trim(),
+      description: productForm.description.trim(),
       benefits: normalizeOptional(productForm.benefits),
       usageInstructions: normalizeOptional(productForm.usageInstructions),
       ingredients: normalizeOptional(productForm.ingredients),
@@ -195,447 +239,825 @@ export function AdminCatalogManager({
         });
       }
 
-      setProductForm(emptyProductForm);
-      setEditingProductId(null);
       await refreshCatalog();
-      setMessage(editingProductId ? "Product updated." : "Product created.");
+      const wasEdit = Boolean(editingProductId);
+      closeProductEditor();
+      setFeedback({
+        type: "success",
+        text: wasEdit
+          ? "Product changes saved."
+          : "New product added to catalog.",
+      });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Product failed.");
+      setFeedback({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Could not save product. Check required fields.",
+      });
     } finally {
       setIsSaving(false);
     }
   }
 
-  async function handleDeleteProduct(id: string) {
+  async function handleDeactivateProduct(product: Product) {
     setIsSaving(true);
-    setMessage(null);
+    setFeedback(null);
 
     try {
-      await deleteProductFromClient(id);
+      await deleteProductFromClient(product.id);
       await refreshCatalog();
-      setMessage("Product deactivated.");
+      setFeedback({
+        type: "success",
+        text: `${product.name} marked inactive.`,
+      });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Product failed.");
+      setFeedback({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Could not deactivate product.",
+      });
     } finally {
       setIsSaving(false);
     }
   }
 
-  function startEditingProduct(product: Product) {
-    setEditingProductId(product.id);
-    setProductForm(toProductForm(product));
-    setMessage(null);
+  function openNewCategoryEditor() {
+    setFeedback(null);
+    setEditingCategoryId(null);
+    setCategoryForm(emptyCategoryForm);
+    setIsCategoryEditorOpen(true);
   }
 
-  function resetProductForm() {
-    setEditingProductId(null);
-    setProductForm(emptyProductForm);
+  function openEditCategoryEditor(category: Category) {
+    setFeedback(null);
+    setEditingCategoryId(category.id);
+    setCategoryForm(toCategoryForm(category));
+    setIsCategoryEditorOpen(true);
   }
 
-  function handleProductImageUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  function closeCategoryEditor() {
+    setIsCategoryEditorOpen(false);
+    setEditingCategoryId(null);
+    setCategoryForm(emptyCategoryForm);
+  }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new window.Image();
-      img.onload = () => {
-        const maxWidth = 800;
-        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const compressed = canvas.toDataURL("image/jpeg", 0.82);
-        setProductForm((current) => ({ ...current, image: compressed }));
-        setMessage("Photo ready. Save product to apply.");
-      };
-      if (typeof reader.result === "string") {
-        img.src = reader.result;
+  async function handleSaveCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSaving(true);
+    setFeedback(null);
+
+    const trimmedImage = categoryForm.image.trim();
+
+    try {
+      if (editingCategoryId) {
+        await updateCategoryFromClient(editingCategoryId, {
+          name: categoryForm.name.trim(),
+          description: normalizeOptional(categoryForm.description),
+          image: trimmedImage ? trimmedImage : null,
+        });
+      } else {
+        await createCategoryFromClient({
+          name: categoryForm.name.trim(),
+          description: normalizeOptional(categoryForm.description),
+          image: trimmedImage ? trimmedImage : undefined,
+        });
       }
-    };
-    reader.readAsDataURL(file);
-    event.target.value = "";
+
+      await refreshCatalog();
+      const wasEdit = Boolean(editingCategoryId);
+      closeCategoryEditor();
+      setFeedback({
+        type: "success",
+        text: wasEdit ? "Category updated." : "Category created.",
+      });
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        text:
+          error instanceof Error ? error.message : "Could not save category.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDeleteCategory(category: Category) {
+    setIsSaving(true);
+    setFeedback(null);
+
+    try {
+      await deleteCategoryFromClient(category.id);
+      await refreshCatalog();
+      setFeedback({
+        type: "success",
+        text: `${category.name} deleted.`,
+      });
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Category could not be deleted (move or remove its products first).",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
-    <div>
-      <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="space-y-6">
-          <Card className="rounded-lg shadow-sm">
-            <CardHeader>
-              <CardTitle>Categories</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <form className="space-y-3" onSubmit={handleCreateCategory}>
-                <Input
-                  placeholder="Category name"
-                  value={categoryForm.name}
-                  onChange={(event) =>
-                    setCategoryForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  required
-                />
-                <Textarea
-                  placeholder="Description"
-                  value={categoryForm.description}
-                  onChange={(event) =>
-                    setCategoryForm((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                />
-                <Input
-                  placeholder="Image URL"
-                  value={categoryForm.image}
-                  onChange={(event) =>
-                    setCategoryForm((current) => ({
-                      ...current,
-                      image: event.target.value,
-                    }))
-                  }
-                />
-                <Button className="w-full" disabled={isSaving} type="submit">
-                  <Plus />
-                  Add category
-                </Button>
-              </form>
-
-              <div className="space-y-2">
-                {categories.map((category) => (
-                  <div
-                    className="flex items-center justify-between gap-3 rounded-md border p-3"
-                    key={category.id}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {category.name}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {category.slug}
-                      </p>
-                    </div>
-                    <Button
-                      aria-label={`Delete ${category.name}`}
-                      disabled={isSaving}
-                      onClick={() => handleDeleteCategory(category.id)}
-                      size="icon"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <Trash2 />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {message ? (
-            <p className="rounded-md border bg-card px-3 py-2 text-sm">
-              {message}
-            </p>
-          ) : null}
+    <div className="space-y-5">
+      {/* Sub-section Switcher */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="inline-grid grid-cols-2 rounded-lg border border-border/80 bg-white p-1 sm:w-auto">
+          <button
+            type="button"
+            onClick={() => {
+              setSection("products");
+              setFeedback(null);
+            }}
+            className={`min-h-10 rounded-md px-4 text-sm font-medium transition-colors whitespace-nowrap ${
+              section === "products"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Products ({products.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSection("categories");
+              setFeedback(null);
+            }}
+            className={`min-h-10 rounded-md px-4 text-sm font-medium transition-colors whitespace-nowrap ${
+              section === "categories"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Categories ({categories.length})
+          </button>
         </div>
 
-        <div className="space-y-6">
-          <Card className="rounded-lg shadow-sm">
-            <CardHeader>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <CardTitle>
-                  {editingProductId ? "Edit product" : "Create product"}
-                </CardTitle>
-                {editingProductId ? (
-                  <Button onClick={resetProductForm} type="button" variant="ghost">
-                    <RotateCcw />
-                    New product
-                  </Button>
-                ) : null}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <form
-                className="grid gap-4 md:grid-cols-2"
-                onSubmit={handleSaveProduct}
-              >
-                <Input
-                  className="md:col-span-1"
-                  placeholder="Product name"
-                  value={productForm.name}
-                  onChange={(event) =>
-                    setProductForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  required
-                />
+        {section === "products" && !isProductEditorOpen ? (
+          <Button
+            type="button"
+            onClick={openNewProductEditor}
+            disabled={categories.length === 0}
+            className="min-h-11 w-full sm:w-auto"
+          >
+            <Plus className="mr-1.5 h-4 w-4" />
+            Add product
+          </Button>
+        ) : null}
 
-                <select
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                  value={productForm.categoryId}
-                  onChange={(event) =>
-                    setProductForm((current) => ({
-                      ...current,
-                      categoryId: event.target.value,
-                    }))
-                  }
-                  required
+        {section === "categories" && !isCategoryEditorOpen ? (
+          <Button
+            type="button"
+            onClick={openNewCategoryEditor}
+            className="min-h-11 w-full sm:w-auto"
+          >
+            <FolderPlus className="mr-1.5 h-4 w-4" />
+            Add category
+          </Button>
+        ) : null}
+      </div>
+
+      {feedback ? (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+            feedback.type === "error"
+              ? "border-destructive/40 bg-destructive/10 text-destructive"
+              : "border-emerald-200 bg-emerald-50 text-emerald-900"
+          }`}
+        >
+          {feedback.text}
+        </div>
+      ) : null}
+
+      {section === "products" ? (
+        <div className="space-y-5">
+          {isProductEditorOpen ? (
+            <div className="rounded-xl border border-border/80 bg-white p-5 sm:p-6">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-4">
+                <div>
+                  <h2 className="text-lg font-semibold">
+                    {editingProductId ? "Edit product" : "Create new product"}
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Upload a clear photo and enter Kenyan Shilling (KES)
+                    pricing.
+                  </p>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="min-h-10"
+                  onClick={closeProductEditor}
                 >
-                  <option value="">Select category</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
+                  <ArrowLeft className="mr-1.5 h-4 w-4" />
+                  Back to products
+                </Button>
+              </div>
 
-                <Textarea
-                  className="md:col-span-2"
-                  placeholder="Description"
-                  value={productForm.description}
-                  onChange={(event) =>
-                    setProductForm((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                  required
-                />
-
-                <Textarea
-                  className="md:col-span-2"
-                  placeholder="Benefits"
-                  value={productForm.benefits}
-                  onChange={(event) =>
-                    setProductForm((current) => ({
-                      ...current,
-                      benefits: event.target.value,
-                    }))
+              <form onSubmit={handleSaveProduct} className="space-y-6">
+                <AdminImageDropzone
+                  id="product-image-upload"
+                  label="Product photo"
+                  value={productForm.image}
+                  onChange={(nextImage) =>
+                    setProductForm((prev) => ({ ...prev, image: nextImage }))
                   }
                 />
 
-                <Textarea
-                  placeholder="Usage instructions"
-                  value={productForm.usageInstructions}
-                  onChange={(event) =>
-                    setProductForm((current) => ({
-                      ...current,
-                      usageInstructions: event.target.value,
-                    }))
-                  }
-                />
-
-                <Textarea
-                  placeholder="Ingredients"
-                  value={productForm.ingredients}
-                  onChange={(event) =>
-                    setProductForm((current) => ({
-                      ...current,
-                      ingredients: event.target.value,
-                    }))
-                  }
-                />
-
-                <Input
-                  min="0"
-                  placeholder="Price"
-                  step="0.01"
-                  type="number"
-                  value={productForm.price}
-                  onChange={(event) =>
-                    setProductForm((current) => ({
-                      ...current,
-                      price: event.target.value,
-                    }))
-                  }
-                  required
-                />
-
-                <Input
-                  min="0"
-                  placeholder="Stock quantity"
-                  type="number"
-                  value={productForm.stockQuantity}
-                  onChange={(event) =>
-                    setProductForm((current) => ({
-                      ...current,
-                      stockQuantity: event.target.value,
-                    }))
-                  }
-                  required
-                />
-
-                <div className="space-y-2 md:col-span-2">
-                  <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="product-name"
+                      className="text-sm font-medium"
+                    >
+                      Product name *
+                    </label>
                     <Input
-                      className="flex-1"
-                      placeholder="Image URL (https://... or /images/...)"
-                      value={productForm.image}
-                      onChange={(event) =>
-                        setProductForm((current) => ({
-                          ...current,
-                          image: event.target.value,
+                      id="product-name"
+                      className="h-11"
+                      placeholder="e.g. Raw Mau Forest Honey (500g)"
+                      value={productForm.name}
+                      onChange={(e) =>
+                        setProductForm((prev) => ({
+                          ...prev,
+                          name: e.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="product-category"
+                      className="text-sm font-medium"
+                    >
+                      Category *
+                    </label>
+                    <select
+                      id="product-category"
+                      className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={productForm.categoryId}
+                      onChange={(e) =>
+                        setProductForm((prev) => ({
+                          ...prev,
+                          categoryId: e.target.value,
+                        }))
+                      }
+                      required
+                    >
+                      <option value="">Select category</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="product-price"
+                      className="text-sm font-medium"
+                    >
+                      Price (KES) *
+                    </label>
+                    <Input
+                      id="product-price"
+                      className="h-11 tabular-nums"
+                      type="number"
+                      min="1"
+                      step="0.01"
+                      placeholder="e.g. 1500"
+                      value={productForm.price}
+                      onChange={(e) =>
+                        setProductForm((prev) => ({
+                          ...prev,
+                          price: e.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="product-stock"
+                      className="text-sm font-medium"
+                    >
+                      Stock quantity *
+                    </label>
+                    <Input
+                      id="product-stock"
+                      className="h-11 tabular-nums"
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="e.g. 25"
+                      value={productForm.stockQuantity}
+                      onChange={(e) =>
+                        setProductForm((prev) => ({
+                          ...prev,
+                          stockQuantity: e.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="product-description"
+                    className="text-sm font-medium"
+                  >
+                    Description *
+                  </label>
+                  <Textarea
+                    id="product-description"
+                    rows={3}
+                    placeholder="Describe the product clearly for shoppers..."
+                    value={productForm.description}
+                    onChange={(e) =>
+                      setProductForm((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label
+                      htmlFor="product-benefits"
+                      className="text-sm font-medium"
+                    >
+                      Wellness benefits (optional)
+                    </label>
+                    <Textarea
+                      id="product-benefits"
+                      rows={2}
+                      placeholder="Key wellness benefits..."
+                      value={productForm.benefits}
+                      onChange={(e) =>
+                        setProductForm((prev) => ({
+                          ...prev,
+                          benefits: e.target.value,
                         }))
                       }
                     />
-                    <label className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent">
-                      <Upload className="h-4 w-4" />
-                      Upload photo
-                      <input
-                        accept="image/*"
-                        className="sr-only"
-                        onChange={handleProductImageUpload}
-                        type="file"
-                      />
-                    </label>
                   </div>
-                  {productForm.image ? (
-                    <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 p-2">
-                      <div className="flex min-w-0 items-center gap-3">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          alt="Product preview"
-                          className="h-12 w-16 shrink-0 rounded object-cover"
-                          src={productForm.image}
-                        />
-                        <span className="truncate text-xs text-muted-foreground">
-                          {productForm.image.startsWith("data:")
-                            ? "Image ready to store in database"
-                            : productForm.image}
-                        </span>
+
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="product-usage"
+                      className="text-sm font-medium"
+                    >
+                      Usage instructions (optional)
+                    </label>
+                    <Textarea
+                      id="product-usage"
+                      rows={2}
+                      placeholder="Recommended daily usage..."
+                      value={productForm.usageInstructions}
+                      onChange={(e) =>
+                        setProductForm((prev) => ({
+                          ...prev,
+                          usageInstructions: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="product-ingredients"
+                      className="text-sm font-medium"
+                    >
+                      Ingredients (optional)
+                    </label>
+                    <Textarea
+                      id="product-ingredients"
+                      rows={2}
+                      placeholder="100% pure organic..."
+                      value={productForm.ingredients}
+                      onChange={(e) =>
+                        setProductForm((prev) => ({
+                          ...prev,
+                          ingredients: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-6 rounded-lg border border-border/70 bg-muted/20 p-4">
+                  <label className="flex min-h-9 cursor-pointer items-center gap-2.5 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={productForm.isActive}
+                      onChange={(e) =>
+                        setProductForm((prev) => ({
+                          ...prev,
+                          isActive: e.target.checked,
+                        }))
+                      }
+                      className="h-4 w-4 rounded border-border accent-primary"
+                    />
+                    Visible in storefront
+                  </label>
+
+                  <label className="flex min-h-9 cursor-pointer items-center gap-2.5 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={productForm.isFeatured}
+                      onChange={(e) =>
+                        setProductForm((prev) => ({
+                          ...prev,
+                          isFeatured: e.target.checked,
+                        }))
+                      }
+                      className="h-4 w-4 rounded border-border accent-primary"
+                    />
+                    Featured product
+                  </label>
+                </div>
+
+                <div className="flex flex-col-reverse gap-3 border-t border-border/70 pt-4 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-11"
+                    onClick={closeProductEditor}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSaving || categories.length === 0}
+                    className="min-h-11 sm:min-w-[160px]"
+                  >
+                    {isSaving
+                      ? "Saving..."
+                      : editingProductId
+                        ? "Save changes"
+                        : "Create product"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          ) : null}
+
+          {/* Search & Filters */}
+          <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search products..."
+                className="h-10 pl-9"
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {(
+                [
+                  { key: "all", label: "All" },
+                  { key: "active", label: "Active" },
+                  { key: "missing_photo", label: "No photo" },
+                  { key: "low_stock", label: "Low stock" },
+                  { key: "inactive", label: "Archived" },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setProductFilter(tab.key)}
+                  className={`min-h-9 rounded-md px-3 text-xs font-medium transition-colors whitespace-nowrap ${
+                    productFilter === tab.key
+                      ? "bg-foreground text-background"
+                      : "bg-muted/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {categories.length === 0 ? (
+            <div className="rounded-xl border border-border/80 bg-white p-8 text-center">
+              <p className="text-sm font-medium">Create a category first</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Add at least one category before creating products.
+              </p>
+              <Button
+                type="button"
+                className="mt-4 min-h-10"
+                onClick={() => {
+                  setSection("categories");
+                  openNewCategoryEditor();
+                }}
+              >
+                Create category
+              </Button>
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="rounded-xl border border-border/80 bg-white p-8 text-center text-sm text-muted-foreground">
+              No products match the current search or filter.
+            </div>
+          ) : (
+            <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/80 bg-white">
+              {filteredProducts.map((product) => {
+                const status = getInventoryStatus(product.stockQuantity);
+                const category = categoryById.get(product.categoryId);
+
+                return (
+                  <div
+                    key={product.id}
+                    className="flex flex-col gap-4 p-4 transition-colors hover:bg-muted/20 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex min-w-0 items-start gap-3.5 sm:items-center">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/30">
+                        {product.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={product.image}
+                            alt={product.name}
+                            referrerPolicy="no-referrer"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <ImageOff className="h-5 w-5 text-muted-foreground/60" />
+                        )}
                       </div>
+
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <h3 className="truncate font-semibold text-foreground">
+                            {product.name}
+                          </h3>
+                          {!product.isActive ? (
+                            <span className="text-xs font-medium text-muted-foreground">
+                              · Archived
+                            </span>
+                          ) : null}
+                          {!product.image ? (
+                            <span className="text-xs font-medium text-amber-700">
+                              · Needs photo
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <p className="text-xs text-muted-foreground tabular-nums">
+                          {category?.name ?? "Uncategorized"}
+                          <span aria-hidden="true"> · </span>
+                          <span className="font-semibold text-foreground">
+                            {formatKes(product.price)}
+                          </span>
+                          <span aria-hidden="true"> · </span>
+                          <span
+                            className={
+                              status === "OUT_OF_STOCK"
+                                ? "font-medium text-destructive"
+                                : status === "LOW_STOCK"
+                                  ? "font-medium text-amber-700"
+                                  : ""
+                            }
+                          >
+                            {product.stockQuantity} in stock
+                          </span>
+                        </p>
+
+                        <p className="line-clamp-1 text-xs text-muted-foreground">
+                          {product.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2 sm:pl-4">
                       <Button
-                        onClick={() =>
-                          setProductForm((current) => ({
-                            ...current,
-                            image: "",
-                          }))
-                        }
+                        type="button"
+                        variant="outline"
                         size="sm"
+                        className="min-h-10 flex-1 sm:flex-initial"
+                        onClick={() => openEditProductEditor(product)}
+                      >
+                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+
+                      <Button
                         type="button"
                         variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        disabled={isSaving || !product.isActive}
+                        aria-label={`Archive ${product.name}`}
+                        onClick={() => handleDeactivateProduct(product)}
                       >
-                        Remove
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                  ) : null}
-                </div>
-
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    checked={productForm.isFeatured}
-                    onChange={(event) =>
-                      setProductForm((current) => ({
-                        ...current,
-                        isFeatured: event.target.checked,
-                      }))
-                    }
-                    type="checkbox"
-                  />
-                  Featured
-                </label>
-
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    checked={productForm.isActive}
-                    onChange={(event) =>
-                      setProductForm((current) => ({
-                        ...current,
-                        isActive: event.target.checked,
-                      }))
-                    }
-                    type="checkbox"
-                  />
-                  Active
-                </label>
-
-                {message ? (
-                  <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm md:col-span-2">
-                    {message}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {isCategoryEditorOpen ? (
+            <div className="rounded-xl border border-border/80 bg-white p-5 sm:p-6">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-4">
+                <div>
+                  <h2 className="text-lg font-semibold">
+                    {editingCategoryId
+                      ? "Edit category"
+                      : "Create new category"}
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Organize your storefront and upload an optional category
+                    photo.
                   </p>
-                ) : null}
+                </div>
 
                 <Button
-                  className="md:col-span-2"
-                  disabled={isSaving || categories.length === 0}
-                  type="submit"
+                  type="button"
+                  variant="ghost"
+                  className="min-h-10"
+                  onClick={closeCategoryEditor}
                 >
-                  <Save />
-                  {editingProductId ? "Save changes" : "Create product"}
+                  <ArrowLeft className="mr-1.5 h-4 w-4" />
+                  Cancel
                 </Button>
-              </form>
-            </CardContent>
-          </Card>
+              </div>
 
-          <div className="grid gap-3">
-            {products.map((product) => {
-              const status = getInventoryStatus(product.stockQuantity);
-              const category = categoryById.get(product.categoryId);
+              <form onSubmit={handleSaveCategory} className="space-y-5">
+                <AdminImageDropzone
+                  id="category-image-upload"
+                  label="Category photo (optional)"
+                  value={categoryForm.image}
+                  onChange={(nextImage) =>
+                    setCategoryForm((prev) => ({ ...prev, image: nextImage }))
+                  }
+                />
 
-              return (
-                <div
-                  className="grid gap-3 rounded-lg border bg-card p-4 text-card-foreground md:grid-cols-[minmax(0,1fr)_auto]"
-                  key={product.id}
-                >
-                  <div className="min-w-0 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-medium">{product.name}</h3>
-                      <Badge variant={product.isActive ? "secondary" : "outline"}>
-                        {product.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                      <Badge
-                        variant={
-                          status === "OUT_OF_STOCK" ? "destructive" : "secondary"
-                        }
-                      >
-                        {status === "LOW_STOCK"
-                         ? "⚠️ LOW STOCK"
-                         : getInventoryStatusLabel(status)}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {category?.name ?? "Uncategorized"} · {formatKes(product.price)} ·{" "}
-                      {product.stockQuantity} units
-                    </p>
-                    <p className="line-clamp-2 text-sm">{product.description}</p>
-                  </div>
-
-                  <div className="flex gap-2 md:items-start">
-                    <Button
-                      onClick={() => startEditingProduct(product)}
-                      type="button"
-                      variant="outline"
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      disabled={isSaving || !product.isActive}
-                      onClick={() => handleDeleteProduct(product.id)}
-                      size="icon"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <Trash2 />
-                    </Button>
-                  </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="category-name"
+                    className="text-sm font-medium"
+                  >
+                    Category name *
+                  </label>
+                  <Input
+                    id="category-name"
+                    className="h-11"
+                    placeholder="e.g. Herbal Teas"
+                    value={categoryForm.name}
+                    onChange={(e) =>
+                      setCategoryForm((prev) => ({
+                        ...prev,
+                        name: e.target.value,
+                      }))
+                    }
+                    required
+                  />
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
 
-      <div className="mt-10">
-        <h2 className="mb-3 text-lg font-semibold">Orders</h2>
-        <AdminOrdersPanel />
-      </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="category-description"
+                    className="text-sm font-medium"
+                  >
+                    Description (optional)
+                  </label>
+                  <Textarea
+                    id="category-description"
+                    rows={2}
+                    placeholder="Short category summary for shoppers..."
+                    value={categoryForm.description}
+                    onChange={(e) =>
+                      setCategoryForm((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="flex flex-col-reverse gap-3 border-t border-border/70 pt-4 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-11"
+                    onClick={closeCategoryEditor}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSaving}
+                    className="min-h-11 sm:min-w-[150px]"
+                  >
+                    {isSaving
+                      ? "Saving..."
+                      : editingCategoryId
+                        ? "Save category"
+                        : "Create category"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          ) : null}
+
+          {categories.length === 0 ? (
+            <div className="rounded-xl border border-border/80 bg-white p-8 text-center text-sm text-muted-foreground">
+              No categories yet. Add your first category above.
+            </div>
+          ) : (
+            <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/80 bg-white">
+              {categories.map((category) => {
+                const count = productCountByCategory.get(category.id) ?? 0;
+
+                return (
+                  <div
+                    key={category.id}
+                    className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex min-w-0 items-center gap-3.5">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/30">
+                        {category.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={category.image}
+                            alt={category.name}
+                            referrerPolicy="no-referrer"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <ImageOff className="h-4 w-4 text-muted-foreground/60" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0">
+                        <h3 className="truncate font-semibold text-foreground">
+                          {category.name}
+                        </h3>
+                        <p className="truncate text-xs text-muted-foreground tabular-nums">
+                          /{category.slug} · {count} product
+                          {count === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="min-h-10 flex-1 sm:flex-initial"
+                        onClick={() => openEditCategoryEditor(category)}
+                      >
+                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        disabled={isSaving}
+                        aria-label={`Delete ${category.name}`}
+                        onClick={() => handleDeleteCategory(category)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

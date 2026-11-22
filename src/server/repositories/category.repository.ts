@@ -29,7 +29,9 @@ export async function createCategory(data: CreateCategoryData) {
   });
 }
 
-type UpdateCategoryData = Partial<CreateCategoryData>;
+type UpdateCategoryData = Partial<Omit<CreateCategoryData, "image">> & {
+  image?: string | null;
+};
 
 export async function updateCategory(id: string, data: UpdateCategoryData) {
   return db.category.update({
