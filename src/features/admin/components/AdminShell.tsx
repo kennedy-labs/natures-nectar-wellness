@@ -15,10 +15,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 
-type AdminTab = "overview" | "orders" | "catalog";
+export type AdminTab = "overview" | "orders" | "catalog";
 
 type AdminShellProps = {
   activeTab: AdminTab;
+  onTabChange?: (tab: AdminTab) => void;
   adminEmail: string;
   pendingOrdersCount: number;
   lowStockCount: number;
@@ -27,6 +28,7 @@ type AdminShellProps = {
 
 export function AdminShell({
   activeTab,
+  onTabChange,
   adminEmail,
   pendingOrdersCount,
   lowStockCount,
@@ -72,7 +74,7 @@ export function AdminShell({
   return (
     <div className="min-h-screen bg-[#F7F8F6] text-foreground">
       {/* Desktop Fixed Sidebar (lg+) */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-60 lg:flex-col lg:border-r lg:border-border/80 lg:bg-white">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-60 lg:flex-col lg:border-r lg:border-border/80 lg:bg-white">
         <div className="flex h-16 items-center gap-2.5 border-b border-border/70 px-5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Leaf className="h-4 w-4" />
@@ -82,19 +84,17 @@ export function AdminShell({
           </span>
         </div>
 
-        <nav className="flex-1 space-y-1 p-3">
+        <nav aria-label="Admin sidebar navigation" className="flex-1 space-y-1 p-3">
           {navItems.map((item) => {
             const isActive = activeTab === item.key;
-            return (
-              <Link
-                key={item.key}
-                href={item.href}
-                className={`flex min-h-11 items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                }`}
-              >
+            const itemClass = `flex w-full min-h-11 items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors whitespace-nowrap ${
+              isActive
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+            }`;
+
+            const inner = (
+              <>
                 <span className="flex items-center gap-2.5">
                   <item.icon className="h-4 w-4 shrink-0" />
                   <span>{item.label}</span>
@@ -110,6 +110,31 @@ export function AdminShell({
                     {item.count}
                   </span>
                 ) : null}
+              </>
+            );
+
+            if (onTabChange) {
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={() => onTabChange(item.key)}
+                  className={itemClass}
+                >
+                  {inner}
+                </button>
+              );
+            }
+
+            return (
+              <Link
+                key={item.key}
+                href={item.href}
+                aria-current={isActive ? "page" : undefined}
+                className={itemClass}
+              >
+                {inner}
               </Link>
             );
           })}
@@ -195,16 +220,14 @@ export function AdminShell({
           >
             {navItems.map((item) => {
               const isActive = activeTab === item.key;
-              return (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  className={`flex min-h-10 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors whitespace-nowrap ${
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                  }`}
-                >
+              const mobileItemClass = `flex min-h-10 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors whitespace-nowrap ${
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              }`;
+
+              const inner = (
+                <>
                   <item.icon className="h-3.5 w-3.5 shrink-0" />
                   <span>{item.label}</span>
                   {item.count !== undefined ? (
@@ -216,6 +239,31 @@ export function AdminShell({
                       {item.count}
                     </span>
                   ) : null}
+                </>
+              );
+
+              if (onTabChange) {
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    aria-current={isActive ? "page" : undefined}
+                    onClick={() => onTabChange(item.key)}
+                    className={mobileItemClass}
+                  >
+                    {inner}
+                  </button>
+                );
+              }
+
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={mobileItemClass}
+                >
+                  {inner}
                 </Link>
               );
             })}

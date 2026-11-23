@@ -6,6 +6,7 @@ type StatsCardProps = {
   value: string | number;
   subtext?: string;
   href?: string;
+  onClick?: () => void;
   tone?: "default" | "warning" | "success";
 };
 
@@ -14,6 +15,7 @@ export function StatsCard({
   value,
   subtext,
   href,
+  onClick,
   tone = "default",
 }: StatsCardProps) {
   const toneClass =
@@ -27,7 +29,7 @@ export function StatsCard({
     <div className="flex h-full flex-col justify-between rounded-xl border border-border/80 bg-white p-5 transition-colors hover:border-border">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium text-muted-foreground">{title}</p>
-        {href ? (
+        {href || onClick ? (
           <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
         ) : null}
       </div>
@@ -44,6 +46,18 @@ export function StatsCard({
       </div>
     </div>
   );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="block h-full w-full text-left focus-visible:outline-none"
+      >
+        {content}
+      </button>
+    );
+  }
 
   if (href) {
     return (
