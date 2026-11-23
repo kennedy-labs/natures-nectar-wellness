@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/store/cart.store";
@@ -16,13 +16,26 @@ type Props = {
   };
 };
 
+const emptySubscribe = () => () => {};
+
 export function AddToCartButton({ product }: Props) {
   const [feedback, setFeedback] = useState<"idle" | "added">("idle");
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
   const addItem = useCartStore((state) => state.addItem);
+  const rawInCartQty = useCartStore(
+    (state) =>
+      state.items.find((item) => item.productId === product.id)?.quantity ?? 0
+  );
+  const inCartQty = isClient ? rawInCartQty : 0;
 
-  const disabled = product.stockQuantity <= 0;
+  const isOutOfStock = product.stockQuantity <= 0;
+  const isMaxed = !isOutOfStock && inCartQty >= product.stockQuantity;
 
   useEffect(() => {
     return () => {
@@ -48,22 +61,36 @@ export function AddToCartButton({ product }: Props) {
     e.preventDefault();
     e.stopPropagation();
 
-    addItem({
-      productId: product.id,
-      name: product.name,
-      price: product.price,
-      slug: product.slug,
-      stockQuantity: product.stockQuantity,
-      image: product.image ?? null,
-      quantity: 1,
-    });
+    if (isOutOfStock || isMaxed) return;
 
-    setFeedback("added");
+    try {
+      addItem({
+        productId: product.id,
+        name: product.name,
+        price: product.price,
+        slug: product.slug,
+        stockQuantity: product.stockQuantity,
+        image: product.image ?? null,
+        quantity: 1,
+      });
+
+      setFeedback("added");
+    } catch {
+      // Stock or validation guard prevented adding
+    }
   }
 
-  if (disabled) {
+  if (isOutOfStock) {
     return (
-      <Button type="button" size="sm" disabled>
+      <Button
+        type="button"
+        size="sm"
+        disabled
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
         Out of stock
       </Button>
     );
@@ -73,10 +100,15 @@ export function AddToCartButton({ product }: Props) {
     <Button
       type="button"
       size="sm"
+      disabled={isMaxed}
       variant={feedback === "added" ? "default" : "outline"}
       onClick={handleClick}
     >
-      {feedback === "added" ? "✓ Added!" : "Add to cart"}
+      {feedback === "added"
+        ? "✓ Added!"
+        : isMaxed
+          ? "Max in cart"
+          : "Add to cart"}
     </Button>
   );
 }

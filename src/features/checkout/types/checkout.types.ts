@@ -31,6 +31,7 @@ export type CheckoutFormValues = {
   };
 
   preferredPaymentMethod?: PaymentMethod;
+  mpesaPhone?: string;
 
   customerNotes?: string;
 };

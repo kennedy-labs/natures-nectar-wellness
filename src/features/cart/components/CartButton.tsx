@@ -1,27 +1,45 @@
 "use client";
 
+import * as React from "react";
 import { ShoppingBag } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
 import { useCartStore } from "@/store/cart.store";
 
-type CartButtonProps = {
-  onClick?: () => void;
-};
+const emptySubscribe = () => () => {};
 
-export function CartButton({ onClick }: CartButtonProps) {
-  const itemCount = useCartStore((state) => state.getItemCount());
+export const CartButton = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, ...props }, ref) => {
+    const isClient = React.useSyncExternalStore(
+      emptySubscribe,
+      () => true,
+      () => false
+    );
+    const rawCount = useCartStore((state) => state.getItemCount());
+    const itemCount = isClient ? rawCount : 0;
 
-  return (
-    <Button onClick={onClick} size="sm" type="button" variant="outline">
-      <ShoppingBag />
-      Cart
+    return (
+      <Button
+        ref={ref}
+        size="sm"
+        type="button"
+        variant="outline"
+        className={className}
+        aria-label={
+          itemCount > 0 ? `Open cart (${itemCount} items)` : "Open cart"
+        }
+        {...props}
+      >
+        <ShoppingBag className="h-4 w-4" />
+        <span>Cart</span>
 
-      {itemCount > 0 ? (
-        <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
-          {itemCount}
-        </span>
-      ) : null}
-    </Button>
-  );
-}
+        {itemCount > 0 ? (
+          <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
+            {itemCount}
+          </span>
+        ) : null}
+      </Button>
+    );
+  }
+);
+CartButton.displayName = "CartButton";

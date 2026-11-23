@@ -1,14 +1,25 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { formatKes } from "@/lib/format";
 import { useCartStore } from "@/store/cart.store";
 
+const emptySubscribe = () => () => {};
+
 export function CheckoutCartSummary() {
-  const items = useCartStore((state) => state.items);
-  const subtotal = useCartStore((state) => state.getSubtotal());
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+  const rawItems = useCartStore((state) => state.items);
+  const rawSubtotal = useCartStore((state) => state.getSubtotal());
+
+  const items = isClient ? rawItems : [];
+  const subtotal = isClient ? rawSubtotal : 0;
 
   if (items.length === 0) {
     return (

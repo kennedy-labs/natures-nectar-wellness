@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Minus, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,20 +14,32 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { CartButton } from "@/features/cart/components/CartButton";
 import { formatKes } from "@/lib/format";
 import { useCartStore } from "@/store/cart.store";
+
+const emptySubscribe = () => () => {};
 
 export function CartDrawer() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
 
-  const items = useCartStore((state) => state.items);
-  const subtotal = useCartStore((state) => state.getSubtotal());
+  const rawItems = useCartStore((state) => state.items);
+  const rawSubtotal = useCartStore((state) => state.getSubtotal());
   const removeItem = useCartStore((state) => state.removeItem);
   const setQuantity = useCartStore((state) => state.setQuantity);
   const clearCart = useCartStore((state) => state.clearCart);
 
+  const items = isClient ? rawItems : [];
+  const subtotal = isClient ? rawSubtotal : 0;
+
   function handleProceedToCheckout() {
+    if (items.length === 0) return;
     setOpen(false);
     router.push("/checkout");
   }
@@ -35,15 +47,13 @@ export function CartDrawer() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="outline" size="sm">
-          Cart
-        </Button>
+        <CartButton />
       </SheetTrigger>
       <SheetContent className="flex w-full flex-col sm:max-w-md">
         <SheetHeader>
           <SheetTitle>Your cart</SheetTitle>
           <SheetDescription>
-            Review items before checkout. Delivery fee is confirmed on WhatsApp.
+            Review items before checkout.
           </SheetDescription>
         </SheetHeader>
 
@@ -63,6 +73,7 @@ export function CartDrawer() {
                     <Link
                       className="font-medium hover:underline"
                       href={`/products/${item.slug}`}
+                      onClick={() => setOpen(false)}
                     >
                       {item.name}
                     </Link>
@@ -125,7 +136,11 @@ export function CartDrawer() {
           </div>
 
           <div className="grid gap-2">
-            <Button className="w-full" onClick={handleProceedToCheckout}>
+            <Button
+              className="w-full"
+              disabled={items.length === 0}
+              onClick={handleProceedToCheckout}
+            >
               Proceed to checkout
             </Button>
             {items.length > 0 ? (

@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { ShoppingCart } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/store/cart.store";
+
+const emptySubscribe = () => () => {};
 
 type AddToCartButtonProps = {
   product: {
@@ -18,10 +20,16 @@ type AddToCartButtonProps = {
 };
 
 export function AddToCartButton({ product }: AddToCartButtonProps) {
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
   const addItem = useCartStore((state) => state.addItem);
-  const itemInCart = useCartStore((state) =>
+  const rawItemInCart = useCartStore((state) =>
     state.items.find((item) => item.productId === product.id)
   );
+  const itemInCart = isClient ? rawItemInCart : undefined;
 
   const [error, setError] = useState<string | null>(null);
 

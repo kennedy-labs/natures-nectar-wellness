@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  Banknote,
   CheckCircle2,
-  CreditCard,
   Loader2,
   MessageCircle,
   Smartphone,
@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
 import {
   initiateMpesaStk,
-  initializePaystackCheckout,
   pollMpesaPaymentStatus,
 } from "@/features/checkout/api/checkout-api";
 import type {
@@ -29,6 +28,8 @@ type CheckoutSuccessProps = {
   whatsappMessage: string;
   amount: number;
   customerPhone?: string;
+  mpesaPhone?: string;
+  autoStartMpesa?: boolean;
   customerEmail?: string | null;
   preferredPaymentMethod?: PaymentMethod | null;
   gatewayAvailability?: GatewayAvailability;
@@ -45,19 +46,22 @@ export function CheckoutSuccess({
   whatsappMessage,
   amount,
   customerPhone = "",
-  customerEmail,
+  mpesaPhone,
+  autoStartMpesa = false,
   preferredPaymentMethod,
   gatewayAvailability,
   initialVerified = null,
 }: CheckoutSuccessProps) {
-  const [phone, setPhone] = useState(customerPhone);
-  const [stkSending, setStkSending] = useState(false);
+  const initialPhone = (mpesaPhone || customerPhone || "").trim();
+  const darajaEnabled = gatewayAvailability?.darajaEnabled ?? false;
+
+  const [phone, setPhone] = useState(initialPhone);
+  const [stkSending, setStkSending] = useState(
+    Boolean(autoStartMpesa && darajaEnabled && orderId && !initialVerified)
+  );
   const [stkPolling, setStkPolling] = useState(false);
   const [stkError, setStkError] = useState<string | null>(null);
   const [stkInfo, setStkInfo] = useState<string | null>(null);
-
-  const [paystackLoading, setPaystackLoading] = useState(false);
-  const [paystackError, setPaystackError] = useState<string | null>(null);
 
   const [verifiedReceipt, setVerifiedReceipt] = useState<{
     transactionRef: string | null;
@@ -65,16 +69,58 @@ export function CheckoutSuccess({
     channelLabel?: string;
   } | null>(initialVerified);
 
+  const hasAutoTriggeredRef = useRef(false);
+
   const whatsappUrl =
     getWhatsAppUrl(whatsappMessage) ??
     `https://wa.me/254757122299?text=${encodeURIComponent(whatsappMessage)}`;
 
-  const isCashOnFulfillment =
-    preferredPaymentMethod === "CASH_ON_PICKUP" ||
-    preferredPaymentMethod === "CASH_ON_DELIVERY";
+  const isMpesaOrder = preferredPaymentMethod === "MPESA_BUY_GOODS";
+  const isCashOnPickup = preferredPaymentMethod === "CASH_ON_PICKUP";
 
-  const darajaEnabled = gatewayAvailability?.darajaEnabled ?? false;
-  const paystackEnabled = gatewayAvailability?.paystackEnabled ?? false;
+  useEffect(() => {
+    if (
+      !autoStartMpesa ||
+      !darajaEnabled ||
+      !orderId ||
+      verifiedReceipt ||
+      !initialPhone ||
+      hasAutoTriggeredRef.current
+    ) {
+      return;
+    }
+
+    hasAutoTriggeredRef.current = true;
+    let cancelled = false;
+
+    initiateMpesaStk({
+      orderId,
+      orderNumber,
+      phone: initialPhone,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setStkInfo(res.customerMessage);
+        setStkPolling(true);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setStkError(
+          error instanceof Error
+            ? error.message
+            : "Could not send M-Pesa PIN prompt to your phone."
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setStkSending(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [autoStartMpesa, darajaEnabled, orderId, orderNumber, initialPhone, verifiedReceipt]);
 
   useEffect(() => {
     if (!stkPolling || !orderId || verifiedReceipt) {
@@ -112,11 +158,11 @@ export function CheckoutSuccess({
         if (attempts >= 30) {
           setStkPolling(false);
           setStkInfo(
-            "Still awaiting confirmation. Click 'Check Payment Status' if you entered your PIN."
+            "Still waiting for confirmation. Tap 'Check Payment Status' if you already entered your M-Pesa PIN."
           );
         }
       } catch {
-        // Keep polling transiently unless timed out
+        // Keep polling on transient failures until timeout
       }
     }, 3000);
 
@@ -179,44 +225,36 @@ export function CheckoutSuccess({
     }
   }
 
-  async function handlePaystackPay() {
-    if (!orderId) return;
-    setPaystackError(null);
-    setPaystackLoading(true);
-
-    try {
-      const res = await initializePaystackCheckout({
-        orderId,
-        orderNumber,
-        email: customerEmail || undefined,
-      });
-      window.location.href = res.authorizationUrl;
-    } catch (error) {
-      setPaystackError(
-        error instanceof Error
-          ? error.message
-          : "Could not start Paystack checkout."
-      );
-      setPaystackLoading(false);
-    }
-  }
-
   return (
     <div className="rounded-xl border bg-card p-6 sm:p-8">
       <div className="mx-auto max-w-lg space-y-6">
         <div className="space-y-2 text-center">
           <p className="text-sm font-medium text-green-600">
-            {verifiedReceipt ? "Order paid & verified" : "Order submitted"}
+            {verifiedReceipt
+              ? "Order paid & verified"
+              : stkPolling || stkSending
+                ? "Complete M-Pesa payment"
+                : "Order submitted"}
           </p>
 
           <h2 className="text-3xl font-semibold tracking-tight">
-            {verifiedReceipt ? "Payment received" : "Thank you for your order"}
+            {verifiedReceipt
+              ? "Payment received"
+              : stkSending
+                ? "Opening M-Pesa..."
+                : stkPolling
+                  ? "Check your phone"
+                  : "Thank you for your order"}
           </h2>
 
           <p className="text-sm text-muted-foreground">
             {verifiedReceipt
-              ? "Your payment has been verified automatically and your order is now queued for processing."
-              : "Complete payment below or confirm delivery details on WhatsApp."}
+              ? "Your payment has been verified automatically and your order is queued for processing."
+              : stkPolling
+                ? "Enter your M-Pesa PIN on the Safaricom popup on your phone to complete payment."
+                : isCashOnPickup
+                  ? "Your order is saved. Pay in cash when collecting your order."
+                  : "Complete M-Pesa payment below or confirm delivery details on WhatsApp."}
           </p>
         </div>
 
@@ -236,7 +274,7 @@ export function CheckoutSuccess({
             <div className="flex items-center gap-2 font-medium text-green-700 dark:text-green-400">
               <CheckCircle2 className="h-4 w-4" />
               <span>
-                Verified {verifiedReceipt.channelLabel ?? "Online"} Payment
+                Verified {verifiedReceipt.channelLabel ?? "M-Pesa"} Payment
               </span>
             </div>
             <p className="text-muted-foreground">
@@ -247,141 +285,139 @@ export function CheckoutSuccess({
             </p>
             {verifiedReceipt.transactionRef ? (
               <p className="text-muted-foreground">
-                Receipt reference:{" "}
+                M-Pesa receipt:{" "}
                 <strong className="text-foreground">
                   {verifiedReceipt.transactionRef}
                 </strong>
               </p>
             ) : null}
           </div>
-        ) : orderId ? (
-          <div className="space-y-4">
-            <div className="space-y-3 rounded-lg border p-4">
+        ) : orderId && isMpesaOrder ? (
+          darajaEnabled ? (
+            <div className="space-y-4 rounded-xl border border-primary/30 bg-primary/5 p-5">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 font-medium">
+                <div className="flex items-center gap-2 font-medium text-foreground">
                   <Smartphone className="h-4 w-4 text-primary" />
-                  <span>Pay with M-Pesa STK Push</span>
+                  <span>M-Pesa Payment</span>
                 </div>
-                {gatewayAvailability?.darajaEnabled ? (
-                  <span className="text-xs font-medium text-green-600">
-                    {gatewayAvailability.darajaEnv === "sandbox"
-                      ? "Sandbox ready"
-                      : "Live"}
+                <span className="text-xs font-medium text-green-600">
+                  {gatewayAvailability?.darajaEnv === "sandbox"
+                    ? "Sandbox"
+                    : "Safaricom M-Pesa"}
+                </span>
+              </div>
+
+              {stkSending ? (
+                <div className="flex items-center gap-3 rounded-lg bg-background p-3.5 text-sm">
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
+                  <span>
+                    Sending M-Pesa PIN prompt to <strong>{phone}</strong>...
                   </span>
-                ) : null}
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="0712 345 678"
-                  className="flex-1 rounded-md border px-3 py-2 text-sm"
-                  disabled={!darajaEnabled || stkSending || stkPolling}
-                />
-                <Button
-                  type="button"
-                  onClick={handleSendStkPush}
-                  disabled={!darajaEnabled || stkSending || stkPolling || !phone.trim()}
-                >
-                  {stkSending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending...
-                    </>
-                  ) : stkPolling ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Waiting for PIN...
-                    </>
-                  ) : (
-                    `Pay ${formatKes(amount)}`
-                  )}
-                </Button>
-              </div>
-
-              {!darajaEnabled ? (
-                <p className="text-xs text-muted-foreground">
-                  Instant M-Pesa prompt activates once Safaricom Daraja API
-                  credentials are configured.
-                </p>
+                </div>
               ) : null}
 
-              {stkInfo ? (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/60 p-2.5 text-xs">
-                  <span>{stkInfo}</span>
-                  <button
+              {stkPolling ? (
+                <div className="space-y-3 rounded-lg bg-background p-4 text-sm">
+                  <div className="flex items-start gap-3">
+                    <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary" />
+                    <div className="space-y-1">
+                      <p className="font-medium text-foreground">
+                        M-Pesa prompt sent to {phone}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {stkInfo ||
+                          `Enter your M-Pesa PIN to authorize ${formatKes(amount)}. This page updates automatically once Safaricom confirms.`}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
                     onClick={handleManualStatusCheck}
-                    className="font-medium underline"
                   >
-                    Check status
-                  </button>
+                    Check Payment Status
+                  </Button>
+                </div>
+              ) : null}
+
+              {!stkSending && !stkPolling ? (
+                <div className="space-y-3">
+                  {stkInfo ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-background p-2.5 text-xs">
+                      <span>{stkInfo}</span>
+                      <button
+                        type="button"
+                        onClick={handleManualStatusCheck}
+                        className="font-medium text-primary underline"
+                      >
+                        Check status
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="0712 345 678"
+                      className="flex-1 rounded-md border bg-background px-3 py-2 text-sm"
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleSendStkPush}
+                      disabled={!phone.trim()}
+                    >
+                      {stkError || autoStartMpesa
+                        ? `Resend M-Pesa Prompt (${formatKes(amount)})`
+                        : `Pay ${formatKes(amount)} via M-Pesa`}
+                    </Button>
+                  </div>
                 </div>
               ) : null}
 
               {stkError ? (
-                <p className="text-xs text-destructive">{stkError}</p>
-              ) : null}
-            </div>
-
-            <div className="space-y-3 rounded-lg border p-4">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 font-medium">
-                  <CreditCard className="h-4 w-4 text-primary" />
-                  <span>Pay with Paystack (M-Pesa or Card)</span>
-                </div>
-                {paystackEnabled ? (
-                  <span className="text-xs font-medium text-green-600">
-                    Ready
-                  </span>
-                ) : null}
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={handlePaystackPay}
-                disabled={!paystackEnabled || paystackLoading}
-              >
-                {paystackLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Opening Paystack checkout...
-                  </>
-                ) : (
-                  `Pay ${formatKes(amount)} via Paystack`
-                )}
-              </Button>
-
-              {!paystackEnabled ? (
-                <p className="text-xs text-muted-foreground">
-                  Paystack M-Pesa & card checkout activates once{" "}
-                  <code>PAYSTACK_SECRET_KEY</code> is configured.
+                <p className="text-xs font-medium text-destructive">
+                  {stkError}
                 </p>
               ) : null}
-
-              {paystackError ? (
-                <p className="text-xs text-destructive">{paystackError}</p>
-              ) : null}
             </div>
-
-            {isCashOnFulfillment ? (
-              <p className="text-center text-xs text-muted-foreground">
-                You selected Cash on{" "}
-                {preferredPaymentMethod === "CASH_ON_PICKUP"
-                  ? "Pickup"
-                  : "Delivery"}
-                . You can also pay upfront above or confirm via WhatsApp.
+          ) : (
+            <div className="space-y-2 rounded-xl border bg-muted/40 p-4 text-sm">
+              <div className="flex items-center gap-2 font-medium text-foreground">
+                <Smartphone className="h-4 w-4 text-primary" />
+                <span>M-Pesa Selected</span>
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Your order is reserved for M-Pesa payment of{" "}
+                <strong>{formatKes(amount)}</strong>. Tap{" "}
+                <strong>Continue on WhatsApp</strong> below to receive our M-Pesa
+                payment prompt or Till details and confirm your order.
               </p>
-            ) : null}
+            </div>
+          )
+        ) : isCashOnPickup ? (
+          <div className="space-y-2 rounded-xl border bg-muted/40 p-4 text-sm">
+            <div className="flex items-center gap-2 font-medium text-foreground">
+              <Banknote className="h-4 w-4 text-primary" />
+              <span>Cash on Pickup</span>
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              No online payment is required now. Please have{" "}
+              <strong>{formatKes(amount)}</strong> ready in cash when picking up
+              your order, or message us on WhatsApp to coordinate pickup timing.
+            </p>
           </div>
         ) : null}
 
         <div className="space-y-2.5 pt-2">
-          <Button asChild className="w-full" variant={verifiedReceipt ? "default" : "secondary"}>
+          <Button
+            asChild
+            className="w-full"
+            variant={verifiedReceipt || !darajaEnabled ? "default" : "secondary"}
+          >
             <a href={whatsappUrl} rel="noopener noreferrer" target="_blank">
               <MessageCircle className="mr-2 h-4 w-4" />
               Continue on WhatsApp

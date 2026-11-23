@@ -37,6 +37,7 @@ export function CheckoutForm({
   const clearCart = useCartStore((state) => state.clearCart);
 
   const [generalError, setGeneralError] = useState<string | null>(null);
+  const [submittedMpesaPhone, setSubmittedMpesaPhone] = useState<string>("");
   const [verifyingPaystack, setVerifyingPaystack] = useState(
     Boolean(initialPaystackReturn)
   );
@@ -102,13 +103,23 @@ export function CheckoutForm({
       },
 
       preferredPaymentMethod: undefined,
+      mpesaPhone: "",
       customerNotes: "",
     },
   });
 
+  const selectedPaymentMethod = watch("preferredPaymentMethod");
+
   async function onSubmit(values: CheckoutFormValues) {
     clearErrors();
     setGeneralError(null);
+
+    const chosenMpesaPhone = (
+      values.mpesaPhone ||
+      values.customer.phone ||
+      ""
+    ).trim();
+    setSubmittedMpesaPhone(chosenMpesaPhone);
 
     try {
       const response = await submit(values, cartItems);
@@ -168,6 +179,10 @@ export function CheckoutForm({
   }
 
   if (isSuccess && result) {
+    const shouldAutoStartMpesa =
+      result.preferredPaymentMethod === "MPESA_BUY_GOODS" &&
+      Boolean(gatewayAvailability?.darajaEnabled);
+
     return (
       <CheckoutSuccess
         orderId={result.id}
@@ -175,6 +190,8 @@ export function CheckoutForm({
         whatsappMessage={result.whatsappMessage}
         amount={result.totalAmount ?? result.subtotalAmount}
         customerPhone={result.customerPhone}
+        mpesaPhone={submittedMpesaPhone || result.customerPhone}
+        autoStartMpesa={shouldAutoStartMpesa}
         customerEmail={result.customerEmail}
         preferredPaymentMethod={result.preferredPaymentMethod}
         gatewayAvailability={gatewayAvailability}
@@ -200,6 +217,9 @@ export function CheckoutForm({
 
         <CheckoutPaymentSection
           register={register}
+          watch={watch}
+          setValue={setValue}
+          clearErrors={clearErrors}
           errors={errors}
           gatewayAvailability={gatewayAvailability}
         />
@@ -227,7 +247,14 @@ export function CheckoutForm({
           disabled={isSubmitting || cartItems.length === 0}
           className="w-full rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isSubmitting ? "Submitting order..." : "Place order"}
+          {isSubmitting
+            ? selectedPaymentMethod === "MPESA_BUY_GOODS" &&
+              gatewayAvailability?.darajaEnabled
+              ? "Placing order & opening M-Pesa..."
+              : "Submitting order..."
+            : selectedPaymentMethod === "MPESA_BUY_GOODS"
+              ? "Place Order & Pay with M-Pesa"
+              : "Place order"}
         </button>
       </div>
 
