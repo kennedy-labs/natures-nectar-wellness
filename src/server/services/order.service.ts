@@ -8,6 +8,7 @@ import {
 import { submitOrderSchema } from "@/features/orders/validations/order.validation";
 import { db } from "@/server/db/prisma";
 import { ApiError } from "@/server/http/api-error";
+import { getPaymentGatewayAvailability } from "@/server/services/payment-gateway.service";
 import type { OrderStatus as PrismaOrderStatus } from "@prisma/client";
 
 /**
@@ -15,6 +16,45 @@ import type { OrderStatus as PrismaOrderStatus } from "@prisma/client";
  */
 export async function getOrdersForAdmin() {
   return db.order.findMany({
+    where: {
+      NOT: {
+        AND: [
+          { preferredPaymentMethod: "MPESA_BUY_GOODS" },
+          {
+            payments: {
+              none: {
+                status: "VERIFIED",
+              },
+            },
+          },
+          {
+            OR: [
+              { status: "AWAITING_PAYMENT" },
+              {
+                AND: [
+                  { status: "CANCELLED" },
+                  {
+                    OrderStatusHistory: {
+                      none: {
+                        status: {
+                          in: [
+                            "PENDING",
+                            "PAID",
+                            "PROCESSING",
+                            "OUT_FOR_DELIVERY",
+                            "DELIVERED",
+                          ],
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    },
     include: {
       customer: true,
       items: true,
@@ -26,11 +66,49 @@ export async function getOrdersForAdmin() {
   });
 }
 
+async function releaseExpiredMpesaHolds(minutes = 30) {
+  const cutoff = new Date(Date.now() - minutes * 60 * 1000);
+  const expiredHolds = await db.order.findMany({
+    where: {
+      preferredPaymentMethod: "MPESA_BUY_GOODS",
+      status: "AWAITING_PAYMENT",
+      createdAt: { lt: cutoff },
+      payments: {
+        none: { status: "VERIFIED" },
+      },
+    },
+    select: { id: true },
+    take: 20,
+  });
+
+  for (const hold of expiredHolds) {
+    try {
+      await cancelOrder(hold.id);
+    } catch {
+      // Concurrent release or verification already transitioned this order
+    }
+  }
+}
+
 /**
  * CHECKOUT
  */
 export async function submitOrder(input: unknown) {
   const data = submitOrderSchema.parse(input);
+  const isMpesaCheckout = data.preferredPaymentMethod === "MPESA_BUY_GOODS";
+
+  if (isMpesaCheckout) {
+    const gateway = getPaymentGatewayAvailability();
+    if (!gateway.darajaEnabled) {
+      throw new ApiError(
+        400,
+        "MPESA_NOT_CONFIGURED",
+        "Instant M-Pesa payment is not activated yet. Please select Cash on Pickup or configure Safaricom Daraja credentials."
+      );
+    }
+  }
+
+  await releaseExpiredMpesaHolds(30);
 
   const productIds = [...new Set(data.items.map((i) => i.productId))];
   const products = await findActiveProductsByIds(productIds);
@@ -98,6 +176,7 @@ export async function submitOrder(input: unknown) {
     delivery: data.delivery,
     subtotalAmount,
     preferredPaymentMethod: data.preferredPaymentMethod,
+    initialStatus: isMpesaCheckout ? "AWAITING_PAYMENT" : "PENDING",
     customerNotes: data.customerNotes,
     whatsappMessage,
     items: orderItems,
@@ -293,6 +372,41 @@ export async function cancelOrder(orderId: string) {
 
     return updated;
   });
+}
+
+const releaseMpesaHoldSchema = z.object({
+  orderId: z.string().min(1),
+  orderNumber: z.string().min(1),
+});
+
+export async function releaseUnpaidMpesaHold(rawInput: unknown) {
+  const input = releaseMpesaHoldSchema.parse(rawInput);
+
+  const order = await db.order.findFirst({
+    where: {
+      id: input.orderId,
+      orderNumber: input.orderNumber,
+    },
+    include: {
+      payments: true,
+    },
+  });
+
+  if (!order) {
+    return { released: false };
+  }
+
+  const hasVerifiedPayment = order.payments.some((p) => p.status === "VERIFIED");
+  if (
+    hasVerifiedPayment ||
+    order.preferredPaymentMethod !== "MPESA_BUY_GOODS" ||
+    order.status !== "AWAITING_PAYMENT"
+  ) {
+    return { released: false };
+  }
+
+  await cancelOrder(order.id);
+  return { released: true };
 }
 
 export async function expireStaleUnpaidOrders(hours = 24) {

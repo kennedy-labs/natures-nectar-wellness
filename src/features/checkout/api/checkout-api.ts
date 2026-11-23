@@ -90,3 +90,18 @@ export async function verifyPaystackCheckout(payload: {
 
   return readApiData<PaystackVerifyResponse>(response);
 }
+
+export async function releaseUnpaidCheckoutOrder(payload: {
+  orderId: string;
+  orderNumber: string;
+}) {
+  const response = await fetch("/api/orders/release-unpaid", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return readApiData<{ released: boolean }>(response);
+}

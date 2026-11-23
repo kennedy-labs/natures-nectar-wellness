@@ -12,6 +12,7 @@ import { CheckoutCustomerSection } from "@/features/checkout/components/Checkout
 import { CheckoutDeliverySection } from "@/features/checkout/components/CheckoutDeliverySection";
 import { CheckoutPaymentSection } from "@/features/checkout/components/CheckoutPaymentSection";
 import { CheckoutSuccess } from "@/features/checkout/components/CheckoutSuccess";
+import { MpesaPaymentGate } from "@/features/checkout/components/MpesaPaymentGate";
 
 import { useCheckout } from "@/features/checkout/hooks/useCheckout";
 
@@ -38,13 +39,18 @@ export function CheckoutForm({
 
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [submittedMpesaPhone, setSubmittedMpesaPhone] = useState<string>("");
+  const [verifiedMpesaReceipt, setVerifiedMpesaReceipt] = useState<{
+    transactionRef: string | null;
+    amount: number;
+    channelLabel?: string;
+  } | null>(null);
   const [verifyingPaystack, setVerifyingPaystack] = useState(
     Boolean(initialPaystackReturn)
   );
   const [paystackVerified, setPaystackVerified] =
     useState<PaystackVerifyResponse | null>(null);
 
-  const { submit, result, isSubmitting, isSuccess } = useCheckout();
+  const { submit, reset, result, isSubmitting, isSuccess } = useCheckout();
 
   useEffect(() => {
     if (!initialPaystackReturn) {
@@ -109,10 +115,24 @@ export function CheckoutForm({
   });
 
   const selectedPaymentMethod = watch("preferredPaymentMethod");
+  const mpesaBlockedWithoutDaraja =
+    selectedPaymentMethod === "MPESA_BUY_GOODS" &&
+    !gatewayAvailability?.darajaEnabled;
 
   async function onSubmit(values: CheckoutFormValues) {
     clearErrors();
     setGeneralError(null);
+    setVerifiedMpesaReceipt(null);
+
+    if (
+      values.preferredPaymentMethod === "MPESA_BUY_GOODS" &&
+      !gatewayAvailability?.darajaEnabled
+    ) {
+      setGeneralError(
+        "Online M-Pesa payment is not activated yet on this store. Please choose Cash on Pickup to place your order now."
+      );
+      return;
+    }
 
     const chosenMpesaPhone = (
       values.mpesaPhone ||
@@ -124,7 +144,10 @@ export function CheckoutForm({
     try {
       const response = await submit(values, cartItems);
 
-      clearCart();
+      // Only clear cart immediately for Cash on Pickup; M-Pesa clears cart after Safaricom verifies payment.
+      if (response.preferredPaymentMethod !== "MPESA_BUY_GOODS") {
+        clearCart();
+      }
 
       return response;
     } catch (error) {
@@ -179,9 +202,32 @@ export function CheckoutForm({
   }
 
   if (isSuccess && result) {
-    const shouldAutoStartMpesa =
+    if (
       result.preferredPaymentMethod === "MPESA_BUY_GOODS" &&
-      Boolean(gatewayAvailability?.darajaEnabled);
+      !verifiedMpesaReceipt
+    ) {
+      return (
+        <MpesaPaymentGate
+          orderId={result.id}
+          orderNumber={result.orderNumber}
+          amount={result.totalAmount ?? result.subtotalAmount}
+          initialPhone={submittedMpesaPhone || result.customerPhone}
+          darajaEnv={gatewayAvailability?.darajaEnv}
+          onVerified={(receipt) => {
+            clearCart();
+            setVerifiedMpesaReceipt({
+              transactionRef: receipt.transactionRef,
+              amount: receipt.amount,
+              channelLabel: "M-Pesa",
+            });
+          }}
+          onCancelBack={() => {
+            setVerifiedMpesaReceipt(null);
+            reset();
+          }}
+        />
+      );
+    }
 
     return (
       <CheckoutSuccess
@@ -190,11 +236,9 @@ export function CheckoutForm({
         whatsappMessage={result.whatsappMessage}
         amount={result.totalAmount ?? result.subtotalAmount}
         customerPhone={result.customerPhone}
-        mpesaPhone={submittedMpesaPhone || result.customerPhone}
-        autoStartMpesa={shouldAutoStartMpesa}
         customerEmail={result.customerEmail}
         preferredPaymentMethod={result.preferredPaymentMethod}
-        gatewayAvailability={gatewayAvailability}
+        initialVerified={verifiedMpesaReceipt}
       />
     );
   }
@@ -244,17 +288,20 @@ export function CheckoutForm({
 
         <button
           type="submit"
-          disabled={isSubmitting || cartItems.length === 0}
+          disabled={
+            isSubmitting || cartItems.length === 0 || mpesaBlockedWithoutDaraja
+          }
           className="w-full rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isSubmitting
-            ? selectedPaymentMethod === "MPESA_BUY_GOODS" &&
-              gatewayAvailability?.darajaEnabled
-              ? "Placing order & opening M-Pesa..."
-              : "Submitting order..."
-            : selectedPaymentMethod === "MPESA_BUY_GOODS"
-              ? "Place Order & Pay with M-Pesa"
-              : "Place order"}
+          {mpesaBlockedWithoutDaraja
+            ? "Select Cash on Pickup (M-Pesa awaiting activation)"
+            : isSubmitting
+              ? selectedPaymentMethod === "MPESA_BUY_GOODS"
+                ? "Opening M-Pesa payment..."
+                : "Submitting order..."
+              : selectedPaymentMethod === "MPESA_BUY_GOODS"
+                ? "Pay with M-Pesa & Place Order"
+                : "Place order"}
         </button>
       </div>
 

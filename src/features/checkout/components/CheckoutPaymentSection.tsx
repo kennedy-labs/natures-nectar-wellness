@@ -177,6 +177,7 @@ export function CheckoutPaymentSection({
               id="checkout-mpesa-phone"
               type="tel"
               placeholder="0712 345 678"
+              disabled={!darajaEnabled}
               {...register("mpesaPhone", {
                 onChange: () => setMpesaPhoneEdited(true),
                 validate: (val) => {
@@ -201,18 +202,26 @@ export function CheckoutPaymentSection({
               </p>
             ) : null}
 
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              {darajaEnabled
-                ? "When you click Place Order & Pay with M-Pesa below, the Safaricom M-Pesa PIN prompt will pop up directly on this phone."
-                : "Your order will be saved with M-Pesa selected and you can complete payment on the next step."}
-            </p>
+            {darajaEnabled ? (
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Your order will only complete once you enter your M-Pesa PIN on
+                this phone and Safaricom confirms payment. Your cart remains
+                saved until paid.
+              </p>
+            ) : (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-950">
+                Online M-Pesa PIN payment is not activated yet on this store.
+                Please select <strong>Cash on Pickup</strong> to submit your
+                order now.
+              </div>
+            )}
           </div>
         ) : null}
 
         {selectedMethod === "CASH_ON_PICKUP" ? (
           <div className="rounded-xl border bg-muted/40 p-3.5 text-xs leading-relaxed text-muted-foreground">
-            No upfront online payment needed — pay in cash when collecting your
-            order.
+            No upfront online payment needed — your order submits immediately
+            and you pay in cash when collecting it.
           </div>
         ) : null}
       </CardContent>
