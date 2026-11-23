@@ -10,11 +10,16 @@ import {
   findAllProductsForAdmin,
   findActiveProductsByCategorySlug,
   findActiveProductBySlug,
+  findFeaturedProducts,
   updateProduct as updateProductRecord,
 } from "@/server/repositories/product.repository";
 
 export async function getAllProducts() {
   return findAllProducts();
+}
+
+export async function getFeaturedProducts() {
+  return findFeaturedProducts();
 }
 
 export async function getAllProductsForAdmin() {

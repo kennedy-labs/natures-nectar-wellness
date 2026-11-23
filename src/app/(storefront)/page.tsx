@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -7,6 +8,10 @@ import {
   SITE_DESCRIPTION,
   SITE_TITLE,
 } from "@/config/site";
+import { ProductGrid } from "@/features/products/components/ProductGrid";
+import { getFeaturedProducts } from "@/server/services/product.service";
+
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: {
@@ -31,7 +36,9 @@ export const metadata: Metadata = {
   },
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const featuredProducts = await getFeaturedProducts();
+
   return (
     <section className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-12 md:py-16">
       <div className="max-w-2xl space-y-5">
@@ -77,6 +84,30 @@ export default function HomePage() {
           </p>
         </div>
       </div>
+
+      {featuredProducts.length > 0 ? (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-semibold tracking-tight">
+                Featured Products
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Handpicked herbal essentials highlighted from our store.
+              </p>
+            </div>
+            <Link
+              href="/products"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            >
+              View all products
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          <ProductGrid products={featuredProducts} />
+        </div>
+      ) : null}
     </section>
   );
 }

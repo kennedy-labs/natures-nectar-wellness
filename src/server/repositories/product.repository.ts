@@ -14,6 +14,22 @@ export async function findAllProducts() {
   });
 }
 
+export async function findFeaturedProducts() {
+  return db.product.findMany({
+    include: {
+      category: true,
+    },
+    where: {
+      isActive: true,
+      isFeatured: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 6,
+  });
+}
+
 export async function findAllProductsForAdmin() {
   return db.product.findMany({
     include: {
