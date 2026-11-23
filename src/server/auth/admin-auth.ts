@@ -14,6 +14,29 @@ async function getAdminSession(requestHeaders: Headers) {
     return null;
   }
 
+  const sessionUser = session.user as {
+    id: string;
+    email: string;
+    name: string;
+    role?: string;
+  };
+
+  if (sessionUser.role) {
+    if (sessionUser.role !== "ADMIN") {
+      return null;
+    }
+
+    return {
+      session,
+      user: {
+        id: sessionUser.id,
+        email: sessionUser.email,
+        name: sessionUser.name,
+        role: sessionUser.role,
+      },
+    };
+  }
+
   const user = await db.user.findUnique({
     where: {
       id: session.user.id,

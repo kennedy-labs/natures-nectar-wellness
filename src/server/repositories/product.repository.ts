@@ -93,6 +93,9 @@ type CreateProductData = {
 
 export async function createProduct(data: CreateProductData) {
   return db.product.create({
+    include: {
+      category: true,
+    },
     data,
   });
 }

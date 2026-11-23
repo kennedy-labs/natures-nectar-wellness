@@ -18,7 +18,6 @@ import { AdminImageDropzone } from "@/features/admin/components/AdminImageDropzo
 import {
   createCategoryFromClient,
   deleteCategoryFromClient,
-  getCategoriesForClient,
   updateCategoryFromClient,
 } from "@/features/categories/services/category-client.service";
 import type { Category } from "@/features/categories/types/category.types";
@@ -26,7 +25,6 @@ import { getInventoryStatus } from "@/features/inventory/utils/inventory.utils";
 import {
   createProductFromClient,
   deleteProductFromClient,
-  getAdminProductsForClient,
   updateProductFromClient,
 } from "@/features/products/services/product-client.service";
 import type { Product } from "@/features/products/types/product.types";
@@ -309,15 +307,6 @@ export function AdminCatalogManager({
     });
   }, [products, productFilter, searchQuery, categoryById]);
 
-  async function refreshCatalog() {
-    const [nextCategories, nextProducts] = await Promise.all([
-      getCategoriesForClient(),
-      getAdminProductsForClient(),
-    ]);
-    setCategories(nextCategories);
-    setProducts(nextProducts);
-  }
-
   function clearProductFieldError(field: string) {
     setProductFieldErrors((prev) => {
       if (!prev[field]) return prev;
@@ -406,20 +395,25 @@ export function AdminCatalogManager({
     };
 
     try {
-      if (editingProductId) {
-        await updateProductFromClient(editingProductId, {
-          ...basePayload,
-          image: trimmedImage ? trimmedImage : null,
-        });
-      } else {
-        await createProductFromClient({
-          ...basePayload,
-          image: trimmedImage ? trimmedImage : undefined,
-        });
-      }
-
-      await refreshCatalog();
       const wasEdit = Boolean(editingProductId);
+      const savedProduct = editingProductId
+        ? await updateProductFromClient(editingProductId, {
+            ...basePayload,
+            image: trimmedImage ? trimmedImage : null,
+          })
+        : await createProductFromClient({
+            ...basePayload,
+            image: trimmedImage ? trimmedImage : undefined,
+          });
+
+      setProducts((prev) =>
+        wasEdit
+          ? prev.map((item) =>
+              item.id === savedProduct.id ? savedProduct : item
+            )
+          : [savedProduct, ...prev]
+      );
+
       closeProductEditor();
       setFeedback({
         type: "success",
@@ -449,8 +443,10 @@ export function AdminCatalogManager({
     setFeedback(null);
 
     try {
-      await deleteProductFromClient(product.id);
-      await refreshCatalog();
+      const updated = await deleteProductFromClient(product.id);
+      setProducts((prev) =>
+        prev.map((item) => (item.id === updated.id ? updated : item))
+      );
       setFeedback({
         type: "success",
         text: `${product.name} marked inactive.`,
@@ -520,22 +516,28 @@ export function AdminCatalogManager({
     const trimmedImage = categoryForm.image.trim();
 
     try {
-      if (editingCategoryId) {
-        await updateCategoryFromClient(editingCategoryId, {
-          name: categoryForm.name.trim(),
-          description: normalizeOptional(categoryForm.description),
-          image: trimmedImage ? trimmedImage : null,
-        });
-      } else {
-        await createCategoryFromClient({
-          name: categoryForm.name.trim(),
-          description: normalizeOptional(categoryForm.description),
-          image: trimmedImage ? trimmedImage : undefined,
-        });
-      }
-
-      await refreshCatalog();
       const wasEdit = Boolean(editingCategoryId);
+      const savedCategory = editingCategoryId
+        ? await updateCategoryFromClient(editingCategoryId, {
+            name: categoryForm.name.trim(),
+            description: normalizeOptional(categoryForm.description),
+            image: trimmedImage ? trimmedImage : null,
+          })
+        : await createCategoryFromClient({
+            name: categoryForm.name.trim(),
+            description: normalizeOptional(categoryForm.description),
+            image: trimmedImage ? trimmedImage : undefined,
+          });
+
+      setCategories((prev) => {
+        const next = wasEdit
+          ? prev.map((item) =>
+              item.id === savedCategory.id ? savedCategory : item
+            )
+          : [...prev, savedCategory];
+        return [...next].sort((a, b) => a.name.localeCompare(b.name));
+      });
+
       closeCategoryEditor();
       setFeedback({
         type: "success",
@@ -560,7 +562,7 @@ export function AdminCatalogManager({
 
     try {
       await deleteCategoryFromClient(category.id);
-      await refreshCatalog();
+      setCategories((prev) => prev.filter((item) => item.id !== category.id));
       setFeedback({
         type: "success",
         text: `${category.name} deleted.`,

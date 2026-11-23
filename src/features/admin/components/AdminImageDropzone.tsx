@@ -95,11 +95,11 @@ export function AdminImageDropzone({
         return;
       }
 
-      // Preserve vector SVGs and animated GIFs under 1.2 MB directly without rasterizing
+      // Preserve compact vector SVGs and animated GIFs directly without rasterizing
       if (
         (mime === "image/svg+xml" || mime === "image/gif") &&
         result.startsWith("data:image/") &&
-        result.length <= 1_600_000
+        result.length <= 500_000
       ) {
         onChange(result);
         setProcessingState(false);
@@ -115,8 +115,9 @@ export function AdminImageDropzone({
       };
 
       img.onload = () => {
-        const maxWidth = 960;
-        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+        const maxSide = 720;
+        const largestDim = Math.max(img.width, img.height);
+        const scale = largestDim > maxSide ? maxSide / largestDim : 1;
         const width = Math.max(1, Math.round(img.width * scale));
         const height = Math.max(1, Math.round(img.height * scale));
 
@@ -131,6 +132,8 @@ export function AdminImageDropzone({
           return;
         }
 
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
         ctx.drawImage(img, 0, 0, width, height);
 
         const preserveTransparency =
@@ -141,12 +144,37 @@ export function AdminImageDropzone({
 
         let encoded = canvas.toDataURL(
           preserveTransparency ? "image/webp" : "image/jpeg",
-          0.84
+          0.78
         );
 
-        // Fallback if a browser encodes image/webp as PNG larger than ideal
-        if (encoded.length > 750_000) {
-          encoded = canvas.toDataURL("image/jpeg", 0.78);
+        // Keep payloads lean (~<= 120 KB) so saving to PostgreSQL stays fast
+        if (encoded.length > 160_000) {
+          encoded = canvas.toDataURL("image/jpeg", 0.68);
+        }
+
+        if (encoded.length > 220_000) {
+          const compactScale = 540 / Math.max(width, height);
+          if (compactScale < 1) {
+            const compactCanvas = document.createElement("canvas");
+            compactCanvas.width = Math.max(1, Math.round(width * compactScale));
+            compactCanvas.height = Math.max(
+              1,
+              Math.round(height * compactScale)
+            );
+            const compactCtx = compactCanvas.getContext("2d");
+            if (compactCtx) {
+              compactCtx.imageSmoothingEnabled = true;
+              compactCtx.imageSmoothingQuality = "high";
+              compactCtx.drawImage(
+                canvas,
+                0,
+                0,
+                compactCanvas.width,
+                compactCanvas.height
+              );
+              encoded = compactCanvas.toDataURL("image/jpeg", 0.68);
+            }
+          }
         }
 
         onChange(encoded);
