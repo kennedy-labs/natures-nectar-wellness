@@ -11,12 +11,14 @@ type AdminImageDropzoneProps = {
   label: string;
   value: string;
   onChange: (nextValue: string) => void;
+  onProcessingChange?: (isProcessing: boolean) => void;
+  error?: string;
   helperText?: string;
 };
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB raw upload guard
 const ACCEPTED_TYPES =
-  ".jpg,.jpeg,.png,.webp,.gif,.avif,.svg,.bmp,image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml,image/bmp";
+  ".jpg,.jpeg,.jfif,.png,.webp,.gif,.avif,.svg,.bmp,.ico,image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml,image/bmp,image/x-icon";
 
 function estimateDataUrlKb(dataUrl: string): number {
   const base64Index = dataUrl.indexOf(",");
@@ -30,6 +32,8 @@ export function AdminImageDropzone({
   label,
   value,
   onChange,
+  onProcessingChange,
+  error,
   helperText = "Supports JPG, PNG, WebP, GIF, AVIF, and SVG photos up to 10 MB.",
 }: AdminImageDropzoneProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -37,6 +41,11 @@ export function AdminImageDropzone({
   const [isProcessing, setIsProcessing] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  function setProcessingState(next: boolean) {
+    setIsProcessing(next);
+    onProcessingChange?.(next);
+  }
 
   function processFile(file: File) {
     setUploadError(null);
@@ -47,9 +56,21 @@ export function AdminImageDropzone({
     }
 
     const mime = file.type.toLowerCase();
+    const isHeic =
+      mime === "image/heic" ||
+      mime === "image/heif" ||
+      /\.(heic|heif)$/i.test(file.name);
+
+    if (isHeic) {
+      setUploadError(
+        "iPhone HEIC/HEIF photos cannot be decoded directly in most browsers. Please export or save it as JPG or PNG first."
+      );
+      return;
+    }
+
     const looksLikeImage =
       mime.startsWith("image/") ||
-      /\.(jpe?g|png|webp|gif|avif|svg|bmp)$/i.test(file.name);
+      /\.(jpe?g|jfif|png|webp|gif|avif|svg|bmp|ico)$/i.test(file.name);
 
     if (!looksLikeImage) {
       setUploadError(
@@ -58,18 +79,18 @@ export function AdminImageDropzone({
       return;
     }
 
-    setIsProcessing(true);
+    setProcessingState(true);
     const reader = new FileReader();
 
     reader.onerror = () => {
-      setIsProcessing(false);
+      setProcessingState(false);
       setUploadError("Could not read that image file. Please try another file.");
     };
 
     reader.onload = () => {
       const result = typeof reader.result === "string" ? reader.result : "";
       if (!result) {
-        setIsProcessing(false);
+        setProcessingState(false);
         setUploadError("Image file was empty.");
         return;
       }
@@ -77,18 +98,19 @@ export function AdminImageDropzone({
       // Preserve vector SVGs and animated GIFs under 1.2 MB directly without rasterizing
       if (
         (mime === "image/svg+xml" || mime === "image/gif") &&
+        result.startsWith("data:image/") &&
         result.length <= 1_600_000
       ) {
         onChange(result);
-        setIsProcessing(false);
+        setProcessingState(false);
         return;
       }
 
       const img = new window.Image();
       img.onerror = () => {
-        setIsProcessing(false);
+        setProcessingState(false);
         setUploadError(
-          "Your browser could not decode this image format. Try saving it as JPG, PNG, or WebP."
+          "Your browser could not decode this image file. Try saving or exporting it as JPG, PNG, or WebP."
         );
       };
 
@@ -104,7 +126,7 @@ export function AdminImageDropzone({
         const ctx = canvas.getContext("2d");
 
         if (!ctx) {
-          setIsProcessing(false);
+          setProcessingState(false);
           setUploadError("Image processing is unavailable in this browser.");
           return;
         }
@@ -128,7 +150,7 @@ export function AdminImageDropzone({
         }
 
         onChange(encoded);
-        setIsProcessing(false);
+        setProcessingState(false);
       };
 
       img.src = result;
@@ -156,6 +178,7 @@ export function AdminImageDropzone({
 
   const trimmedValue = value.trim();
   const isDataUri = trimmedValue.startsWith("data:image/");
+  const displayedError = uploadError ?? error;
 
   return (
     <div className="space-y-2.5">
@@ -183,7 +206,11 @@ export function AdminImageDropzone({
       />
 
       {trimmedValue ? (
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          className={`flex flex-col gap-3 rounded-lg border bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between ${
+            displayedError ? "border-destructive/60" : "border-border"
+          }`}
+        >
           <div className="flex min-w-0 items-center gap-3">
             <div className="h-16 w-20 shrink-0 overflow-hidden rounded-md border bg-white">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -251,9 +278,11 @@ export function AdminImageDropzone({
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
           className={`flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-5 text-center transition-colors ${
-            isDragging
-              ? "border-primary bg-primary/5"
-              : "border-border bg-muted/15 hover:border-primary/50 hover:bg-muted/30"
+            displayedError
+              ? "border-destructive/60 bg-destructive/5"
+              : isDragging
+                ? "border-primary bg-primary/5"
+                : "border-border bg-muted/15 hover:border-primary/50 hover:bg-muted/30"
           }`}
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -283,8 +312,8 @@ export function AdminImageDropzone({
         />
       ) : null}
 
-      {uploadError ? (
-        <p className="text-xs font-medium text-destructive">{uploadError}</p>
+      {displayedError ? (
+        <p className="text-xs font-medium text-destructive">{displayedError}</p>
       ) : null}
     </div>
   );

@@ -31,6 +31,7 @@ import {
 } from "@/features/products/services/product-client.service";
 import type { Product } from "@/features/products/types/product.types";
 import { formatKes } from "@/lib/format";
+import { ApiClientError } from "@/lib/api-client";
 
 type AdminCatalogManagerProps = {
   initialCategories: Category[];
@@ -108,6 +109,135 @@ function normalizeOptional(value: string) {
   return value.trim() ? value.trim() : undefined;
 }
 
+function isValidImageReference(value: string) {
+  return (
+    value.startsWith("/") ||
+    value.startsWith("https://") ||
+    value.startsWith("http://") ||
+    value.startsWith("data:image/")
+  );
+}
+
+type FieldErrors = Record<string, string>;
+
+function extractErrorFeedback(error: unknown, fallbackMessage: string): {
+  summary: string;
+  details: string[];
+  fieldErrors: FieldErrors;
+} {
+  if (error instanceof ApiClientError) {
+    const fieldErrors: FieldErrors = {};
+    const details: string[] = [];
+
+    if (error.issues && error.issues.length > 0) {
+      for (const issue of error.issues) {
+        const key = typeof issue.path[0] === "string" ? issue.path[0] : "form";
+        if (!fieldErrors[key]) {
+          fieldErrors[key] = issue.message;
+        }
+        if (!details.includes(issue.message)) {
+          details.push(issue.message);
+        }
+      }
+    }
+
+    return {
+      summary:
+        details.length > 0
+          ? "Please fix the highlighted fields below:"
+          : error.message,
+      details,
+      fieldErrors,
+    };
+  }
+
+  return {
+    summary: error instanceof Error ? error.message : fallbackMessage,
+    details: [],
+    fieldErrors: {},
+  };
+}
+
+function validateProductForm(form: ProductFormState): FieldErrors {
+  const errors: FieldErrors = {};
+  const name = form.name.trim();
+  const description = form.description.trim();
+  const benefits = form.benefits.trim();
+  const usageInstructions = form.usageInstructions.trim();
+  const ingredients = form.ingredients.trim();
+  const trimmedImage = form.image.trim();
+  const price = Number(form.price);
+  const stock = Number(form.stockQuantity);
+
+  if (name.length < 3) {
+    errors.name = "Product name must be at least 3 characters.";
+  }
+
+  if (!form.categoryId) {
+    errors.categoryId = "Please select a category.";
+  }
+
+  if (!form.price.trim() || !Number.isFinite(price) || price <= 0) {
+    errors.price = "Enter a valid price greater than KES 0.";
+  }
+
+  if (
+    form.stockQuantity.trim() === "" ||
+    !Number.isFinite(stock) ||
+    !Number.isInteger(stock) ||
+    stock < 0
+  ) {
+    errors.stockQuantity = "Stock quantity must be a whole number (0 or more).";
+  }
+
+  if (description.length < 5) {
+    errors.description = "Description must be at least 5 characters.";
+  }
+
+  if (benefits && benefits.length < 2) {
+    errors.benefits = "Wellness benefits must be at least 2 characters if filled in.";
+  }
+
+  if (usageInstructions && usageInstructions.length < 2) {
+    errors.usageInstructions =
+      "Usage instructions must be at least 2 characters if filled in.";
+  }
+
+  if (ingredients && ingredients.length < 2) {
+    errors.ingredients = "Ingredients must be at least 2 characters if filled in.";
+  }
+
+  if (trimmedImage && !isValidImageReference(trimmedImage)) {
+    errors.image =
+      "Photo must be an uploaded image, an https:// URL, or a /images/ path.";
+  }
+
+  return errors;
+}
+
+function validateCategoryForm(form: CategoryFormState): FieldErrors {
+  const errors: FieldErrors = {};
+  const name = form.name.trim();
+  const description = form.description.trim();
+  const trimmedImage = form.image.trim();
+
+  if (name.length < 2) {
+    errors.name = "Category name must be at least 2 characters.";
+  }
+
+  if (description && description.length < 3) {
+    errors.description =
+      "Category description must be at least 3 characters if filled in.";
+  }
+
+  if (trimmedImage && !isValidImageReference(trimmedImage)) {
+    errors.image =
+      "Photo must be an uploaded image, an https:// URL, or a /images/ path.";
+  }
+
+  return errors;
+}
+
 export function AdminCatalogManager({
   initialCategories,
   initialProducts,
@@ -123,6 +253,7 @@ export function AdminCatalogManager({
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [productForm, setProductForm] =
     useState<ProductFormState>(emptyProductForm);
+  const [productFieldErrors, setProductFieldErrors] = useState<FieldErrors>({});
 
   const [isCategoryEditorOpen, setIsCategoryEditorOpen] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
@@ -130,11 +261,16 @@ export function AdminCatalogManager({
   );
   const [categoryForm, setCategoryForm] =
     useState<CategoryFormState>(emptyCategoryForm);
+  const [categoryFieldErrors, setCategoryFieldErrors] = useState<FieldErrors>(
+    {}
+  );
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isImageProcessing, setIsImageProcessing] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
     text: string;
+    details?: string[];
   } | null>(null);
 
   const categoryById = useMemo(
@@ -182,8 +318,27 @@ export function AdminCatalogManager({
     setProducts(nextProducts);
   }
 
+  function clearProductFieldError(field: string) {
+    setProductFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function clearCategoryFieldError(field: string) {
+    setCategoryFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }
+
   function openNewProductEditor() {
     setFeedback(null);
+    setProductFieldErrors({});
     setEditingProductId(null);
     setProductForm({
       ...emptyProductForm,
@@ -195,6 +350,7 @@ export function AdminCatalogManager({
 
   function openEditProductEditor(product: Product) {
     setFeedback(null);
+    setProductFieldErrors({});
     setEditingProductId(product.id);
     setProductForm(toProductForm(product));
     setIsProductEditorOpen(true);
@@ -205,12 +361,35 @@ export function AdminCatalogManager({
     setIsProductEditorOpen(false);
     setEditingProductId(null);
     setProductForm(emptyProductForm);
+    setProductFieldErrors({});
   }
 
   async function handleSaveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSaving(true);
     setFeedback(null);
+
+    if (isImageProcessing) {
+      setFeedback({
+        type: "error",
+        text: "Please wait a moment while your photo finishes optimizing.",
+      });
+      return;
+    }
+
+    const clientErrors = validateProductForm(productForm);
+    if (Object.keys(clientErrors).length > 0) {
+      setProductFieldErrors(clientErrors);
+      setFeedback({
+        type: "error",
+        text: "Please fix the highlighted fields below:",
+        details: Object.values(clientErrors),
+      });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    setProductFieldErrors({});
+    setIsSaving(true);
 
     const trimmedImage = productForm.image.trim();
     const basePayload = {
@@ -249,13 +428,17 @@ export function AdminCatalogManager({
           : "New product added to catalog.",
       });
     } catch (error) {
+      const parsed = extractErrorFeedback(
+        error,
+        "Could not save product. Check required fields."
+      );
+      setProductFieldErrors(parsed.fieldErrors);
       setFeedback({
         type: "error",
-        text:
-          error instanceof Error
-            ? error.message
-            : "Could not save product. Check required fields.",
+        text: parsed.summary,
+        details: parsed.details,
       });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setIsSaving(false);
     }
@@ -287,6 +470,7 @@ export function AdminCatalogManager({
 
   function openNewCategoryEditor() {
     setFeedback(null);
+    setCategoryFieldErrors({});
     setEditingCategoryId(null);
     setCategoryForm(emptyCategoryForm);
     setIsCategoryEditorOpen(true);
@@ -294,6 +478,7 @@ export function AdminCatalogManager({
 
   function openEditCategoryEditor(category: Category) {
     setFeedback(null);
+    setCategoryFieldErrors({});
     setEditingCategoryId(category.id);
     setCategoryForm(toCategoryForm(category));
     setIsCategoryEditorOpen(true);
@@ -303,12 +488,34 @@ export function AdminCatalogManager({
     setIsCategoryEditorOpen(false);
     setEditingCategoryId(null);
     setCategoryForm(emptyCategoryForm);
+    setCategoryFieldErrors({});
   }
 
   async function handleSaveCategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSaving(true);
     setFeedback(null);
+
+    if (isImageProcessing) {
+      setFeedback({
+        type: "error",
+        text: "Please wait a moment while your photo finishes optimizing.",
+      });
+      return;
+    }
+
+    const clientErrors = validateCategoryForm(categoryForm);
+    if (Object.keys(clientErrors).length > 0) {
+      setCategoryFieldErrors(clientErrors);
+      setFeedback({
+        type: "error",
+        text: "Please fix the highlighted fields below:",
+        details: Object.values(clientErrors),
+      });
+      return;
+    }
+
+    setCategoryFieldErrors({});
+    setIsSaving(true);
 
     const trimmedImage = categoryForm.image.trim();
 
@@ -335,10 +542,12 @@ export function AdminCatalogManager({
         text: wasEdit ? "Category updated." : "Category created.",
       });
     } catch (error) {
+      const parsed = extractErrorFeedback(error, "Could not save category.");
+      setCategoryFieldErrors(parsed.fieldErrors);
       setFeedback({
         type: "error",
-        text:
-          error instanceof Error ? error.message : "Could not save category.",
+        text: parsed.summary,
+        details: parsed.details,
       });
     } finally {
       setIsSaving(false);
@@ -430,13 +639,21 @@ export function AdminCatalogManager({
 
       {feedback ? (
         <div
-          className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+          role={feedback.type === "error" ? "alert" : "status"}
+          className={`rounded-xl border px-4 py-3 text-sm ${
             feedback.type === "error"
               ? "border-destructive/40 bg-destructive/10 text-destructive"
               : "border-emerald-200 bg-emerald-50 text-emerald-900"
           }`}
         >
-          {feedback.text}
+          <p className="font-medium">{feedback.text}</p>
+          {feedback.details && feedback.details.length > 0 ? (
+            <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-xs">
+              {feedback.details.map((detail) => (
+                <li key={detail}>{detail}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
 
@@ -466,14 +683,17 @@ export function AdminCatalogManager({
                 </Button>
               </div>
 
-              <form onSubmit={handleSaveProduct} className="space-y-6">
+              <form noValidate onSubmit={handleSaveProduct} className="space-y-6">
                 <AdminImageDropzone
                   id="product-image-upload"
                   label="Product photo"
                   value={productForm.image}
-                  onChange={(nextImage) =>
-                    setProductForm((prev) => ({ ...prev, image: nextImage }))
-                  }
+                  error={productFieldErrors.image}
+                  onProcessingChange={setIsImageProcessing}
+                  onChange={(nextImage) => {
+                    clearProductFieldError("image");
+                    setProductForm((prev) => ({ ...prev, image: nextImage }));
+                  }}
                 />
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -486,17 +706,31 @@ export function AdminCatalogManager({
                     </label>
                     <Input
                       id="product-name"
-                      className="h-11"
+                      aria-invalid={Boolean(productFieldErrors.name)}
+                      className={`h-11 ${
+                        productFieldErrors.name
+                          ? "border-destructive focus-visible:ring-destructive"
+                          : ""
+                      }`}
                       placeholder="e.g. Raw Mau Forest Honey (500g)"
                       value={productForm.name}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        clearProductFieldError("name");
                         setProductForm((prev) => ({
                           ...prev,
                           name: e.target.value,
-                        }))
-                      }
-                      required
+                        }));
+                      }}
                     />
+                    {productFieldErrors.name ? (
+                      <p className="text-xs font-medium text-destructive">
+                        {productFieldErrors.name}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        At least 3 characters.
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -508,15 +742,20 @@ export function AdminCatalogManager({
                     </label>
                     <select
                       id="product-category"
-                      className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      aria-invalid={Boolean(productFieldErrors.categoryId)}
+                      className={`h-11 w-full rounded-md border bg-background px-3 text-sm ${
+                        productFieldErrors.categoryId
+                          ? "border-destructive"
+                          : "border-input"
+                      }`}
                       value={productForm.categoryId}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        clearProductFieldError("categoryId");
                         setProductForm((prev) => ({
                           ...prev,
                           categoryId: e.target.value,
-                        }))
-                      }
-                      required
+                        }));
+                      }}
                     >
                       <option value="">Select category</option>
                       {categories.map((cat) => (
@@ -525,6 +764,11 @@ export function AdminCatalogManager({
                         </option>
                       ))}
                     </select>
+                    {productFieldErrors.categoryId ? (
+                      <p className="text-xs font-medium text-destructive">
+                        {productFieldErrors.categoryId}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-1.5">
@@ -536,20 +780,30 @@ export function AdminCatalogManager({
                     </label>
                     <Input
                       id="product-price"
-                      className="h-11 tabular-nums"
+                      aria-invalid={Boolean(productFieldErrors.price)}
+                      className={`h-11 tabular-nums ${
+                        productFieldErrors.price
+                          ? "border-destructive focus-visible:ring-destructive"
+                          : ""
+                      }`}
                       type="number"
                       min="1"
                       step="0.01"
                       placeholder="e.g. 1500"
                       value={productForm.price}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        clearProductFieldError("price");
                         setProductForm((prev) => ({
                           ...prev,
                           price: e.target.value,
-                        }))
-                      }
-                      required
+                        }));
+                      }}
                     />
+                    {productFieldErrors.price ? (
+                      <p className="text-xs font-medium text-destructive">
+                        {productFieldErrors.price}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-1.5">
@@ -561,20 +815,30 @@ export function AdminCatalogManager({
                     </label>
                     <Input
                       id="product-stock"
-                      className="h-11 tabular-nums"
+                      aria-invalid={Boolean(productFieldErrors.stockQuantity)}
+                      className={`h-11 tabular-nums ${
+                        productFieldErrors.stockQuantity
+                          ? "border-destructive focus-visible:ring-destructive"
+                          : ""
+                      }`}
                       type="number"
                       min="0"
                       step="1"
                       placeholder="e.g. 25"
                       value={productForm.stockQuantity}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        clearProductFieldError("stockQuantity");
                         setProductForm((prev) => ({
                           ...prev,
                           stockQuantity: e.target.value,
-                        }))
-                      }
-                      required
+                        }));
+                      }}
                     />
+                    {productFieldErrors.stockQuantity ? (
+                      <p className="text-xs font-medium text-destructive">
+                        {productFieldErrors.stockQuantity}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -587,17 +851,32 @@ export function AdminCatalogManager({
                   </label>
                   <Textarea
                     id="product-description"
+                    aria-invalid={Boolean(productFieldErrors.description)}
                     rows={3}
-                    placeholder="Describe the product clearly for shoppers..."
+                    className={
+                      productFieldErrors.description
+                        ? "border-destructive focus-visible:ring-destructive"
+                        : ""
+                    }
+                    placeholder="Describe the product clearly for shoppers (at least 5 characters)..."
                     value={productForm.description}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      clearProductFieldError("description");
                       setProductForm((prev) => ({
                         ...prev,
                         description: e.target.value,
-                      }))
-                    }
-                    required
+                      }));
+                    }}
                   />
+                  {productFieldErrors.description ? (
+                    <p className="text-xs font-medium text-destructive">
+                      {productFieldErrors.description}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      At least 5 characters.
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -610,16 +889,28 @@ export function AdminCatalogManager({
                     </label>
                     <Textarea
                       id="product-benefits"
+                      aria-invalid={Boolean(productFieldErrors.benefits)}
                       rows={2}
+                      className={
+                        productFieldErrors.benefits
+                          ? "border-destructive focus-visible:ring-destructive"
+                          : ""
+                      }
                       placeholder="Key wellness benefits..."
                       value={productForm.benefits}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        clearProductFieldError("benefits");
                         setProductForm((prev) => ({
                           ...prev,
                           benefits: e.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                     />
+                    {productFieldErrors.benefits ? (
+                      <p className="text-xs font-medium text-destructive">
+                        {productFieldErrors.benefits}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-1.5">
@@ -631,16 +922,30 @@ export function AdminCatalogManager({
                     </label>
                     <Textarea
                       id="product-usage"
+                      aria-invalid={Boolean(
+                        productFieldErrors.usageInstructions
+                      )}
                       rows={2}
+                      className={
+                        productFieldErrors.usageInstructions
+                          ? "border-destructive focus-visible:ring-destructive"
+                          : ""
+                      }
                       placeholder="Recommended daily usage..."
                       value={productForm.usageInstructions}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        clearProductFieldError("usageInstructions");
                         setProductForm((prev) => ({
                           ...prev,
                           usageInstructions: e.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                     />
+                    {productFieldErrors.usageInstructions ? (
+                      <p className="text-xs font-medium text-destructive">
+                        {productFieldErrors.usageInstructions}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-1.5">
@@ -652,16 +957,28 @@ export function AdminCatalogManager({
                     </label>
                     <Textarea
                       id="product-ingredients"
+                      aria-invalid={Boolean(productFieldErrors.ingredients)}
                       rows={2}
+                      className={
+                        productFieldErrors.ingredients
+                          ? "border-destructive focus-visible:ring-destructive"
+                          : ""
+                      }
                       placeholder="100% pure organic..."
                       value={productForm.ingredients}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        clearProductFieldError("ingredients");
                         setProductForm((prev) => ({
                           ...prev,
                           ingredients: e.target.value,
-                        }))
-                      }
+                        }));
+                      }}
                     />
+                    {productFieldErrors.ingredients ? (
+                      <p className="text-xs font-medium text-destructive">
+                        {productFieldErrors.ingredients}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -708,14 +1025,18 @@ export function AdminCatalogManager({
                   </Button>
                   <Button
                     type="submit"
-                    disabled={isSaving || categories.length === 0}
+                    disabled={
+                      isSaving || isImageProcessing || categories.length === 0
+                    }
                     className="min-h-11 sm:min-w-[160px]"
                   >
-                    {isSaving
-                      ? "Saving..."
-                      : editingProductId
-                        ? "Save changes"
-                        : "Create product"}
+                    {isImageProcessing
+                      ? "Optimizing photo..."
+                      : isSaving
+                        ? "Saving..."
+                        : editingProductId
+                          ? "Save changes"
+                          : "Create product"}
                   </Button>
                 </div>
               </form>
@@ -909,14 +1230,17 @@ export function AdminCatalogManager({
                 </Button>
               </div>
 
-              <form onSubmit={handleSaveCategory} className="space-y-5">
+              <form noValidate onSubmit={handleSaveCategory} className="space-y-5">
                 <AdminImageDropzone
                   id="category-image-upload"
                   label="Category photo (optional)"
                   value={categoryForm.image}
-                  onChange={(nextImage) =>
-                    setCategoryForm((prev) => ({ ...prev, image: nextImage }))
-                  }
+                  error={categoryFieldErrors.image}
+                  onProcessingChange={setIsImageProcessing}
+                  onChange={(nextImage) => {
+                    clearCategoryFieldError("image");
+                    setCategoryForm((prev) => ({ ...prev, image: nextImage }));
+                  }}
                 />
 
                 <div className="space-y-1.5">
@@ -928,17 +1252,27 @@ export function AdminCatalogManager({
                   </label>
                   <Input
                     id="category-name"
-                    className="h-11"
+                    aria-invalid={Boolean(categoryFieldErrors.name)}
+                    className={`h-11 ${
+                      categoryFieldErrors.name
+                        ? "border-destructive focus-visible:ring-destructive"
+                        : ""
+                    }`}
                     placeholder="e.g. Herbal Teas"
                     value={categoryForm.name}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      clearCategoryFieldError("name");
                       setCategoryForm((prev) => ({
                         ...prev,
                         name: e.target.value,
-                      }))
-                    }
-                    required
+                      }));
+                    }}
                   />
+                  {categoryFieldErrors.name ? (
+                    <p className="text-xs font-medium text-destructive">
+                      {categoryFieldErrors.name}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-1.5">
@@ -950,16 +1284,28 @@ export function AdminCatalogManager({
                   </label>
                   <Textarea
                     id="category-description"
+                    aria-invalid={Boolean(categoryFieldErrors.description)}
                     rows={2}
+                    className={
+                      categoryFieldErrors.description
+                        ? "border-destructive focus-visible:ring-destructive"
+                        : ""
+                    }
                     placeholder="Short category summary for shoppers..."
                     value={categoryForm.description}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      clearCategoryFieldError("description");
                       setCategoryForm((prev) => ({
                         ...prev,
                         description: e.target.value,
-                      }))
-                    }
+                      }));
+                    }}
                   />
+                  {categoryFieldErrors.description ? (
+                    <p className="text-xs font-medium text-destructive">
+                      {categoryFieldErrors.description}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-col-reverse gap-3 border-t border-border/70 pt-4 sm:flex-row sm:justify-end">
@@ -973,14 +1319,16 @@ export function AdminCatalogManager({
                   </Button>
                   <Button
                     type="submit"
-                    disabled={isSaving}
+                    disabled={isSaving || isImageProcessing}
                     className="min-h-11 sm:min-w-[150px]"
                   >
-                    {isSaving
-                      ? "Saving..."
-                      : editingCategoryId
-                        ? "Save category"
-                        : "Create category"}
+                    {isImageProcessing
+                      ? "Optimizing photo..."
+                      : isSaving
+                        ? "Saving..."
+                        : editingCategoryId
+                          ? "Save category"
+                          : "Create category"}
                   </Button>
                 </div>
               </form>

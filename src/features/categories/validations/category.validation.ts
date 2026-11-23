@@ -9,13 +9,20 @@ const imageValueSchema = z
       val.startsWith("https://") ||
       val.startsWith("http://") ||
       val.startsWith("data:image/"),
-    "Must be a valid image URL, uploaded photo, or /images/ path"
+    "Image must be an uploaded photo, an https:// URL, or a /images/ path."
   )
   .optional();
 
 export const createCategorySchema = z.object({
-  name: z.string().min(2),
-  description: z.string().min(3).optional(),
+  name: z
+    .string("Category name is required.")
+    .trim()
+    .min(2, "Category name must be at least 2 characters."),
+  description: z
+    .string()
+    .trim()
+    .min(3, "Category description must be at least 3 characters if provided.")
+    .optional(),
   image: imageValueSchema,
 });
 
