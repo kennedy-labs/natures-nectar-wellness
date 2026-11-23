@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 
@@ -22,7 +21,6 @@ const emptySubscribe = () => () => {};
 
 export function CartDrawer() {
   const [open, setOpen] = useState(false);
-  const router = useRouter();
   const isClient = useSyncExternalStore(
     emptySubscribe,
     () => true,
@@ -37,12 +35,6 @@ export function CartDrawer() {
 
   const items = isClient ? rawItems : [];
   const subtotal = isClient ? rawSubtotal : 0;
-
-  function handleProceedToCheckout() {
-    if (items.length === 0) return;
-    setOpen(false);
-    router.push("/checkout");
-  }
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -136,12 +128,10 @@ export function CartDrawer() {
           </div>
 
           <div className="grid gap-2">
-            <Button
-              className="w-full"
-              disabled={items.length === 0}
-              onClick={handleProceedToCheckout}
-            >
-              Proceed to checkout
+            <Button asChild className="w-full">
+              <Link href="/checkout" onClick={() => setOpen(false)}>
+                Proceed to checkout
+              </Link>
             </Button>
             {items.length > 0 ? (
               <Button
