@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   Clock,
+  ExternalLink,
+  MapPin,
   MessageCircle,
   Package,
   Phone,
@@ -14,6 +16,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { parseDeliveryNotesPin } from "@/features/orders/utils/order.utils";
 import { formatKes } from "@/lib/format";
 
 type Payment = {
@@ -433,6 +436,8 @@ export function AdminOrdersPanel() {
 
         const waMessage = `Hello ${order.customerName}, regarding your Nature's Nectar order ${order.orderNumber} (Total: ${formatKes(total)}).`;
         const waHref = `https://wa.me/${toWhatsAppPhone(order.customerPhone)}?text=${encodeURIComponent(waMessage)}`;
+        const { cleanNotes: cleanDeliveryNotes, mapUrl } =
+          parseDeliveryNotesPin(order.deliveryNotes);
 
         return (
           <div
@@ -518,15 +523,29 @@ export function AdminOrdersPanel() {
                 ) : null}
               </div>
 
-              <div className="space-y-1 text-xs text-muted-foreground">
+              <div className="space-y-1.5 text-xs text-muted-foreground">
                 <p className="font-medium text-foreground">
                   {order.deliveryMethod.replace(/_/g, " ")}
                 </p>
                 {order.deliveryLocation ? (
                   <p>Location: {order.deliveryLocation}</p>
                 ) : null}
-                {order.deliveryNotes ? (
-                  <p>Delivery note: {order.deliveryNotes}</p>
+                {mapUrl ? (
+                  <div className="pt-0.5">
+                    <a
+                      href={mapUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+                    >
+                      <MapPin className="h-3.5 w-3.5" />
+                      Open Map Pin
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                ) : null}
+                {cleanDeliveryNotes ? (
+                  <p>Delivery note: {cleanDeliveryNotes}</p>
                 ) : null}
                 {order.customerNotes ? (
                   <p>Customer note: {order.customerNotes}</p>

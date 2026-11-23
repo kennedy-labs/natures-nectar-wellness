@@ -22,6 +22,16 @@ export async function submitCheckout(
       method: values.delivery.method,
       location: values.delivery.location?.trim() || undefined,
       notes: values.delivery.notes?.trim() || undefined,
+      latitude:
+        typeof values.delivery.latitude === "number" &&
+        Number.isFinite(values.delivery.latitude)
+          ? values.delivery.latitude
+          : undefined,
+      longitude:
+        typeof values.delivery.longitude === "number" &&
+        Number.isFinite(values.delivery.longitude)
+          ? values.delivery.longitude
+          : undefined,
     },
 
     items,

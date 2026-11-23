@@ -26,6 +26,8 @@ export type CheckoutFormValues = {
     method: DeliveryMethod;
     location?: string;
     notes?: string;
+    latitude?: number;
+    longitude?: number;
   };
 
   preferredPaymentMethod?: PaymentMethod;

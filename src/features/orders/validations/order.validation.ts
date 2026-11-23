@@ -16,6 +16,8 @@ export const submitOrderSchema = z
       method: z.enum(["PICKUP", "LOCAL_DELIVERY", "COUNTRYWIDE_DELIVERY"]),
       location: z.string().min(3).optional(),
       notes: z.string().min(3).optional(),
+      latitude: z.number().min(-90).max(90).optional(),
+      longitude: z.number().min(-180).max(180).optional(),
     }),
     items: z.array(orderItemInputSchema).min(1),
     preferredPaymentMethod: z

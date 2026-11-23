@@ -81,6 +81,7 @@ export function CheckoutForm({
     register,
     handleSubmit,
     watch,
+    setValue,
     setError,
     clearErrors,
     formState: { errors },
@@ -96,6 +97,8 @@ export function CheckoutForm({
         method: "PICKUP",
         location: "",
         notes: "",
+        latitude: undefined,
+        longitude: undefined,
       },
 
       preferredPaymentMethod: undefined,
@@ -190,6 +193,8 @@ export function CheckoutForm({
         <CheckoutDeliverySection
           register={register}
           watch={watch}
+          setValue={setValue}
+          clearErrors={clearErrors}
           errors={errors}
         />
 

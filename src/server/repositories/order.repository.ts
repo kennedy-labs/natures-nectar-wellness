@@ -1,4 +1,8 @@
 import { db } from "@/server/db/prisma";
+import {
+  appendGpsPinToNotes,
+  buildGoogleMapsPinUrl,
+} from "@/features/orders/utils/order.utils";
 import { SubmitOrderInput } from "@/features/orders/validations/order.validation";
 
 export type CreateOrderRequestData = SubmitOrderInput & {
@@ -38,6 +42,11 @@ const customer = await transaction.customer.create({
   },
 });
 
+const mapUrl = buildGoogleMapsPinUrl(
+  data.delivery.latitude,
+  data.delivery.longitude
+);
+
 const order = await transaction.order.create({
   include: {
     customer: true,
@@ -52,7 +61,7 @@ const order = await transaction.order.create({
     customerEmail: data.customer.email,
     deliveryMethod: data.delivery.method,
     deliveryLocation: data.delivery.location,
-    deliveryNotes: data.delivery.notes,
+    deliveryNotes: appendGpsPinToNotes(data.delivery.notes, mapUrl),
     subtotalAmount: data.subtotalAmount,
     preferredPaymentMethod: data.preferredPaymentMethod,
     customerNotes: data.customerNotes,
