@@ -4,11 +4,11 @@ import { Leaf, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
 import { CartDrawer } from "@/features/cart/components/CartDrawer";
+import { OrdersNavLink } from "@/features/orders/components/OrdersNavLink";
 
 const navLinks = [
   { href: "/products", label: "Products" },
   { href: "/categories", label: "Categories" },
-  { href: "/track", label: "Track Order" },
 ];
 
 export function Navbar() {
@@ -37,19 +37,21 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-2">
-        <CartDrawer />
+          <OrdersNavLink />
+          <CartDrawer />
           {whatsappUrl ? (
-  <a
-    href={whatsappUrl}
-    rel="noopener noreferrer"
-    target="_blank"
-  >
-    <Button size="sm" variant="outline">
-      <MessageCircle />
-      WhatsApp
-    </Button>
-  </a>
-) : null}
+            <a
+              href={whatsappUrl}
+              rel="noopener noreferrer"
+              target="_blank"
+              className="hidden sm:inline-flex"
+            >
+              <Button size="sm" variant="outline">
+                <MessageCircle />
+                WhatsApp
+              </Button>
+            </a>
+          ) : null}
         </div>
       </div>
     </header>

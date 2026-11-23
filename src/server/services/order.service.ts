@@ -626,19 +626,15 @@ export async function verifyPaymentAndMarkPaid(
 }
 
 /**
- * PUBLIC CUSTOMER ORDER TRACKING
+ * CUSTOMER STOREFRONT ORDERS (DEVICE-SAVED REFERENCES)
  */
-const trackOrderInputSchema = z.object({
-  orderNumber: z
-    .string()
-    .trim()
-    .min(4, "Enter your order number (e.g. NNW-...).")
-    .max(40),
-  phone: z
-    .string()
-    .trim()
-    .min(9, "Enter the phone number used when placing the order.")
-    .max(25),
+const customerOrderRefSchema = z.object({
+  orderNumber: z.string().trim().min(4).max(40),
+  phone: z.string().trim().min(7).max(25),
+});
+
+const customerOrdersLookupSchema = z.object({
+  refs: z.array(customerOrderRefSchema).max(25),
 });
 
 function extractPhoneTail(raw: string): string {
@@ -646,14 +642,35 @@ function extractPhoneTail(raw: string): string {
   return digits.length >= 9 ? digits.slice(-9) : digits;
 }
 
-export async function trackCustomerOrder(rawInput: unknown) {
-  const input = trackOrderInputSchema.parse(rawInput);
-  const normalizedOrderNumber = input.orderNumber.toUpperCase();
-  const inputPhoneTail = extractPhoneTail(input.phone);
+export async function getCustomerOrdersByRefs(rawInput: unknown) {
+  const input = customerOrdersLookupSchema.parse(rawInput);
+  if (input.refs.length === 0) {
+    return [];
+  }
 
-  const order = await db.order.findUnique({
+  const normalizedRefs = input.refs.map((r) => ({
+    orderNumber: r.orderNumber.toUpperCase(),
+    phoneTail: extractPhoneTail(r.phone),
+  }));
+
+  const uniqueOrderNumbers = [
+    ...new Set(normalizedRefs.map((r) => r.orderNumber)),
+  ];
+
+  const orders = await db.order.findMany({
     where: {
-      orderNumber: normalizedOrderNumber,
+      orderNumber: { in: uniqueOrderNumbers },
+      NOT: {
+        AND: [
+          { preferredPaymentMethod: "MPESA_BUY_GOODS" },
+          { status: "AWAITING_PAYMENT" },
+          {
+            payments: {
+              none: { status: "VERIFIED" },
+            },
+          },
+        ],
+      },
     },
     include: {
       items: {
@@ -662,6 +679,7 @@ export async function trackCustomerOrder(rawInput: unknown) {
           productName: true,
           productSlug: true,
           quantity: true,
+          priceAtPurchase: true,
           lineTotal: true,
         },
       },
@@ -672,70 +690,56 @@ export async function trackCustomerOrder(rawInput: unknown) {
           method: true,
           status: true,
           amount: true,
-          transactionRef: true,
           verifiedAt: true,
         },
       },
-      OrderStatusHistory: {
-        orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          status: true,
-          createdAt: true,
-        },
-      },
+    },
+    orderBy: {
+      createdAt: "desc",
     },
   });
 
-  if (
-    !order ||
-    !inputPhoneTail ||
-    extractPhoneTail(order.customerPhone) !== inputPhoneTail
-  ) {
-    throw new ApiError(
-      404,
-      "ORDER_NOT_FOUND",
-      "No matching order was found for that order number and phone number."
-    );
+  const phoneByOrderNumber = new Map<string, string>();
+  for (const ref of normalizedRefs) {
+    if (ref.phoneTail && !phoneByOrderNumber.has(ref.orderNumber)) {
+      phoneByOrderNumber.set(ref.orderNumber, ref.phoneTail);
+    }
   }
 
-  const verifiedPayment =
-    order.payments.find((p) => p.status === "VERIFIED") ?? null;
-  const latestPayment = verifiedPayment ?? order.payments[0] ?? null;
+  return orders
+    .filter((order) => {
+      const expectedTail = phoneByOrderNumber.get(order.orderNumber);
+      return (
+        Boolean(expectedTail) &&
+        extractPhoneTail(order.customerPhone) === expectedTail
+      );
+    })
+    .map((order) => {
+      const verifiedPayment =
+        order.payments.find((p) => p.status === "VERIFIED") ?? null;
+      const latestPayment = verifiedPayment ?? order.payments[0] ?? null;
 
-  return {
-    id: order.id,
-    orderNumber: order.orderNumber,
-    status: order.status,
-    createdAt: order.createdAt.toISOString(),
-    deliveryMethod: order.deliveryMethod,
-    deliveryLocation: order.deliveryLocation,
-    deliveryFee: order.deliveryFee,
-    deliveryQuoteNotes: order.deliveryQuoteNotes,
-    subtotalAmount: order.subtotalAmount,
-    totalAmount: order.totalAmount ?? order.subtotalAmount,
-    preferredPaymentMethod: order.preferredPaymentMethod,
-    whatsappMessage: order.whatsappMessage ?? "",
-    customerPhone: order.customerPhone,
-    items: order.items,
-    payment: latestPayment
-      ? {
-          status: latestPayment.status,
-          method: latestPayment.method,
-          amount: latestPayment.amount,
-          transactionRef:
-            latestPayment.status === "VERIFIED"
-              ? latestPayment.transactionRef
-              : null,
-          verifiedAt: latestPayment.verifiedAt
-            ? latestPayment.verifiedAt.toISOString()
-            : null,
-        }
-      : null,
-    statusHistory: order.OrderStatusHistory.map((h) => ({
-      id: h.id,
-      status: h.status,
-      createdAt: h.createdAt.toISOString(),
-    })),
-  };
+      return {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        createdAt: order.createdAt.toISOString(),
+        deliveryMethod: order.deliveryMethod,
+        deliveryLocation: order.deliveryLocation,
+        deliveryFee: order.deliveryFee,
+        deliveryQuoteNotes: order.deliveryQuoteNotes,
+        subtotalAmount: order.subtotalAmount,
+        totalAmount: order.totalAmount ?? order.subtotalAmount,
+        preferredPaymentMethod: order.preferredPaymentMethod,
+        whatsappMessage: order.whatsappMessage ?? "",
+        items: order.items,
+        payment: latestPayment
+          ? {
+              status: latestPayment.status,
+              method: latestPayment.method,
+              amount: latestPayment.amount,
+            }
+          : null,
+      };
+    });
 }

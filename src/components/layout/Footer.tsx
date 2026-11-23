@@ -20,8 +20,8 @@ export function Footer() {
           <Link className="hover:text-foreground" href="/products">
             Browse products
           </Link>
-          <Link className="hover:text-foreground" href="/track">
-            Track your order
+          <Link className="hover:text-foreground" href="/orders">
+            Orders
           </Link>
           {whatsappUrl ? (
             <a

@@ -24,6 +24,7 @@ import type {
 } from "@/features/checkout/types/checkout.types";
 
 import { useCartStore } from "@/store/cart.store";
+import { useOrdersStore } from "@/store/orders.store";
 
 type CheckoutFormProps = {
   gatewayAvailability?: GatewayAvailability;
@@ -36,6 +37,7 @@ export function CheckoutForm({
 }: CheckoutFormProps) {
   const cartItems = useCartStore((state) => state.items);
   const clearCart = useCartStore((state) => state.clearCart);
+  const saveOrderRef = useOrdersStore((state) => state.saveOrderRef);
 
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [submittedMpesaPhone, setSubmittedMpesaPhone] = useState<string>("");
@@ -144,9 +146,13 @@ export function CheckoutForm({
     try {
       const response = await submit(values, cartItems);
 
-      // Only clear cart immediately for Cash on Pickup; M-Pesa clears cart after Safaricom verifies payment.
+      // Only clear cart and record order immediately for Cash on Pickup; M-Pesa waits until Safaricom verifies payment.
       if (response.preferredPaymentMethod !== "MPESA_BUY_GOODS") {
         clearCart();
+        saveOrderRef({
+          orderNumber: response.orderNumber,
+          phone: response.customerPhone,
+        });
       }
 
       return response;
@@ -215,6 +221,10 @@ export function CheckoutForm({
           darajaEnv={gatewayAvailability?.darajaEnv}
           onVerified={(receipt) => {
             clearCart();
+            saveOrderRef({
+              orderNumber: result.orderNumber,
+              phone: result.customerPhone,
+            });
             setVerifiedMpesaReceipt({
               transactionRef: receipt.transactionRef,
               amount: receipt.amount,
