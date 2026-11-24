@@ -25,17 +25,20 @@ export const CartButton = React.forwardRef<HTMLButtonElement, ButtonProps>(
         size="sm"
         type="button"
         variant="outline"
-        className={cn("h-10 px-2.5 sm:h-9 sm:px-3", className)}
+        className={cn(
+          "h-10 shrink-0 gap-1 px-2 text-xs sm:h-9 sm:gap-1.5 sm:px-3 sm:text-sm",
+          className
+        )}
         aria-label={
           itemCount > 0 ? `Open cart (${itemCount} items)` : "Open cart"
         }
         {...props}
       >
-        <ShoppingBag className="h-4 w-4" />
-        <span>Cart</span>
+        <ShoppingBag className="h-4 w-4 shrink-0" />
+        <span className="hidden min-[420px]:inline">Cart</span>
 
         {itemCount > 0 ? (
-          <span className="ml-1 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
+          <span className="rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-semibold leading-none text-primary-foreground tabular-nums">
             {itemCount}
           </span>
         ) : null}
