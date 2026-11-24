@@ -10,6 +10,7 @@ import {
   MessageCircle,
   Package,
   RefreshCw,
+  Search,
   ShoppingBag,
   Truck,
   XCircle,
@@ -93,19 +94,34 @@ function formatDate(iso: string): string {
   }).format(new Date(iso));
 }
 
-export function CustomerOrdersView() {
+type CustomerOrdersViewProps = {
+  initialOrderNumber?: string;
+};
+
+export function CustomerOrdersView({
+  initialOrderNumber,
+}: CustomerOrdersViewProps) {
   const isClient = useSyncExternalStore(
     emptySubscribe,
     () => true,
     () => false
   );
   const savedRefs = useOrdersStore((state) => state.orders);
+  const saveOrderRef = useOrdersStore((state) => state.saveOrderRef);
 
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
+  const [lookupOpen, setLookupOpen] = useState(Boolean(initialOrderNumber));
+  const [lookupOrderNumber, setLookupOrderNumber] = useState(
+    initialOrderNumber ?? ""
+  );
+  const [lookupPhone, setLookupPhone] = useState("");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
 
   const refsKey = JSON.stringify(
     savedRefs.map((r) => ({
@@ -181,49 +197,191 @@ export function CustomerOrdersView() {
     }
   }
 
+  async function handleLookupSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const cleanedOrder = lookupOrderNumber.trim().toUpperCase();
+    const cleanedPhone = lookupPhone.trim();
+
+    if (cleanedOrder.length < 4 || cleanedPhone.length < 7) {
+      setLookupError(
+        "Enter both your order number (e.g. NNW-...) and the phone number used at checkout."
+      );
+      return;
+    }
+
+    setLookupLoading(true);
+    setLookupError(null);
+
+    try {
+      const matched = await fetchOrdersFromApi(
+        JSON.stringify([{ orderNumber: cleanedOrder, phone: cleanedPhone }])
+      );
+
+      if (matched.length === 0) {
+        setLookupError(
+          "No confirmed order matched that order number and phone number."
+        );
+        return;
+      }
+
+      const found = matched[0];
+      setOrders((prev) => [
+        found,
+        ...prev.filter((existing) => existing.id !== found.id),
+      ]);
+      setLoading(false);
+      saveOrderRef({ orderNumber: found.orderNumber, phone: cleanedPhone });
+      setExpandedOrderId(found.id);
+      setLookupPhone("");
+      setLookupOpen(false);
+    } catch (err) {
+      setLookupError(
+        err instanceof Error
+          ? err.message
+          : "Could not look up your order right now."
+      );
+    } finally {
+      setLookupLoading(false);
+    }
+  }
+
+  function renderLookupCard(compactHeading?: boolean) {
+    return (
+      <form
+        onSubmit={handleLookupSubmit}
+        className="rounded-2xl border border-border/80 bg-card p-5 text-left shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-6"
+      >
+        <div className="space-y-1">
+          <h2
+            className={cn(
+              "font-display font-medium text-foreground",
+              compactHeading ? "text-lg" : "text-xl"
+            )}
+          >
+            Find an order from another device
+          </h2>
+          <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+            Enter your order number and the phone number you used at checkout to
+            retrieve your receipt and live delivery status.
+          </p>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label
+              htmlFor="lookup-order-number"
+              className="text-xs font-medium text-foreground"
+            >
+              Order number
+            </label>
+            <input
+              id="lookup-order-number"
+              type="text"
+              value={lookupOrderNumber}
+              onChange={(e) => setLookupOrderNumber(e.target.value)}
+              placeholder="e.g. NNW-MI4K9-AB12"
+              autoComplete="off"
+              className="h-11 w-full rounded-md border border-input bg-background px-3 font-mono text-base uppercase shadow-xs transition-colors placeholder:font-sans placeholder:normal-case placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-10 md:text-sm"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="lookup-phone"
+              className="text-xs font-medium text-foreground"
+            >
+              Checkout phone number
+            </label>
+            <input
+              id="lookup-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              value={lookupPhone}
+              onChange={(e) => setLookupPhone(e.target.value)}
+              placeholder="e.g. 0712 345 678"
+              className="h-11 w-full rounded-md border border-input bg-background px-3 text-base shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-10 md:text-sm"
+            />
+          </div>
+        </div>
+
+        {lookupError ? (
+          <p className="mt-3 text-xs font-medium text-destructive">
+            {lookupError}
+          </p>
+        ) : null}
+
+        <div className="mt-4 flex flex-wrap items-center gap-2.5">
+          <Button
+            type="submit"
+            disabled={lookupLoading}
+            className="min-h-11 w-full gap-1.5 sm:w-auto"
+          >
+            <Search className="h-4 w-4" />
+            {lookupLoading ? "Checking order..." : "Find order"}
+          </Button>
+          {savedRefs.length > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setLookupOpen(false);
+                setLookupError(null);
+              }}
+              className="min-h-11 w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+          ) : null}
+        </div>
+      </form>
+    );
+  }
+
   if (!isClient) {
     return <CustomerOrdersSkeleton />;
   }
 
   if (savedRefs.length === 0) {
     return (
-      <div className="rounded-2xl border border-border/80 bg-card p-6 text-center shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-12">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted text-primary">
-          <ShoppingBag className="h-6 w-6" />
+      <div className="space-y-5">
+        {renderLookupCard(false)}
+
+        <div className="rounded-2xl border border-border/80 bg-card p-6 text-center shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-8">
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-muted text-primary">
+            <ShoppingBag className="h-5 w-5" />
+          </div>
+          <h3 className="mt-3 font-display text-lg font-medium text-foreground">
+            New to Nature&apos;s Nectar?
+          </h3>
+          <p className="mx-auto mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
+            Orders placed on this browser also appear here automatically.
+          </p>
+          <Button asChild variant="outline" className="mt-5 min-h-11 w-full sm:w-auto">
+            <Link href="/products">Browse products</Link>
+          </Button>
         </div>
-        <h2 className="mt-4 font-display text-xl font-medium text-foreground">
-          No orders yet
-        </h2>
-        <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-          Orders you place on this browser will appear here automatically so you
-          can view your items and delivery status anytime.
-        </p>
-        <Button asChild className="mt-6 min-h-11 w-full sm:w-auto">
-          <Link href="/products">Browse products</Link>
-        </Button>
       </div>
     );
   }
 
-  if (loading) {
+  if (loading && orders.length === 0) {
     return <CustomerOrdersSkeleton />;
   }
 
   if (orders.length === 0) {
     return (
-      <div className="rounded-2xl border border-border/80 bg-card p-6 text-center shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-12">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted text-primary">
-          <ShoppingBag className="h-6 w-6" />
+      <div className="space-y-5">
+        {renderLookupCard(false)}
+
+        <div className="rounded-2xl border border-border/80 bg-card p-6 text-center shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-8">
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            No confirmed orders were found for this browser yet.
+          </p>
+          <Button asChild variant="outline" className="mt-4 min-h-11 w-full sm:w-auto">
+            <Link href="/products">Browse products</Link>
+          </Button>
         </div>
-        <h2 className="mt-4 font-display text-xl font-medium text-foreground">
-          No orders found
-        </h2>
-        <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-          No confirmed orders were found for this browser yet.
-        </p>
-        <Button asChild className="mt-6 min-h-11 w-full sm:w-auto">
-          <Link href="/products">Browse products</Link>
-        </Button>
       </div>
     );
   }
@@ -234,18 +392,35 @@ export function CustomerOrdersView() {
         <p className="text-sm text-muted-foreground">
           Tap any order to view items and live tracking status.
         </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={refreshing}
-          onClick={handleRefresh}
-          className="min-h-10 shrink-0 gap-1.5"
-        >
-          <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
-          Refresh
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setLookupOpen((open) => !open);
+              setLookupError(null);
+            }}
+            className="min-h-10 shrink-0 gap-1.5"
+          >
+            <Search className="h-3.5 w-3.5" />
+            Find another order
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={refreshing}
+            onClick={handleRefresh}
+            className="min-h-10 shrink-0 gap-1.5"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
+            Refresh
+          </Button>
+        </div>
       </div>
+
+      {lookupOpen ? renderLookupCard(true) : null}
 
       {error ? (
         <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">

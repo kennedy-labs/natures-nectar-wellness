@@ -31,6 +31,7 @@ export function CheckoutSuccess({
   orderNumber,
   whatsappMessage,
   amount,
+  customerEmail,
   preferredPaymentMethod,
   initialVerified = null,
 }: CheckoutSuccessProps) {
@@ -112,6 +113,14 @@ export function CheckoutSuccess({
             </p>
           </div>
         ) : null}
+
+        <p className="text-center text-xs leading-relaxed text-muted-foreground">
+          {customerEmail
+            ? `A confirmation copy is sent to ${customerEmail} when email receipts are active. `
+            : ""}
+          Keep your order number (<span className="font-mono">{orderNumber}</span>)
+          and checkout phone number to track your order from any device.
+        </p>
 
         <div className="space-y-2.5 pt-2">
           <Button asChild className="w-full min-h-11">

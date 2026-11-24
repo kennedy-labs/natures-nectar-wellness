@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getSiteUrl } from "@/config/site";
 import { db } from "@/server/db/prisma";
 import { ApiError } from "@/server/http/api-error";
+import { sendOrderNotifications } from "@/server/services/notification.service";
 
 export type PaymentGatewayAvailability = {
   darajaEnabled: boolean;
@@ -264,6 +265,19 @@ async function markGatewayPaymentVerified(args: {
   }
 
   const result = await db.$transaction(async (tx) => {
+    const current = await tx.payment.findUnique({
+      where: { id: args.paymentId },
+      include: { order: true },
+    });
+
+    if (current?.status === "VERIFIED") {
+      return {
+        payment: current,
+        order: current.order,
+        alreadyVerified: true,
+      };
+    }
+
     const payment = await tx.payment.update({
       where: { id: args.paymentId },
       data: {
@@ -307,11 +321,22 @@ async function markGatewayPaymentVerified(args: {
       });
     }
 
-    return { payment, order };
+    return { payment, order, alreadyVerified: false };
   });
 
+  if (!result.alreadyVerified) {
+    await sendOrderNotifications({
+      orderId: args.orderId,
+      event: "PAYMENT_VERIFIED",
+      transactionRef: args.transactionRef,
+      paidAmount: args.paidAmount,
+    }).catch((err) => {
+      console.error("[PaymentGateway] Notification failed after verification:", err);
+    });
+  }
+
   revalidatePath("/admin");
-  return result;
+  return { payment: result.payment, order: result.order };
 }
 
 const stkInitiateSchema = z.object({

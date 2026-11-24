@@ -9,6 +9,7 @@ import { submitOrderSchema } from "@/features/orders/validations/order.validatio
 import { db } from "@/server/db/prisma";
 import { ApiError } from "@/server/http/api-error";
 import { getPaymentGatewayAvailability } from "@/server/services/payment-gateway.service";
+import { sendOrderNotifications } from "@/server/services/notification.service";
 import type { OrderStatus as PrismaOrderStatus } from "@prisma/client";
 
 /**
@@ -185,6 +186,15 @@ export async function submitOrder(input: unknown) {
     whatsappMessage,
     items: orderItems,
   });
+
+  if (!isMpesaCheckout) {
+    await sendOrderNotifications({
+      orderId: order.id,
+      event: "ORDER_PLACED",
+    }).catch((err) => {
+      console.error("[OrderService] Notification failed after order create:", err);
+    });
+  }
 
   return order;
 }
@@ -588,7 +598,7 @@ export async function verifyPaymentAndMarkPaid(
     existingPayment.order.totalAmount ??
     existingPayment.order.subtotalAmount;
 
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     const payment = await tx.payment.update({
       where: { id: paymentId },
       data: {
@@ -627,6 +637,19 @@ export async function verifyPaymentAndMarkPaid(
 
     return { payment, order };
   });
+
+  if (existingPayment.status !== "VERIFIED") {
+    await sendOrderNotifications({
+      orderId: result.order.id,
+      event: "PAYMENT_VERIFIED",
+      transactionRef: result.payment.transactionRef,
+      paidAmount: result.payment.amount,
+    }).catch((err) => {
+      console.error("[OrderService] Notification failed after payment verify:", err);
+    });
+  }
+
+  return result;
 }
 
 /**
