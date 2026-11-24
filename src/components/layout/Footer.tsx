@@ -55,9 +55,35 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-8 border-t border-border/70 pt-5 text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Nature&apos;s Nectar Wellness. All rights
-          reserved.
+        <div className="mt-8 flex flex-col gap-3 border-t border-border/70 pt-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            © {new Date().getFullYear()} Nature&apos;s Nectar Wellness. All
+            rights reserved.
+          </p>
+
+          <nav
+            aria-label="Legal and store policies"
+            className="flex flex-wrap gap-x-5 gap-y-1"
+          >
+            <Link
+              className="inline-flex min-h-9 items-center py-1 transition-colors hover:text-foreground"
+              href="/privacy-policy"
+            >
+              Privacy Policy
+            </Link>
+            <Link
+              className="inline-flex min-h-9 items-center py-1 transition-colors hover:text-foreground"
+              href="/terms"
+            >
+              Terms &amp; Conditions
+            </Link>
+            <Link
+              className="inline-flex min-h-9 items-center py-1 transition-colors hover:text-foreground"
+              href="/delivery-refund-policy"
+            >
+              Delivery &amp; Refunds
+            </Link>
+          </nav>
         </div>
       </div>
     </footer>
