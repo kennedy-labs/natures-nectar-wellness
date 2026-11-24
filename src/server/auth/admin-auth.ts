@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 import { auth } from "@/server/auth/auth";
 import { db } from "@/server/db/prisma";
@@ -59,6 +60,10 @@ async function getAdminSession(requestHeaders: Headers) {
   };
 }
 
+const getAdminSessionForPage = cache(async () =>
+  getAdminSession(await headers())
+);
+
 export async function requireAdminRequest(request: Request) {
   const adminSession = await getAdminSession(request.headers);
 
@@ -74,7 +79,7 @@ export async function requireAdminRequest(request: Request) {
 }
 
 export async function requireAdminPage() {
-  const adminSession = await getAdminSession(await headers());
+  const adminSession = await getAdminSessionForPage();
 
   if (!adminSession) {
     redirect("/admin/login");

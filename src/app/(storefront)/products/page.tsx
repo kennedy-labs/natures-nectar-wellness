@@ -50,17 +50,21 @@ export default async function ProductsPage() {
   };
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-10">
+    <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(collectionSchema),
         }}
       />
-      <div className="mb-8 space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Products</h1>
-        <p className="text-muted-foreground">
-          Explore our wellness catalog. Stock availability is shown on each product.
+      <div className="mb-8 max-w-2xl space-y-2 border-b border-border/80 pb-6 sm:mb-10">
+        <p className="text-sm font-medium text-primary">Botanical Catalog</p>
+        <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
+          Products
+        </h1>
+        <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
+          Explore our small-batch herbal catalog. Live availability is shown on
+          each product.
         </p>
       </div>
 

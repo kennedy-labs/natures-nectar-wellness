@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { AdminPaymentsSkeleton } from "@/components/skeletons/AdminSkeletons";
+
 type Payment = {
   id: string;
   status: "PENDING" | "VERIFIED" | "FAILED";
@@ -18,18 +20,37 @@ type Order = {
 
 export function AdminPaymentsPanel() {
   const [orders, setOrders] = useState<Order[]>([]);
-
-  async function load() {
-    const res = await fetch("/api/orders");
-    const data = await res.json();
-
-    setOrders(data?.data ?? data);
-  }
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
+    let cancelled = false;
+
+    fetch("/api/orders")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) {
+          setOrders(data?.data ?? data ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOrders([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  if (loading) {
+    return <AdminPaymentsSkeleton />;
+  }
 
   return (
     <div className="space-y-3">

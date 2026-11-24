@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock,
-  Loader2,
   MapPin,
   MessageCircle,
   Package,
@@ -16,6 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 
+import { CustomerOrdersSkeleton } from "@/components/skeletons/StorefrontSkeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
@@ -182,26 +182,23 @@ export function CustomerOrdersView() {
   }
 
   if (!isClient) {
-    return (
-      <div className="flex items-center justify-center gap-2 rounded-xl border bg-card p-12 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin text-primary" />
-        <span>Loading your orders...</span>
-      </div>
-    );
+    return <CustomerOrdersSkeleton />;
   }
 
   if (savedRefs.length === 0) {
     return (
-      <div className="rounded-xl border bg-card p-8 text-center sm:p-12">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+      <div className="rounded-2xl border border-border/80 bg-card p-6 text-center shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-12">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted text-primary">
           <ShoppingBag className="h-6 w-6" />
         </div>
-        <h2 className="mt-4 text-lg font-semibold">No orders yet</h2>
-        <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+        <h2 className="mt-4 font-display text-xl font-medium text-foreground">
+          No orders yet
+        </h2>
+        <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
           Orders you place on this browser will appear here automatically so you
           can view your items and delivery status anytime.
         </p>
-        <Button asChild className="mt-6">
+        <Button asChild className="mt-6 min-h-11 w-full sm:w-auto">
           <Link href="/products">Browse products</Link>
         </Button>
       </div>
@@ -209,25 +206,22 @@ export function CustomerOrdersView() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center gap-2 rounded-xl border bg-card p-12 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin text-primary" />
-        <span>Loading your orders...</span>
-      </div>
-    );
+    return <CustomerOrdersSkeleton />;
   }
 
   if (orders.length === 0) {
     return (
-      <div className="rounded-xl border bg-card p-8 text-center sm:p-12">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+      <div className="rounded-2xl border border-border/80 bg-card p-6 text-center shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-12">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted text-primary">
           <ShoppingBag className="h-6 w-6" />
         </div>
-        <h2 className="mt-4 text-lg font-semibold">No orders found</h2>
-        <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+        <h2 className="mt-4 font-display text-xl font-medium text-foreground">
+          No orders found
+        </h2>
+        <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
           No confirmed orders were found for this browser yet.
         </p>
-        <Button asChild className="mt-6">
+        <Button asChild className="mt-6 min-h-11 w-full sm:w-auto">
           <Link href="/products">Browse products</Link>
         </Button>
       </div>
@@ -236,9 +230,9 @@ export function CustomerOrdersView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          Click any order to view items and live tracking status.
+          Tap any order to view items and live tracking status.
         </p>
         <Button
           type="button"
@@ -246,7 +240,7 @@ export function CustomerOrdersView() {
           size="sm"
           disabled={refreshing}
           onClick={handleRefresh}
-          className="gap-1.5"
+          className="min-h-10 shrink-0 gap-1.5"
         >
           <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
           Refresh
@@ -280,7 +274,7 @@ export function CustomerOrdersView() {
             <div
               key={order.id}
               className={cn(
-                "overflow-hidden rounded-xl border bg-card transition-colors",
+                "overflow-hidden rounded-xl border border-border/80 bg-card shadow-[0_1px_2px_rgba(24,42,32,0.04)] transition-colors",
                 isExpanded ? "border-primary/40 shadow-sm" : "hover:border-primary/30"
               )}
             >
@@ -294,7 +288,7 @@ export function CustomerOrdersView() {
               >
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-sm font-semibold text-foreground">
+                    <span className="break-all font-mono text-sm font-semibold text-foreground">
                       {order.orderNumber}
                     </span>
                     <Badge
@@ -482,7 +476,7 @@ export function CustomerOrdersView() {
                         asChild
                         variant="outline"
                         size="sm"
-                        className="w-full"
+                        className="w-full min-h-11"
                       >
                         <a
                           href={whatsappUrl}

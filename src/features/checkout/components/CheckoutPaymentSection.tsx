@@ -123,7 +123,7 @@ export function CheckoutPaymentSection({
                 aria-checked={isSelected}
                 onClick={() => handleSelectMethod(option.value)}
                 className={cn(
-                  "flex items-start gap-3 rounded-xl border p-4 text-left transition-colors",
+                  "flex min-h-[72px] items-start gap-3 rounded-xl border p-4 text-left transition-colors",
                   isSelected
                     ? "border-primary bg-primary/5 ring-1 ring-primary"
                     : "border-border hover:border-primary/40 hover:bg-muted/30"
@@ -176,6 +176,8 @@ export function CheckoutPaymentSection({
             <Input
               id="checkout-mpesa-phone"
               type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               placeholder="0712 345 678"
               disabled={!darajaEnabled}
               {...register("mpesaPhone", {

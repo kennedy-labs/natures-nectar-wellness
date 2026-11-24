@@ -1,3 +1,6 @@
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
+
 import {
   createProductSchema,
   updateProductSchema,
@@ -14,25 +17,47 @@ import {
   updateProduct as updateProductRecord,
 } from "@/server/repositories/product.repository";
 
-export async function getAllProducts() {
-  return findAllProducts();
-}
+const getCachedAllProducts = unstable_cache(
+  async () => findAllProducts(),
+  ["storefront-all-products"],
+  { revalidate: 60, tags: ["products"] }
+);
 
-export async function getFeaturedProducts() {
-  return findFeaturedProducts();
-}
+const getCachedFeaturedProducts = unstable_cache(
+  async () => findFeaturedProducts(),
+  ["storefront-featured-products"],
+  { revalidate: 60, tags: ["products"] }
+);
+
+const getCachedProductsByCategorySlug = unstable_cache(
+  async (slug: string) => findActiveProductsByCategorySlug(slug),
+  ["storefront-category-products"],
+  { revalidate: 60, tags: ["products", "categories"] }
+);
+
+const getCachedProductBySlug = unstable_cache(
+  async (slug: string) => findActiveProductBySlug(slug),
+  ["storefront-product-by-slug"],
+  { revalidate: 60, tags: ["products"] }
+);
+
+export const getAllProducts = cache(async () => getCachedAllProducts());
+
+export const getFeaturedProducts = cache(async () =>
+  getCachedFeaturedProducts()
+);
 
 export async function getAllProductsForAdmin() {
   return findAllProductsForAdmin();
 }
 
-export async function getProductsByCategorySlug(slug: string) {
-  return findActiveProductsByCategorySlug(slug);
-}
+export const getProductsByCategorySlug = cache(async (slug: string) =>
+  getCachedProductsByCategorySlug(slug)
+);
 
-export async function getProductBySlug(slug: string) {
-  return findActiveProductBySlug(slug);
-}
+export const getProductBySlug = cache(async (slug: string) =>
+  getCachedProductBySlug(slug)
+);
 
 export async function createProduct(input: unknown) {
   const data = createProductSchema.parse(input);

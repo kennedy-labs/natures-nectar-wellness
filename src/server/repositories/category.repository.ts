@@ -1,3 +1,4 @@
+import { toStorefrontMediaUrl } from "@/lib/media";
 import { db } from "@/server/db/prisma";
 
 export async function findAllCategories() {
@@ -8,12 +9,42 @@ export async function findAllCategories() {
   });
 }
 
+export async function findStorefrontCategories() {
+  const categories = await db.category.findMany({
+    orderBy: {
+      name: "asc",
+    },
+  });
+
+  return categories.map((category) => ({
+    ...category,
+    image: toStorefrontMediaUrl(
+      "categories",
+      category.id,
+      category.image,
+      category.updatedAt
+    ),
+  }));
+}
+
 export async function findCategoryBySlug(slug: string) {
-  return db.category.findUnique({
+  const category = await db.category.findUnique({
     where: {
       slug,
     },
   });
+
+  if (!category) return null;
+
+  return {
+    ...category,
+    image: toStorefrontMediaUrl(
+      "categories",
+      category.id,
+      category.image,
+      category.updatedAt
+    ),
+  };
 }
 
 type CreateCategoryData = {

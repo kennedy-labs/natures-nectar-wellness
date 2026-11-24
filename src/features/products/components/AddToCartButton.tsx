@@ -85,6 +85,7 @@ export function AddToCartButton({ product }: Props) {
       <Button
         type="button"
         size="sm"
+        className="min-h-10 px-4"
         disabled
         onClick={(e) => {
           e.preventDefault();
@@ -100,6 +101,7 @@ export function AddToCartButton({ product }: Props) {
     <Button
       type="button"
       size="sm"
+      className="min-h-10 px-4"
       disabled={isMaxed}
       variant={feedback === "added" ? "default" : "outline"}
       onClick={handleClick}

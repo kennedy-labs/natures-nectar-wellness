@@ -1,4 +1,4 @@
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 import { requireAdminRequest } from "@/server/auth/admin-auth";
 import { apiFail, apiOk } from "@/server/http/api-response";
@@ -14,6 +14,8 @@ export async function POST(
     const { id } = await context.params;
     const cancelled = await cancelOrder(id);
 
+    revalidateTag("products", { expire: 0 });
+    revalidatePath("/");
     revalidatePath("/products");
     revalidatePath("/categories");
 

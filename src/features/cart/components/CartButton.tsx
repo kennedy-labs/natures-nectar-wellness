@@ -4,6 +4,7 @@ import * as React from "react";
 import { ShoppingBag } from "lucide-react";
 
 import { Button, type ButtonProps } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useCartStore } from "@/store/cart.store";
 
 const emptySubscribe = () => () => {};
@@ -24,7 +25,7 @@ export const CartButton = React.forwardRef<HTMLButtonElement, ButtonProps>(
         size="sm"
         type="button"
         variant="outline"
-        className={className}
+        className={cn("h-10 px-2.5 sm:h-9 sm:px-3", className)}
         aria-label={
           itemCount > 0 ? `Open cart (${itemCount} items)` : "Open cart"
         }

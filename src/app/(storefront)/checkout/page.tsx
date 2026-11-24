@@ -38,21 +38,21 @@ export default async function CheckoutPage(props: CheckoutPageProps) {
       : null;
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8">
-      <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">Checkout</p>
+    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <div className="space-y-2 border-b border-border/80 pb-6">
+        <p className="text-sm font-medium text-primary">Checkout</p>
 
-        <h1 className="text-3xl font-semibold tracking-tight">
+        <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
           Complete your order
         </h1>
 
-        <p className="text-muted-foreground">
+        <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
           Review your items, delivery details, and payment preference before
           submitting your order.
         </p>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-6 sm:mt-8">
         <CheckoutForm
           gatewayAvailability={gatewayAvailability}
           initialPaystackReturn={initialPaystackReturn}

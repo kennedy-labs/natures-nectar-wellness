@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import { ApiClientError } from "@/lib/api-client";
 
 import { verifyPaystackCheckout } from "@/features/checkout/api/checkout-api";
@@ -183,9 +184,19 @@ export function CheckoutForm({
 
   if (verifyingPaystack) {
     return (
-      <div className="flex items-center justify-center gap-3 rounded-xl border bg-card p-10 text-sm text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-        <span>Verifying your Paystack payment...</span>
+      <div className="space-y-4 rounded-xl border bg-card p-6 sm:p-8">
+        <div className="flex items-center gap-3 text-sm font-medium text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <span>Verifying your Paystack payment...</span>
+        </div>
+        <div className="space-y-3 border-t pt-4">
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-4 w-full max-w-md" />
+          <div className="grid gap-3 pt-2 sm:grid-cols-2">
+            <Skeleton className="h-16 w-full rounded-lg" />
+            <Skeleton className="h-16 w-full rounded-lg" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -284,7 +295,7 @@ export function CheckoutForm({
           </label>
 
           <textarea
-            className="min-h-[120px] w-full rounded-md border p-3"
+            className="min-h-[120px] w-full rounded-md border border-input bg-card p-3 text-base shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:text-sm"
             placeholder="Add any extra information about your order"
             {...register("customerNotes")}
           />
@@ -301,7 +312,7 @@ export function CheckoutForm({
           disabled={
             isSubmitting || cartItems.length === 0 || mpesaBlockedWithoutDaraja
           }
-          className="w-full rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          className="min-h-12 w-full rounded-md bg-primary px-4 py-3 text-base font-medium text-primary-foreground shadow-sm transition-all duration-150 hover:bg-primary/92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
         >
           {mpesaBlockedWithoutDaraja
             ? "Select Cash on Pickup (M-Pesa awaiting activation)"
@@ -315,7 +326,7 @@ export function CheckoutForm({
         </button>
       </div>
 
-      <div>
+      <div className="order-first lg:order-last">
         <CheckoutCartSummary />
       </div>
     </form>

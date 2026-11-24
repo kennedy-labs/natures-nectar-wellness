@@ -1,4 +1,5 @@
 import { db } from "@/server/db/prisma";
+import { ApiError } from "@/server/http/api-error";
 import {
   appendGpsPinToNotes,
   buildGoogleMapsPinUrl,
@@ -25,9 +26,11 @@ export async function createOrderRequest(data: CreateOrderRequestData) {
 
   return db.$transaction(async (transaction) => {
     for (const item of data.items) {
-      await transaction.product.update({
+      const updated = await transaction.product.updateMany({
         where: {
           id: item.productId,
+          isActive: true,
+          stockQuantity: { gte: item.quantity },
         },
         data: {
           stockQuantity: {
@@ -35,15 +38,15 @@ export async function createOrderRequest(data: CreateOrderRequestData) {
           },
         },
       });
-    }
 
-    const customer = await transaction.customer.create({
-      data: {
-        name: data.customer.name,
-        phone: data.customer.phone,
-        email: data.customer.email,
-      },
-    });
+      if (updated.count === 0) {
+        throw new ApiError(
+          400,
+          "INSUFFICIENT_STOCK",
+          `${item.productName} does not have enough stock.`
+        );
+      }
+    }
 
     const mapUrl = buildGoogleMapsPinUrl(
       data.delivery.latitude,
@@ -59,7 +62,6 @@ export async function createOrderRequest(data: CreateOrderRequestData) {
       data: {
         orderNumber: data.orderNumber,
         status: initialStatus,
-        customerId: customer.id,
         customerName: data.customer.name,
         customerPhone: data.customer.phone,
         customerEmail: data.customer.email,
@@ -70,39 +72,34 @@ export async function createOrderRequest(data: CreateOrderRequestData) {
         preferredPaymentMethod: data.preferredPaymentMethod,
         customerNotes: data.customerNotes,
         whatsappMessage: data.whatsappMessage,
+        customer: {
+          create: {
+            name: data.customer.name,
+            phone: data.customer.phone,
+            email: data.customer.email,
+          },
+        },
         items: {
           create: data.items,
         },
+        OrderStatusHistory: {
+          create: {
+            status: initialStatus,
+          },
+        },
+        ...(data.preferredPaymentMethod
+          ? {
+              payments: {
+                create: {
+                  method: data.preferredPaymentMethod,
+                  status: "PENDING",
+                },
+              },
+            }
+          : {}),
       },
     });
 
-    await transaction.orderStatusHistory.create({
-      data: {
-        orderId: order.id,
-        status: initialStatus,
-      },
-    });
-
-if (data.preferredPaymentMethod) {
-  await transaction.payment.create({
-    data: {
-      orderId: order.id,
-      method: data.preferredPaymentMethod,
-      status: "PENDING",
-    },
+    return order;
   });
-}
-
-return transaction.order.findUnique({
-  where: {
-    id: order.id,
-  },
-  include: {
-    customer: true,
-    items: true,
-    payments: true,
-  },
-});
-
-});
 }

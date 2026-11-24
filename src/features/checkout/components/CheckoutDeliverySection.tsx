@@ -154,7 +154,7 @@ export function CheckoutDeliverySection({
           <label className="text-sm font-medium">Delivery method</label>
 
           <select
-            className="w-full rounded-md border p-2"
+            className="h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:h-10 md:text-sm"
             {...register("delivery.method")}
           >
             {deliveryMethods.map((m) => (
@@ -182,7 +182,7 @@ export function CheckoutDeliverySection({
                 size="sm"
                 onClick={handleUseCurrentLocation}
                 disabled={locating}
-                className="min-h-9 gap-1.5 text-xs"
+                className="min-h-10 w-full gap-1.5 text-xs sm:w-auto"
               >
                 {locating ? (
                   <>

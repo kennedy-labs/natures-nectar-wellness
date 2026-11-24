@@ -37,6 +37,7 @@ export function CheckoutCustomerSection({
           </label>
 
           <Input
+            autoComplete="name"
             placeholder="John Doe"
             {...register("customer.name", { required: "Full name is required.", minLength: { value: 2, message: "Name must be at least 2 characters." } })}
           />
@@ -54,6 +55,9 @@ export function CheckoutCustomerSection({
           </label>
 
           <Input
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             placeholder="0712345678"
             {...register("customer.phone", { required: "Phone number is required.", minLength: { value: 7, message: "Phone must be at least 7 characters." } })}
           />
@@ -73,6 +77,8 @@ export function CheckoutCustomerSection({
           <Input
             placeholder="you@example.com"
             type="email"
+            inputMode="email"
+            autoComplete="email"
             {...register("customer.email")}
           />
 

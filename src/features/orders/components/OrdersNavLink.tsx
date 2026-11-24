@@ -19,7 +19,7 @@ export function OrdersNavLink() {
   const count = isClient ? rawCount : 0;
 
   return (
-    <Button asChild size="sm" variant="ghost">
+    <Button asChild size="sm" variant="ghost" className="h-10 px-2.5 sm:h-9 sm:px-3">
       <Link href="/orders" className="gap-1.5">
         <Package className="h-4 w-4" />
         <span>Orders</span>

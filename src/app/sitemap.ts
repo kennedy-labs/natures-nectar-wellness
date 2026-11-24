@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { getAbsoluteUrl } from "@/config/site";
-import { getAllCategories } from "@/server/services/category.service";
+import { getStorefrontCategories } from "@/server/services/category.service";
 import { getAllProducts } from "@/server/services/product.service";
 
 export const revalidate = 300;
@@ -30,7 +30,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const [categories, products] = await Promise.all([
-      getAllCategories(),
+      getStorefrontCategories(),
       getAllProducts(),
     ]);
 

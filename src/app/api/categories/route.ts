@@ -1,15 +1,15 @@
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 import { requireAdminRequest } from "@/server/auth/admin-auth";
 import { apiCreated, apiFail, apiOk, readJson } from "@/server/http/api-response";
 import {
   createCategory,
-  getAllCategories,
+  getStorefrontCategories,
 } from "@/server/services/category.service";
 
 export async function GET() {
   try {
-    const categories = await getAllCategories();
+    const categories = await getStorefrontCategories();
 
     return apiOk(categories);
   } catch (error) {
@@ -24,6 +24,8 @@ export async function POST(req: Request) {
     const body = await readJson(req);
     const category = await createCategory(body);
 
+    revalidateTag("categories", { expire: 0 });
+    revalidateTag("products", { expire: 0 });
     revalidatePath("/categories");
     revalidatePath("/products");
 

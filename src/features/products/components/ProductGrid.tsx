@@ -9,12 +9,12 @@ type ProductGridProps = {
 
 export function ProductGrid({ products }: ProductGridProps) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {products.map((product) => (
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {products.map((product, index) => (
         <Link
           key={product.id}
           href={`/products/${product.slug}`}
-          className="block transition-transform hover:-translate-y-0.5"
+          className="group block h-full"
         >
           <ProductCard
             id={product.id}
@@ -25,6 +25,7 @@ export function ProductGrid({ products }: ProductGridProps) {
             price={product.price}
             stockQuantity={product.stockQuantity}
             image={product.image}
+            priority={index < 3}
           />
         </Link>
       ))}

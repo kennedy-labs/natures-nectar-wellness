@@ -4,11 +4,13 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   allowedDevOrigins: [
+    "**.run.app",
     "*.run.app",
-    "localhost:3000",
-    "127.0.0.1:3000",
+    "localhost",
+    "127.0.0.1",
   ],
   images: {
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       {
         protocol: "https",

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DEFAULT_OG_IMAGE, getAbsoluteUrl } from "@/config/site";
@@ -78,19 +79,28 @@ export default async function CategoryPage(props: CategoryPageProps) {
   };
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-10">
+    <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(categorySchema),
         }}
       />
-      <div className="mb-8 space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">
+      <div className="mb-8 max-w-2xl space-y-2 border-b border-border/80 pb-6 sm:mb-10">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Link href="/categories" className="hover:text-foreground hover:underline underline-offset-4">
+            Categories
+          </Link>
+          <span aria-hidden="true">/</span>
+          <span className="text-primary font-medium">{category.name}</span>
+        </div>
+        <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
           {category.name}
         </h1>
         {category.description ? (
-          <p className="text-muted-foreground">{category.description}</p>
+          <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
+            {category.description}
+          </p>
         ) : null}
       </div>
 

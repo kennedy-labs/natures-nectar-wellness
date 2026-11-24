@@ -1,4 +1,4 @@
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 import { requireAdminRequest } from "@/server/auth/admin-auth";
 import {
@@ -43,6 +43,8 @@ export async function POST(req: Request) {
 
     const order = await submitOrder(body);
 
+    revalidateTag("products", { expire: 0 });
+    revalidatePath("/");
     revalidatePath("/products");
     revalidatePath("/categories");
 

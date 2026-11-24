@@ -41,9 +41,9 @@ export function CartDrawer() {
       <SheetTrigger asChild>
         <CartButton />
       </SheetTrigger>
-      <SheetContent className="flex w-full flex-col sm:max-w-md">
+      <SheetContent className="flex w-full flex-col bg-background px-4 py-5 sm:max-w-md sm:p-6">
         <SheetHeader>
-          <SheetTitle>Your cart</SheetTitle>
+          <SheetTitle className="font-display text-xl font-medium">Your cart</SheetTitle>
           <SheetDescription>
             Review items before checkout.
           </SheetDescription>
@@ -76,6 +76,7 @@ export function CartDrawer() {
 
                   <Button
                     aria-label={`Remove ${item.name}`}
+                    className="h-10 w-10 shrink-0"
                     onClick={() => removeItem(item.productId)}
                     size="icon"
                     type="button"
@@ -89,6 +90,7 @@ export function CartDrawer() {
                   <div className="flex items-center gap-2">
                     <Button
                       aria-label={`Decrease quantity for ${item.name}`}
+                      className="h-10 w-10"
                       disabled={item.quantity <= 1}
                       onClick={() => setQuantity(item.productId, item.quantity - 1)}
                       size="icon"
@@ -97,11 +99,12 @@ export function CartDrawer() {
                     >
                       <Minus />
                     </Button>
-                    <span className="w-10 text-center text-sm font-medium">
+                    <span className="w-10 text-center text-sm font-medium tabular-nums">
                       {item.quantity}
                     </span>
                     <Button
                       aria-label={`Increase quantity for ${item.name}`}
+                      className="h-10 w-10"
                       disabled={item.quantity >= item.stockQuantity}
                       onClick={() => setQuantity(item.productId, item.quantity + 1)}
                       size="icon"
@@ -112,7 +115,7 @@ export function CartDrawer() {
                     </Button>
                   </div>
 
-                  <p className="text-sm font-medium">
+                  <p className="text-sm font-medium tabular-nums">
                     {formatKes(item.price * item.quantity)}
                   </p>
                 </div>
@@ -121,21 +124,21 @@ export function CartDrawer() {
           )}
         </div>
 
-        <div className="mt-6 space-y-4 border-t pt-4">
+        <div className="mt-4 space-y-4 border-t border-border/80 pt-4 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">Subtotal</p>
-            <p className="text-base font-semibold">{formatKes(subtotal)}</p>
+            <p className="text-base font-semibold tabular-nums">{formatKes(subtotal)}</p>
           </div>
 
           <div className="grid gap-2">
-            <Button asChild className="w-full">
+            <Button asChild className="w-full min-h-11">
               <Link href="/checkout" onClick={() => setOpen(false)}>
                 Proceed to checkout
               </Link>
             </Button>
             {items.length > 0 ? (
               <Button
-                className="w-full"
+                className="w-full min-h-11"
                 onClick={() => clearCart()}
                 type="button"
                 variant="outline"

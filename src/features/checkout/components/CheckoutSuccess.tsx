@@ -41,18 +41,18 @@ export function CheckoutSuccess({
   const isCashOnPickup = preferredPaymentMethod === "CASH_ON_PICKUP";
 
   return (
-    <div className="rounded-xl border bg-card p-6 sm:p-8">
+    <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-8">
       <div className="mx-auto max-w-lg space-y-6">
         <div className="space-y-2 text-center">
-          <p className="text-sm font-medium text-green-600">
+          <p className="text-sm font-medium text-primary">
             {initialVerified ? "Order paid & confirmed" : "Order submitted"}
           </p>
 
-          <h2 className="text-3xl font-semibold tracking-tight">
+          <h2 className="font-display text-2xl font-medium tracking-tight text-foreground sm:text-3xl">
             {initialVerified ? "Payment received" : "Thank you for your order"}
           </h2>
 
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm leading-relaxed text-muted-foreground">
             {initialVerified
               ? "Your M-Pesa payment has been verified and your order is now queued for processing."
               : isCashOnPickup
@@ -61,20 +61,24 @@ export function CheckoutSuccess({
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 rounded-lg border bg-muted/40 p-4 text-center">
-          <div>
+        <div className="grid grid-cols-2 gap-3 rounded-xl border border-border/80 bg-muted/45 p-4 text-center sm:gap-4">
+          <div className="min-w-0">
             <p className="text-xs text-muted-foreground">Order number</p>
-            <p className="mt-1 font-semibold">{orderNumber}</p>
+            <p className="mt-1 break-all font-mono text-sm font-semibold text-foreground">
+              {orderNumber}
+            </p>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-muted-foreground">Order total</p>
-            <p className="mt-1 font-semibold">{formatKes(amount)}</p>
+            <p className="mt-1 text-base font-semibold tabular-nums text-foreground">
+              {formatKes(amount)}
+            </p>
           </div>
         </div>
 
         {initialVerified ? (
-          <div className="space-y-2 rounded-lg border border-green-500/40 bg-green-500/10 p-4 text-sm">
-            <div className="flex items-center gap-2 font-medium text-green-700 dark:text-green-400">
+          <div className="space-y-2 rounded-xl border border-primary/25 bg-primary/5 p-4 text-sm">
+            <div className="flex items-center gap-2 font-medium text-primary">
               <CheckCircle2 className="h-4 w-4" />
               <span>
                 Verified {initialVerified.channelLabel ?? "M-Pesa"} Payment
@@ -82,14 +86,14 @@ export function CheckoutSuccess({
             </div>
             <p className="text-muted-foreground">
               Amount paid:{" "}
-              <strong className="text-foreground">
+              <strong className="text-foreground tabular-nums">
                 {formatKes(initialVerified.amount)}
               </strong>
             </p>
             {initialVerified.transactionRef ? (
               <p className="text-muted-foreground">
                 M-Pesa receipt:{" "}
-                <strong className="text-foreground">
+                <strong className="font-mono text-foreground">
                   {initialVerified.transactionRef}
                 </strong>
               </p>
@@ -110,18 +114,18 @@ export function CheckoutSuccess({
         ) : null}
 
         <div className="space-y-2.5 pt-2">
-          <Button asChild className="w-full">
+          <Button asChild className="w-full min-h-11">
             <a href={whatsappUrl} rel="noopener noreferrer" target="_blank">
               <MessageCircle className="mr-2 h-4 w-4" />
               Continue on WhatsApp
             </a>
           </Button>
 
-          <Button asChild variant="outline" className="w-full">
+          <Button asChild variant="outline" className="w-full min-h-11">
             <Link href="/orders">View my orders</Link>
           </Button>
 
-          <Button asChild variant="outline" className="w-full">
+          <Button asChild variant="outline" className="w-full min-h-11">
             <Link href="/products">Continue shopping</Link>
           </Button>
         </div>

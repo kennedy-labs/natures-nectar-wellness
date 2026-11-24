@@ -1,4 +1,4 @@
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 import { requireAdminRequest } from "@/server/auth/admin-auth";
 import { apiFail, apiOk, readJson } from "@/server/http/api-response";
@@ -18,6 +18,8 @@ export async function PATCH(
     const body = await readJson(req);
     const category = await updateCategory(id, body);
 
+    revalidateTag("categories", { expire: 0 });
+    revalidateTag("products", { expire: 0 });
     revalidatePath("/categories");
     revalidatePath("/products");
 
@@ -37,6 +39,8 @@ export async function DELETE(
     const { id } = await context.params;
     const category = await deleteCategory(id);
 
+    revalidateTag("categories", { expire: 0 });
+    revalidateTag("products", { expire: 0 });
     revalidatePath("/categories");
     revalidatePath("/products");
 

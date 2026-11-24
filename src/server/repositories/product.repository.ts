@@ -1,7 +1,44 @@
+import { toStorefrontMediaUrl } from "@/lib/media";
 import { db } from "@/server/db/prisma";
 
+function mapStorefrontProduct<
+  T extends {
+    id: string;
+    image: string | null;
+    updatedAt: Date;
+    category?: {
+      id: string;
+      image: string | null;
+      updatedAt: Date;
+    } | null;
+  },
+>(product: T): T {
+  return {
+    ...product,
+    image: toStorefrontMediaUrl(
+      "products",
+      product.id,
+      product.image,
+      product.updatedAt
+    ),
+    ...(product.category
+      ? {
+          category: {
+            ...product.category,
+            image: toStorefrontMediaUrl(
+              "categories",
+              product.category.id,
+              product.category.image,
+              product.category.updatedAt
+            ),
+          },
+        }
+      : {}),
+  };
+}
+
 export async function findAllProducts() {
-  return db.product.findMany({
+  const products = await db.product.findMany({
     include: {
       category: true,
     },
@@ -12,10 +49,12 @@ export async function findAllProducts() {
       createdAt: "desc",
     },
   });
+
+  return products.map(mapStorefrontProduct);
 }
 
 export async function findFeaturedProducts() {
-  return db.product.findMany({
+  const products = await db.product.findMany({
     include: {
       category: true,
     },
@@ -28,6 +67,8 @@ export async function findFeaturedProducts() {
     },
     take: 6,
   });
+
+  return products.map(mapStorefrontProduct);
 }
 
 export async function findAllProductsForAdmin() {
@@ -42,7 +83,7 @@ export async function findAllProductsForAdmin() {
 }
 
 export async function findActiveProductsByCategorySlug(categorySlug: string) {
-  return db.product.findMany({
+  const products = await db.product.findMany({
     include: {
       category: true,
     },
@@ -56,6 +97,8 @@ export async function findActiveProductsByCategorySlug(categorySlug: string) {
       createdAt: "desc",
     },
   });
+
+  return products.map(mapStorefrontProduct);
 }
 
 export async function findProductBySlug(slug: string) {
@@ -70,7 +113,7 @@ export async function findProductBySlug(slug: string) {
 }
 
 export async function findActiveProductBySlug(slug: string) {
-  return db.product.findFirst({
+  const product = await db.product.findFirst({
     include: {
       category: true,
     },
@@ -79,6 +122,8 @@ export async function findActiveProductBySlug(slug: string) {
       isActive: true,
     },
   });
+
+  return product ? mapStorefrontProduct(product) : null;
 }
 
 export async function findActiveProductsByIds(ids: string[]) {

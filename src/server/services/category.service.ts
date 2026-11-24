@@ -1,3 +1,6 @@
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
+
 import {
   createCategorySchema,
   updateCategorySchema,
@@ -8,16 +11,33 @@ import {
   deleteCategory as deleteCategoryRecord,
   findAllCategories,
   findCategoryBySlug,
+  findStorefrontCategories,
   updateCategory as updateCategoryRecord,
 } from "@/server/repositories/category.repository";
+
+const getCachedStorefrontCategories = unstable_cache(
+  async () => findStorefrontCategories(),
+  ["storefront-categories"],
+  { revalidate: 60, tags: ["categories"] }
+);
+
+const getCachedCategoryBySlug = unstable_cache(
+  async (slug: string) => findCategoryBySlug(slug),
+  ["storefront-category-by-slug"],
+  { revalidate: 60, tags: ["categories"] }
+);
 
 export async function getAllCategories() {
   return findAllCategories();
 }
 
-export async function getCategoryBySlug(slug: string) {
-  return findCategoryBySlug(slug);
-}
+export const getStorefrontCategories = cache(async () =>
+  getCachedStorefrontCategories()
+);
+
+export const getCategoryBySlug = cache(async (slug: string) =>
+  getCachedCategoryBySlug(slug)
+);
 
 export async function createCategory(input: unknown) {
   const data = createCategorySchema.parse(input);

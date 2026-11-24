@@ -1,5 +1,7 @@
 "use client";
 
+import { AdminV2DashboardSkeleton } from "@/components/skeletons/AdminSkeletons";
+
 import { AttentionCard } from "./AttentionCard";
 import { RecentOrders } from "./RecentOrders";
 
@@ -9,11 +11,7 @@ export function DashboardPage() {
   const { data, isLoading, error } = useDashboard();
 
   if (isLoading) {
-    return (
-      <main className="p-8">
-        <p>Loading dashboard...</p>
-      </main>
-    );
+    return <AdminV2DashboardSkeleton />;
   }
 
   if (error || !data) {

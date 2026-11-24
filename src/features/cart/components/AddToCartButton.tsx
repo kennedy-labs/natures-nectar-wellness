@@ -42,8 +42,9 @@ export function AddToCartButton({ product }: AddToCartButtonProps) {
   const isMaxed = remainingStock <= 0;
 
   return (
-    <div className="space-y-2">
+    <div className="w-full space-y-2 sm:w-auto">
       <Button
+        className="w-full min-h-11 sm:w-auto"
         disabled={isOutOfStock || isMaxed}
         onClick={() => {
           setError(null);

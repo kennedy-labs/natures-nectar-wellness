@@ -1,6 +1,4 @@
 import { formatKes } from "@/lib/format";
-import Image from "next/image";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -8,11 +6,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { SkeletonImage } from "@/components/ui/skeleton-image";
 import {
   getInventoryStatus,
   getInventoryStatusLabel,
 } from "@/features/inventory/utils/inventory.utils";
 import { AddToCartButton } from "@/features/products/components/AddToCartButton";
+import { cn } from "@/lib/utils";
 
 type ProductCardProps = {
   id: string;
@@ -23,6 +23,7 @@ type ProductCardProps = {
   price: number;
   stockQuantity: number;
   image?: string | null;
+  priority?: boolean;
 };
 
 export function ProductCard({
@@ -34,64 +35,78 @@ export function ProductCard({
   price,
   stockQuantity,
   image,
+  priority = false,
 }: ProductCardProps) {
   const inventoryStatus = getInventoryStatus(stockQuantity);
+  const statusLabel = getInventoryStatusLabel(inventoryStatus);
+  const trimmedBenefits = benefits?.trim() || "";
+  const trimmedDescription = description.trim();
+  const hasDistinctBenefits =
+    Boolean(trimmedBenefits) &&
+    trimmedBenefits.toLowerCase() !== trimmedDescription.toLowerCase();
 
   return (
-    <Card className="h-full overflow-hidden rounded-lg shadow-sm">
-      <div className="relative aspect-[4/3] bg-muted">
+    <Card className="flex h-full flex-col overflow-hidden rounded-xl border-border/80 bg-card shadow-[0_1px_2px_rgba(24,42,32,0.04)] transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/35 group-hover:shadow-[0_14px_30px_-14px_rgba(24,42,32,0.16)]">
+      <div className="relative aspect-[4/3] overflow-hidden bg-muted/50">
         {image ? (
-          image.startsWith("data:") ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={image}
-              alt={name}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <Image
-              src={image}
-              alt={name}
-              fill
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              referrerPolicy="no-referrer"
-              className="h-full w-full object-cover"
-            />
-          )
+          <SkeletonImage
+            src={image}
+            alt={name}
+            priority={priority}
+            useNextImage={!image.startsWith("data:")}
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            className="transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+          />
         ) : (
-          <div className="flex h-full items-center justify-center px-6 text-center text-sm font-medium text-muted-foreground">
+          <div className="flex h-full items-center justify-center px-6 text-center font-display text-sm font-medium text-muted-foreground">
             Nature&apos;s Nectar
           </div>
         )}
       </div>
 
-      <CardHeader className="space-y-3 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <CardTitle className="text-lg leading-snug">{name}</CardTitle>
-
-          <Badge
-            variant={
+      <CardHeader className="space-y-2 p-5 pb-2">
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <span
+            className={cn(
+              "font-medium",
               inventoryStatus === "OUT_OF_STOCK"
-                ? "destructive"
-                : "secondary"
-            }
+                ? "text-destructive"
+                : inventoryStatus === "LOW_STOCK"
+                  ? "text-amber-700"
+                  : "text-primary"
+            )}
           >
-            {getInventoryStatusLabel(inventoryStatus)}
-          </Badge>
+            {statusLabel}
+          </span>
         </div>
 
-        <p className="line-clamp-2 text-sm text-muted-foreground">
-          {benefits ?? description}
-        </p>
+        <CardTitle className="font-display text-xl font-medium leading-snug tracking-tight text-foreground">
+          {name}
+        </CardTitle>
+
+        {hasDistinctBenefits ? (
+          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+            {trimmedBenefits}
+          </p>
+        ) : null}
       </CardHeader>
 
-      <CardContent className="px-4 pb-4 pt-0">
-        <p className="line-clamp-3 text-sm text-muted-foreground">{description}</p>
+      <CardContent className="px-5 pb-4 pt-1">
+        <p
+          className={cn(
+            "text-sm leading-relaxed text-muted-foreground/90",
+            hasDistinctBenefits ? "line-clamp-2" : "line-clamp-3"
+          )}
+        >
+          {description}
+        </p>
       </CardContent>
 
-      <CardFooter className="flex items-center justify-between px-4 pb-4 pt-0">
-        <div className="flex w-full items-center justify-between">
-          <p className="text-lg font-semibold">{formatKes(price)}</p>
+      <CardFooter className="mt-auto border-t border-border/60 px-5 py-3.5">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
+          <p className="text-base font-semibold tabular-nums text-foreground">
+            {formatKes(price)}
+          </p>
 
           <AddToCartButton
             product={{

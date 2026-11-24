@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 
+import { AdminOrdersListSkeleton } from "@/components/skeletons/AdminSkeletons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { parseDeliveryNotesPin } from "@/features/orders/utils/order.utils";
@@ -333,16 +334,7 @@ export function AdminOrdersPanel() {
   }, [orders, filter, searchQuery]);
 
   if (loading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2, 3].map((n) => (
-          <div
-            key={n}
-            className="h-32 animate-pulse rounded-xl border border-border/70 bg-white"
-          />
-        ))}
-      </div>
-    );
+    return <AdminOrdersListSkeleton />;
   }
 
   return (

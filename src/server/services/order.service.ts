@@ -66,8 +66,17 @@ export async function getOrdersForAdmin() {
   });
 }
 
+const EXPIRED_HOLD_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+let lastExpiredHoldSweepAt = 0;
+
 async function releaseExpiredMpesaHolds(minutes = 30) {
-  const cutoff = new Date(Date.now() - minutes * 60 * 1000);
+  const now = Date.now();
+  if (now - lastExpiredHoldSweepAt < EXPIRED_HOLD_SWEEP_INTERVAL_MS) {
+    return;
+  }
+  lastExpiredHoldSweepAt = now;
+
+  const cutoff = new Date(now - minutes * 60 * 1000);
   const expiredHolds = await db.order.findMany({
     where: {
       preferredPaymentMethod: "MPESA_BUY_GOODS",
@@ -131,12 +140,7 @@ export async function submitOrder(input: unknown) {
       throw new ApiError(400, "PRODUCT_UNAVAILABLE", "Product not available.");
     }
 
-    const productFresh = await db.product.findUnique({
-      where: { id: product.id },
-      select: { stockQuantity: true },
-    });
-
-    if (!productFresh || productFresh.stockQuantity < item.quantity) {
+    if (product.stockQuantity < item.quantity) {
       throw new ApiError(
         400,
         "INSUFFICIENT_STOCK",

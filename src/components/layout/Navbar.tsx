@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Leaf, MessageCircle } from "lucide-react";
 
+import { MobileNavDrawer } from "@/components/layout/MobileNavDrawer";
 import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
 import { CartDrawer } from "@/features/cart/components/CartDrawer";
@@ -17,17 +18,26 @@ export function Navbar() {
   );
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
-        <Link className="flex items-center gap-2 font-semibold tracking-tight" href="/">
-          <Leaf className="h-5 w-5 text-primary" />
-          <span>Nature&apos;s Nectar</span>
-        </Link>
+    <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/80">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:h-16 sm:gap-6 sm:px-6">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+          <MobileNavDrawer whatsappUrl={whatsappUrl} />
+          <Link
+            className="flex min-w-0 items-center gap-2 font-display text-base font-medium tracking-tight text-foreground transition-colors hover:text-primary sm:text-lg whitespace-nowrap shrink-0"
+            href="/"
+          >
+            <Leaf className="h-4 w-4 shrink-0 text-primary" />
+            <span className="truncate">Nature&apos;s Nectar</span>
+          </Link>
+        </div>
 
-        <nav className="hidden items-center gap-6 text-sm md:flex">
+        <nav
+          aria-label="Primary navigation"
+          className="hidden items-center gap-7 text-sm font-medium md:flex"
+        >
           {navLinks.map((link) => (
             <Link
-              className="text-muted-foreground transition-colors hover:text-foreground"
+              className="whitespace-nowrap shrink-0 text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
               href={link.href}
               key={link.href}
             >
@@ -36,7 +46,7 @@ export function Navbar() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <OrdersNavLink />
           <CartDrawer />
           {whatsappUrl ? (
@@ -46,8 +56,8 @@ export function Navbar() {
               target="_blank"
               className="hidden sm:inline-flex"
             >
-              <Button size="sm" variant="outline">
-                <MessageCircle />
+              <Button size="sm" variant="outline" className="min-h-9">
+                <MessageCircle className="text-primary" />
                 WhatsApp
               </Button>
             </a>
