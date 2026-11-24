@@ -278,6 +278,27 @@ export default async function ProductPage(props: ProductPageProps) {
               ) : null}
             </div>
           ) : null}
+
+          <aside
+            aria-label="Wellness disclaimer"
+            className="border-t border-border/70 pt-4 text-xs leading-relaxed text-muted-foreground"
+          >
+            <p className="font-medium text-foreground">Wellness note</p>
+            <p className="mt-1">
+              Natural formulations are offered for everyday wellbeing and are not
+              intended to diagnose, treat, cure, or prevent any medical
+              condition. Consult a qualified healthcare professional before use
+              if you are pregnant, nursing, taking medication, or managing a
+              health condition.{" "}
+              <Link
+                href="/terms"
+                className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+              >
+                Terms &amp; Conditions
+              </Link>
+              .
+            </p>
+          </aside>
         </div>
       </div>
     </section>
