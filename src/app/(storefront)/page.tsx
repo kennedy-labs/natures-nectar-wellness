@@ -13,6 +13,7 @@ import {
 import { ProductGrid } from "@/features/products/components/ProductGrid";
 import { getCategoryFallbackImage } from "@/lib/media";
 import { getStorefrontCategories } from "@/server/services/category.service";
+import { getPaymentGatewayAvailability } from "@/server/services/payment-gateway.service";
 import { getFeaturedProducts } from "@/server/services/product.service";
 
 export const revalidate = 60;
@@ -73,6 +74,7 @@ export default async function HomePage() {
     getFeaturedProducts(),
     getStorefrontCategories(),
   ]);
+  const { darajaEnabled } = getPaymentGatewayAvailability();
 
   const categoriesToShow =
     dbCategories.length > 0
@@ -87,7 +89,7 @@ export default async function HomePage() {
   const featuredSchema = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: "Trending Apothecary Formulations",
+    name: "Popular Wellness Products",
     itemListElement: featuredProducts.map((product, index) => ({
       "@type": "ListItem",
       position: index + 1,
@@ -97,7 +99,7 @@ export default async function HomePage() {
   };
 
   return (
-    <div className="flex flex-col gap-10 pb-16 sm:gap-14 md:gap-16">
+    <div className="flex flex-col gap-6 pb-14 sm:gap-12 sm:pb-16 md:gap-16">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -105,58 +107,16 @@ export default async function HomePage() {
         }}
       />
 
-      {/* 1. COMPRESSED VALUE HERO (High Viewport Density + Luxury Botanical Spotlight) */}
-      <section className="border-b border-border/70 bg-gradient-to-b from-card/85 to-background px-4 pt-5 pb-7 sm:px-6 sm:pt-9 sm:pb-11">
+      {/* 1. PHONE-FIRST VALUE HERO (Visual First on Mobile + Above-the-Fold Product Peek) */}
+      <section className="border-b border-border/70 bg-gradient-to-b from-card/85 to-background px-4 pt-3 pb-4 sm:px-6 sm:pt-8 sm:pb-10">
         <div className="mx-auto max-w-6xl">
-          <div className="grid items-stretch gap-6 lg:grid-cols-12 lg:gap-10">
-            {/* Left Content */}
-            <div className="flex flex-col justify-center space-y-4 lg:col-span-6">
-              <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-                Kenyan Botanical Apothecary
-              </p>
-
-              <h1 className="font-display text-[clamp(1.85rem,3.6vw,3.1rem)] font-semibold leading-[1.12] tracking-tight text-foreground text-balance">
-                Herbal remedies &amp; raw forest honey for everyday vitality
-              </h1>
-
-              <p className="max-w-[54ch] text-sm leading-relaxed text-muted-foreground sm:text-base">
-                Lab-tested botanical tinctures, high-altitude Shilajit resin, and unfiltered Mau Forest honey. Order seamlessly with instant M-Pesa STK push or direct WhatsApp care across Kenya.
-              </p>
-
-              {/* Action Hierarchy: 1 Primary + 1 Secondary */}
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                <a
-                  href="#trending-products"
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 whitespace-nowrap"
-                >
-                  Shop Formulations
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </a>
-
-                <Link
-                  href="/categories"
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-card px-5 text-sm font-medium text-foreground transition-colors hover:bg-muted whitespace-nowrap"
-                >
-                  Categories
-                </Link>
-              </div>
-
-              {/* Clean Unboxed Trust Marker */}
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pt-1 text-xs text-muted-foreground sm:text-sm">
-                <span className="font-medium text-foreground">Delivery Across Kenya</span>
-                <span aria-hidden="true">·</span>
-                <span>Pay on WhatsApp / Instant M-Pesa</span>
-                <span aria-hidden="true">·</span>
-                <span>Lab Purity Tested</span>
-              </div>
-            </div>
-
-            {/* Right Artisanal Botanical Apothecary Photography */}
-            <div className="lg:col-span-6">
-              <div className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl border border-border/80 bg-muted/40 shadow-[0_12px_32px_-14px_rgba(26,66,45,0.18)] lg:h-full lg:min-h-[320px]">
+          <div className="grid items-stretch gap-3.5 sm:gap-6 lg:grid-cols-12 lg:gap-10">
+            {/* Botanical Spotlight Image: Shown First on Phones for Instant Recognition, Right on Desktop */}
+            <div className="order-first lg:order-last lg:col-span-6">
+              <div className="relative h-36 w-full overflow-hidden rounded-xl border border-border/80 bg-muted/40 shadow-[0_10px_26px_-14px_rgba(26,66,45,0.2)] sm:h-56 sm:rounded-2xl lg:h-full lg:min-h-[320px]">
                 <Image
                   src={heroApothecaryImg}
-                  alt="Artisanal Kenyan botanical apothecary showcase with amber tincture bottle, dried hibiscus, raw honeycomb on travertine stone, and warm herbal tea"
+                  alt="Natural Kenyan herbal remedies, raw Mau Forest honey, amber tincture bottle, and dried hibiscus"
                   fill
                   priority
                   placeholder="blur"
@@ -166,22 +126,68 @@ export default async function HomePage() {
                 />
               </div>
             </div>
+
+            {/* Value Proposition & Primary Actions */}
+            <div className="order-last flex flex-col justify-center space-y-2.5 sm:space-y-4 lg:order-first lg:col-span-6">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-primary sm:text-xs">
+                Natural Wellness Store · Kenya
+              </p>
+
+              <h1 className="font-display text-[1.55rem] font-semibold leading-[1.12] tracking-tight text-foreground text-balance sm:text-[clamp(1.95rem,3.6vw,3rem)]">
+                Natural herbal remedies &amp; raw forest honey
+              </h1>
+
+              <p className="max-w-[54ch] text-xs leading-relaxed text-muted-foreground sm:text-base">
+                Pure Kenyan herbs, raw Mau Forest honey, and daily supplements — delivered fast across all 47 counties.
+              </p>
+
+              {/* Action Hierarchy: 1 Primary + 1 Secondary */}
+              <div className="flex flex-wrap items-center gap-2.5 pt-0.5 sm:gap-3 sm:pt-1">
+                <a
+                  href="#trending-products"
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-5 text-xs font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 whitespace-nowrap sm:min-h-11 sm:px-6 sm:text-sm"
+                >
+                  Shop Products
+                  <ArrowRight className="ml-1.5 h-4 w-4 sm:ml-2" />
+                </a>
+
+                <Link
+                  href="/categories"
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-card px-4 text-xs font-medium text-foreground transition-colors hover:bg-muted whitespace-nowrap sm:min-h-11 sm:px-5 sm:text-sm"
+                >
+                  Categories
+                </Link>
+              </div>
+
+              {/* Clean Unboxed Trust Marker */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground sm:gap-x-2.5 sm:pt-1 sm:text-sm">
+                <span className="font-medium text-foreground">Nairobi Same-Day Delivery</span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  {darajaEnabled
+                    ? "Instant M-Pesa & WhatsApp Care"
+                    : "Pay on WhatsApp or Pickup"}
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>Purity Tested</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* 2. IMMEDIATE 2-COL MOBILE / 4-COL DESKTOP PRODUCT GRID */}
       <section id="trending-products" className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 sm:px-6">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3 sm:mb-6">
+          <div className="space-y-0.5 sm:space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-primary sm:text-xs">
               Featured Selection
             </p>
-            <h2 className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              Trending Apothecary Formulations
+            <h2 className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              Popular Wellness Products
             </h2>
-            <p className="text-xs text-muted-foreground sm:text-sm">
-              Handcrafted in small batches and lab-tested for botanical purity.
+            <p className="hidden text-xs text-muted-foreground sm:block sm:text-sm">
+              Handcrafted in small batches and lab-tested for natural purity.
             </p>
           </div>
 
@@ -189,7 +195,7 @@ export default async function HomePage() {
             href="/products"
             className="inline-flex items-center gap-1.5 text-xs font-medium text-primary underline-offset-4 hover:underline sm:text-sm"
           >
-            <span>View all products</span>
+            <span>View all</span>
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
@@ -201,15 +207,15 @@ export default async function HomePage() {
 
       {/* 3. VISUAL CATEGORY DISCOVERY GRID (2x2 Mobile / 4-Col Desktop) */}
       <section className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-        <div className="mb-6 space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-            Browse By Concern
+        <div className="mb-4 space-y-1 sm:mb-6">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary sm:text-xs">
+            Browse By Need
           </p>
-          <h2 className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            Explore Botanical Categories
+          <h2 className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            Shop by Category
           </h2>
           <p className="text-xs text-muted-foreground sm:text-sm">
-            Targeted herbal collections for immune resilience, restful sleep, and mineral nourishment.
+            Targeted herbal collections for immunity, restful sleep, and daily energy.
           </p>
         </div>
 
@@ -273,10 +279,12 @@ export default async function HomePage() {
             </div>
             <div className="space-y-1">
               <h3 className="font-display text-sm font-semibold text-foreground">
-                02. WhatsApp &amp; M-Pesa Care
+                02. {darajaEnabled ? "WhatsApp & M-Pesa Care" : "Direct WhatsApp Care"}
               </h3>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Confirm your order directly on WhatsApp or pay seamlessly online via Safaricom M-Pesa STK push.
+                {darajaEnabled
+                  ? "Confirm your order directly on WhatsApp or pay seamlessly online via Safaricom M-Pesa STK push."
+                  : "Confirm your order directly on WhatsApp with a real person, or choose Cash on Pickup."}
               </p>
             </div>
           </div>
@@ -297,19 +305,19 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* 5. ARTISANAL APOTHECARY PROVENANCE & PURITY */}
+      {/* 5. PROVENANCE & PURITY */}
       <section className="mx-auto w-full max-w-6xl px-4 sm:px-6">
         <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-xs sm:p-10">
           <div className="grid gap-8 lg:grid-cols-12 lg:items-center">
             <div className="space-y-4 lg:col-span-7">
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-                The Apothecary Standard
+                Our Quality Standard
               </p>
               <h2 className="font-display text-2xl font-semibold tracking-tight text-foreground text-balance sm:text-3xl">
-                Traditional wisdom substantiated by rigorous purity
+                Traditional wisdom backed by clean lab testing
               </h2>
               <p className="text-sm leading-relaxed text-muted-foreground">
-                Every jar of Mau Forest honey is raw and unpasteurized, retaining its active botanical pollen and healing enzymes. Our Shilajit resin is purified through traditional herbal filtration and tested to ensure zero heavy metal contamination.
+                Every jar of Mau Forest honey is raw and unpasteurized, retaining its natural pollen and enzymes. Our Shilajit resin is purified and tested to ensure clean, reliable quality.
               </p>
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div className="flex items-center gap-2 text-xs font-medium text-foreground">
@@ -326,7 +334,7 @@ export default async function HomePage() {
                 </div>
                 <div className="flex items-center gap-2 text-xs font-medium text-foreground">
                   <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
-                  <span>Instant M-Pesa &amp; Pickup</span>
+                  <span>{darajaEnabled ? "Instant M-Pesa & Pickup" : "WhatsApp & Cash on Pickup"}</span>
                 </div>
               </div>
             </div>

@@ -62,13 +62,13 @@ export function CartDrawer() {
   return (
     <Sheet open={isDrawerOpen} onOpenChange={setDrawerOpen}>
       <SheetContent className="flex w-full flex-col bg-background px-4 py-5 sm:max-w-md sm:p-6">
-        <SheetHeader className="border-b border-border/70 pb-4">
-          <div className="flex items-center justify-between pr-6">
+        <SheetHeader className="border-b border-border/70 pb-4 text-left">
+          <div className="flex items-baseline gap-2.5 pr-12">
             <SheetTitle className="font-display text-xl font-medium tracking-tight">
               Apothecary Bag
             </SheetTitle>
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {totalCount} {totalCount === 1 ? "item" : "items"}
+            <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+              ({totalCount} {totalCount === 1 ? "item" : "items"})
             </span>
           </div>
           <SheetDescription className="text-xs text-muted-foreground">
