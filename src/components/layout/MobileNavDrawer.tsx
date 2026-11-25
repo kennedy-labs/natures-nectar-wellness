@@ -30,7 +30,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Home", icon: Home },
   { href: "/products", label: "Products", icon: ShoppingBag },
   { href: "/categories", label: "Categories", icon: Grid2x2 },
-  { href: "/orders", label: "Track Order", icon: Package },
+  { href: "/orders", label: "Orders", icon: Package },
 ] as const;
 
 export function MobileNavDrawer({ whatsappUrl }: MobileNavDrawerProps) {

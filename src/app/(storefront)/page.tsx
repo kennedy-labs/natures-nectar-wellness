@@ -134,10 +134,10 @@ export default async function HomePage() {
                 </a>
 
                 <Link
-                  href="/orders"
+                  href="/categories"
                   className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-card px-5 text-sm font-medium text-foreground transition-colors hover:bg-muted whitespace-nowrap"
                 >
-                  Track Order
+                  Categories
                 </Link>
               </div>
 

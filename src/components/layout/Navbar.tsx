@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Leaf, MessageCircle } from "lucide-react";
+import { Leaf, MessageCircle, Package } from "lucide-react";
 
 import { MobileNavDrawer } from "@/components/layout/MobileNavDrawer";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { CartDrawer } from "@/features/cart/components/CartDrawer";
 const navLinks = [
   { href: "/products", label: "Products" },
   { href: "/categories", label: "Categories" },
-  { href: "/orders", label: "Track Order" },
 ];
 
 export function Navbar() {
@@ -20,12 +19,12 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 h-16 max-h-16 border-b border-border/80 bg-background/95 backdrop-blur-md">
-      <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-3 px-3 sm:px-6">
+      <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-2 px-3 sm:gap-3 sm:px-6">
         {/* Zone 1: Mobile drawer & Brand mark */}
-        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+        <div className="flex min-w-0 items-center gap-1 sm:gap-2">
           <MobileNavDrawer whatsappUrl={whatsappUrl} />
           <Link
-            className="flex min-w-0 items-center gap-2 font-display text-base font-semibold tracking-tight text-foreground transition-colors hover:text-primary sm:text-lg whitespace-nowrap"
+            className="flex min-w-0 items-center gap-1.5 font-display text-[15px] font-semibold tracking-tight text-foreground transition-colors hover:text-primary sm:gap-2 sm:text-lg whitespace-nowrap"
             href="/"
           >
             <Leaf className="h-4 w-4 shrink-0 text-primary" />
@@ -49,8 +48,8 @@ export function Navbar() {
           ))}
         </nav>
 
-        {/* Zone 3: Actions (WhatsApp Care & Cart) */}
-        <div className="flex shrink-0 items-center gap-2">
+        {/* Zone 3: Actions (WhatsApp Care, Orders & Cart) */}
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {whatsappUrl ? (
             <a
               href={whatsappUrl}
@@ -68,6 +67,17 @@ export function Navbar() {
               </Button>
             </a>
           ) : null}
+          <Button
+            asChild
+            size="sm"
+            variant="ghost"
+            className="h-10 gap-1.5 px-2.5 text-xs font-medium text-foreground hover:bg-muted sm:h-9 sm:px-3 sm:text-sm whitespace-nowrap shrink-0"
+          >
+            <Link href="/orders">
+              <Package className="hidden h-4 w-4 shrink-0 text-primary min-[380px]:inline-block" />
+              <span>Orders</span>
+            </Link>
+          </Button>
           <CartButton />
           <CartDrawer />
         </div>
