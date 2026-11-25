@@ -17,7 +17,6 @@ export const CartButton = React.forwardRef<HTMLButtonElement, ButtonProps>(
       () => false
     );
     const rawCount = useCartStore((state) => state.getItemCount());
-    const openDrawer = useCartStore((state) => state.openDrawer);
     const itemCount = isClient ? rawCount : 0;
 
     return (
@@ -26,9 +25,8 @@ export const CartButton = React.forwardRef<HTMLButtonElement, ButtonProps>(
         size="sm"
         type="button"
         variant="outline"
-        onClick={openDrawer}
         className={cn(
-          "h-10 shrink-0 gap-1 px-2.5 text-xs sm:h-9 sm:gap-1.5 sm:px-3 sm:text-sm",
+          "h-10 shrink-0 gap-1 px-2 text-xs sm:h-9 sm:gap-1.5 sm:px-3 sm:text-sm",
           className
         )}
         aria-label={

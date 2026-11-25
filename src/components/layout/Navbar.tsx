@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { Leaf, MessageCircle, Package } from "lucide-react";
+import { Leaf, MessageCircle } from "lucide-react";
 
 import { MobileNavDrawer } from "@/components/layout/MobileNavDrawer";
 import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
-import { CartButton } from "@/features/cart/components/CartButton";
 import { CartDrawer } from "@/features/cart/components/CartDrawer";
+import { OrdersNavLink } from "@/features/orders/components/OrdersNavLink";
 
 const navLinks = [
   { href: "/products", label: "Products" },
@@ -18,13 +18,12 @@ export function Navbar() {
   );
 
   return (
-    <header className="sticky top-0 z-40 h-16 max-h-16 border-b border-border/80 bg-background/95 backdrop-blur-md">
-      <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-2 px-3 sm:gap-3 sm:px-6">
-        {/* Zone 1: Mobile drawer & Brand mark */}
-        <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+    <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/80">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-2.5 sm:h-16 sm:gap-6 sm:px-6">
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden sm:gap-2 md:flex-initial">
           <MobileNavDrawer whatsappUrl={whatsappUrl} />
           <Link
-            className="flex min-w-0 items-center gap-1.5 font-display text-[15px] font-semibold tracking-tight text-foreground transition-colors hover:text-primary sm:gap-2 sm:text-lg whitespace-nowrap"
+            className="flex min-w-0 max-w-full items-center gap-1.5 font-display text-[15px] font-medium tracking-tight text-foreground transition-colors hover:text-primary sm:gap-2 sm:text-lg"
             href="/"
           >
             <Leaf className="h-4 w-4 shrink-0 text-primary" />
@@ -32,14 +31,13 @@ export function Navbar() {
           </Link>
         </div>
 
-        {/* Zone 2: Primary navigation links */}
         <nav
           aria-label="Primary navigation"
-          className="hidden items-center gap-8 text-sm font-medium text-muted-foreground md:flex"
+          className="hidden items-center gap-7 text-sm font-medium md:flex"
         >
           {navLinks.map((link) => (
             <Link
-              className="whitespace-nowrap shrink-0 transition-colors hover:text-foreground hover:underline underline-offset-4"
+              className="whitespace-nowrap shrink-0 text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
               href={link.href}
               key={link.href}
             >
@@ -48,38 +46,22 @@ export function Navbar() {
           ))}
         </nav>
 
-        {/* Zone 3: Actions (WhatsApp Care, Orders & Cart) */}
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <OrdersNavLink />
+          <CartDrawer />
           {whatsappUrl ? (
             <a
               href={whatsappUrl}
               rel="noopener noreferrer"
               target="_blank"
-              className="hidden sm:inline-flex shrink-0"
+              className="hidden sm:inline-flex"
             >
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-9 gap-1.5 whitespace-nowrap shrink-0 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <MessageCircle className="h-4 w-4 text-[#25D366]" />
-                <span>Care</span>
+              <Button size="sm" variant="outline" className="min-h-9">
+                <MessageCircle className="text-primary" />
+                WhatsApp
               </Button>
             </a>
           ) : null}
-          <Button
-            asChild
-            size="sm"
-            variant="ghost"
-            className="h-10 gap-1.5 px-2.5 text-xs font-medium text-foreground hover:bg-muted sm:h-9 sm:px-3 sm:text-sm whitespace-nowrap shrink-0"
-          >
-            <Link href="/orders">
-              <Package className="hidden h-4 w-4 shrink-0 text-primary min-[380px]:inline-block" />
-              <span>Orders</span>
-            </Link>
-          </Button>
-          <CartButton />
-          <CartDrawer />
         </div>
       </div>
     </header>

@@ -113,7 +113,7 @@ export async function submitOrder(input: unknown) {
       throw new ApiError(
         400,
         "MPESA_NOT_CONFIGURED",
-        "Instant M-Pesa payment is not activated yet. Please select Pay on Delivery or Cash on Pickup."
+        "Instant M-Pesa payment is not activated yet. Please select Cash on Pickup or configure Safaricom Daraja credentials."
       );
     }
   }

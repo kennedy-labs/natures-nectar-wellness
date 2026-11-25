@@ -1,10 +1,8 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
 
 import { DEFAULT_OG_IMAGE, getAbsoluteUrl } from "@/config/site";
-import { CatalogView } from "@/features/products/components/CatalogView";
+import { ProductGrid } from "@/features/products/components/ProductGrid";
 import { getAllProducts } from "@/server/services/product.service";
-import { getStorefrontCategories } from "@/server/services/category.service";
 
 export const revalidate = 60;
 
@@ -21,7 +19,6 @@ export const metadata: Metadata = {
       "Browse herbal teas, organic supplements, mineral resins, and natural wellness products delivered across Kenya.",
     url: "/products",
     type: "website",
-    locale: "en_KE",
     images: [{ url: DEFAULT_OG_IMAGE }],
   },
   twitter: {
@@ -33,22 +30,8 @@ export const metadata: Metadata = {
   },
 };
 
-type ProductsPageProps = {
-  searchParams: Promise<{
-    category?: string | string[];
-  }>;
-};
-
-export default async function ProductsPage(props: ProductsPageProps) {
-  const searchParams = await props.searchParams;
-  const initialCategory = Array.isArray(searchParams?.category)
-    ? searchParams.category[0]
-    : searchParams?.category;
-
-  const [products, categories] = await Promise.all([
-    getAllProducts(),
-    getStorefrontCategories(),
-  ]);
+export default async function ProductsPage() {
+  const products = await getAllProducts();
 
   const collectionSchema = {
     "@context": "https://schema.org",
@@ -74,23 +57,24 @@ export default async function ProductsPage(props: ProductsPageProps) {
           __html: JSON.stringify(collectionSchema),
         }}
       />
-      <div className="mb-6 max-w-2xl space-y-2 border-b border-border/80 pb-6 sm:mb-8">
-        <p className="text-xs font-semibold uppercase tracking-wider text-primary">Botanical Catalog</p>
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-          Apothecary Formulations
+      <div className="mb-8 max-w-2xl space-y-2 border-b border-border/80 pb-6 sm:mb-10">
+        <p className="text-sm font-medium text-primary">Botanical Catalog</p>
+        <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
+          Products
         </h1>
-        <p className="text-xs sm:text-sm leading-relaxed text-muted-foreground">
-          Explore our small-batch herbal remedies, raw Mau Forest honey, and wild-harvested mineral resins with direct M-Pesa dispatch.
+        <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
+          Explore our small-batch herbal catalog. Live availability is shown on
+          each product.
         </p>
       </div>
 
-      <Suspense fallback={<div className="h-48 flex items-center justify-center text-xs text-muted-foreground">Loading formulations...</div>}>
-        <CatalogView
-          products={products}
-          categories={categories}
-          initialCategory={initialCategory}
-        />
-      </Suspense>
+      {products.length > 0 ? (
+        <ProductGrid products={products} />
+      ) : (
+        <p className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">
+          No products available yet. Please check back soon.
+        </p>
+      )}
     </section>
   );
 }

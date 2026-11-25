@@ -1,10 +1,8 @@
-const DEFAULT_WHATSAPP_NUMBER = "254757122299";
-
-export function getWhatsAppNumber(): string {
+export function getWhatsAppNumber(): string | null {
   const digits = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") ?? "";
 
   if (!digits) {
-    return DEFAULT_WHATSAPP_NUMBER;
+    return null;
   }
 
   if (digits.startsWith("0") && digits.length === 10) {
@@ -20,5 +18,10 @@ export function getWhatsAppNumber(): string {
 
 export function getWhatsAppUrl(message: string) {
   const phone = getWhatsAppNumber();
+
+  if (!phone) {
+    return null;
+  }
+
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }

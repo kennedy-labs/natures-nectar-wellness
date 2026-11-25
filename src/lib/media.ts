@@ -19,20 +19,3 @@ export function toStorefrontMediaUrl(
 
   return `/api/media/${kind}/${id}${versionSuffix}`;
 }
-
-export function getCategoryFallbackImage(slug?: string | null): string {
-  switch (slug) {
-    case "herbal-teas":
-      return "/images/calm-rest-tea.jpg";
-    case "herbal-blends":
-      return "/images/hibiscus-tisane.jpg";
-    case "supplements":
-      return "/images/ashwagandha-tincture.jpg";
-    case "honey-resins":
-      return "/images/mau-forest-honey.jpg";
-    case "topicals":
-      return "/images/neem-balm.jpg";
-    default:
-      return "/images/mau-forest-honey.jpg";
-  }
-}

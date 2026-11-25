@@ -111,9 +111,7 @@ export function CheckoutForm({
         longitude: undefined,
       },
 
-      preferredPaymentMethod: gatewayAvailability?.darajaEnabled
-        ? "MPESA_BUY_GOODS"
-        : "CASH_ON_DELIVERY",
+      preferredPaymentMethod: undefined,
       mpesaPhone: "",
       customerNotes: "",
     },
@@ -134,7 +132,7 @@ export function CheckoutForm({
       !gatewayAvailability?.darajaEnabled
     ) {
       setGeneralError(
-        "Online M-Pesa payment is not activated yet on this store. Please choose Pay on Delivery or Cash on Pickup to place your order now."
+        "Online M-Pesa payment is not activated yet on this store. Please choose Cash on Pickup to place your order now."
       );
       return;
     }
@@ -317,7 +315,7 @@ export function CheckoutForm({
           className="min-h-12 w-full rounded-md bg-primary px-4 py-3 text-base font-medium text-primary-foreground shadow-sm transition-all duration-150 hover:bg-primary/92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
         >
           {mpesaBlockedWithoutDaraja
-            ? "Select Pay on Delivery or Cash on Pickup"
+            ? "Select Cash on Pickup (M-Pesa awaiting activation)"
             : isSubmitting
               ? selectedPaymentMethod === "MPESA_BUY_GOODS"
                 ? "Opening M-Pesa payment..."

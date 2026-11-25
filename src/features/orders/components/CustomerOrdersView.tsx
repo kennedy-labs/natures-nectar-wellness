@@ -640,17 +640,9 @@ export function CustomerOrdersView({
                               ? isPaid
                                 ? "Cash on Pickup (Paid)"
                                 : "Cash on Pickup"
-                              : order.preferredPaymentMethod === "CASH_ON_DELIVERY"
-                                ? isPaid
-                                  ? "Pay on Delivery (Paid)"
-                                  : "Pay on Delivery"
-                                : order.preferredPaymentMethod === "BANK_TRANSFER"
-                                  ? isPaid
-                                    ? "Bank Transfer (Paid)"
-                                    : "Bank Transfer"
-                                  : isPaid
-                                    ? "M-Pesa (Paid)"
-                                    : "M-Pesa"}
+                              : isPaid
+                                ? "M-Pesa (Paid)"
+                                : "M-Pesa"}
                           </p>
                         </div>
                       </div>
