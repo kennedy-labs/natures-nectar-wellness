@@ -47,6 +47,7 @@ export async function generateMetadata(
       title: `${category.name} | Nature's Nectar Wellness`,
       description,
       url: canonicalPath,
+      locale: "en_KE",
       type: "website",
       images: [{ url: ogImage }],
     },

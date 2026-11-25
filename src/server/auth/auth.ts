@@ -9,6 +9,7 @@ import { db } from "@/server/db/prisma";
 const trustedOrigins = Array.from(
   new Set([
     "http://localhost:3000",
+    "https://natures-nectar-wellness.vercel.app",
     "https://*.run.app",
     "https://*.vercel.app",
     serverEnv.BETTER_AUTH_URL,

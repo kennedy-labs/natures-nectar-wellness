@@ -3,6 +3,7 @@ import { Fraunces } from "next/font/google";
 import localFont from "next/font/local";
 
 import { QueryProvider } from "@/components/providers/query-provider";
+import { getWhatsAppNumber } from "@/config/env.client";
 import {
   DEFAULT_OG_IMAGE,
   SITE_DESCRIPTION,
@@ -92,20 +93,46 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const siteUrl = getSiteUrl();
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.trim();
+  const whatsappNumber = getWhatsAppNumber();
 
-  const organizationSchema = {
+  const structuredData = {
     "@context": "https://schema.org",
-    "@type": "OnlineStore",
-    name: SITE_NAME,
-    url: siteUrl,
-    description: SITE_DESCRIPTION,
-    logo: `${siteUrl}${DEFAULT_OG_IMAGE}`,
-    areaServed: {
-      "@type": "Country",
-      name: "Kenya",
-    },
-    ...(whatsappNumber ? { telephone: whatsappNumber } : {}),
+    "@graph": [
+      {
+        "@type": "OnlineStore",
+        "@id": `${siteUrl}/#store`,
+        name: SITE_NAME,
+        url: siteUrl,
+        description: SITE_DESCRIPTION,
+        logo: `${siteUrl}${DEFAULT_OG_IMAGE}`,
+        priceRange: "KSh 1,200 - KSh 5,000",
+        address: {
+          "@type": "PostalAddress",
+          addressLocality: "Nairobi",
+          addressCountry: "KE",
+        },
+        areaServed: {
+          "@type": "Country",
+          name: "Kenya",
+        },
+        ...(whatsappNumber ? { telephone: `+${whatsappNumber}` } : {}),
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${siteUrl}/#website`,
+        url: siteUrl,
+        name: SITE_NAME,
+        inLanguage: "en-KE",
+        potentialAction: {
+          "@type": "SearchAction",
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: `${siteUrl}/products?q={search_term_string}`,
+          },
+          "query-input": "required name=search_term_string",
+        },
+      },
+    ],
   };
 
   return (
@@ -114,7 +141,7 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify(organizationSchema),
+            __html: JSON.stringify(structuredData),
           }}
         />
         <QueryProvider>{children}</QueryProvider>

@@ -17,10 +17,14 @@ export type AddToCartInput = Omit<CartItem, "quantity"> & {
 
 type CartState = {
   items: CartItem[];
+  isDrawerOpen: boolean;
   addItem: (input: AddToCartInput) => void;
   removeItem: (productId: string) => void;
   setQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
+  openDrawer: () => void;
+  closeDrawer: () => void;
+  setDrawerOpen: (open: boolean) => void;
 
   getItemCount: () => number;
   getSubtotal: () => number;
@@ -63,6 +67,11 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
+      isDrawerOpen: false,
+
+      openDrawer: () => set({ isDrawerOpen: true }),
+      closeDrawer: () => set({ isDrawerOpen: false }),
+      setDrawerOpen: (open: boolean) => set({ isDrawerOpen: open }),
 
       addItem: (input) => {
         const nextItem = normalizeProduct(input);

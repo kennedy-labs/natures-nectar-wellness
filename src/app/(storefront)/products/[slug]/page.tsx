@@ -157,16 +157,16 @@ export default async function ProductPage(props: ProductPageProps) {
         <span className="font-medium text-foreground">{product.name}</span>
       </nav>
 
-      <div className="grid items-start gap-8 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1.35fr)] md:gap-10">
+      <div className="grid items-start gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] md:gap-10">
         <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_1px_3px_rgba(24,42,32,0.05)] md:sticky md:top-24">
-          <div className="aspect-[4/3] bg-muted/50">
+          <div className="aspect-square bg-muted/50">
             {product.image ? (
               <SkeletonImage
                 alt={product.name}
                 src={product.image}
                 priority
                 useNextImage={!product.image.startsWith("data:")}
-                sizes="(max-width: 768px) 100vw, 50vw"
+                sizes="(max-width: 768px) 100vw, 45vw"
               />
             ) : (
               <div className="flex h-full items-center justify-center px-8 text-center font-display text-sm font-medium text-muted-foreground">
@@ -179,9 +179,14 @@ export default async function ProductPage(props: ProductPageProps) {
         <div className="space-y-6">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
-              {product.isFeatured ? (
+              {product.category ? (
                 <>
-                  <span className="text-primary">Featured selection</span>
+                  <Link
+                    href={`/products?category=${product.category.slug}`}
+                    className="uppercase tracking-wider text-muted-foreground hover:text-primary"
+                  >
+                    {product.category.name}
+                  </Link>
                   <span aria-hidden="true" className="text-muted-foreground">·</span>
                 </>
               ) : null}
@@ -221,7 +226,7 @@ export default async function ProductPage(props: ProductPageProps) {
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <div className="flex flex-col gap-3">
             <AddToCartButton
               product={{
                 id: product.id,
@@ -233,13 +238,23 @@ export default async function ProductPage(props: ProductPageProps) {
               }}
             />
 
-            {whatsappUrl ? (
-              <Button asChild variant="outline" className="w-full min-h-11 sm:w-auto">
-                <a href={whatsappUrl} rel="noopener noreferrer" target="_blank">
-                  Ask about this on WhatsApp
-                </a>
-              </Button>
-            ) : null}
+            <Button
+              asChild
+              variant="outline"
+              className="w-full min-h-11 gap-2 border-border/90 hover:border-[#168A47] hover:bg-[#168A47]/10 hover:text-[#168A47] sm:w-fit"
+            >
+              <a href={whatsappUrl} rel="noopener noreferrer" target="_blank">
+                <span className="font-medium">Quick Order on WhatsApp</span>
+              </a>
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>Lab purity tested</span>
+            <span aria-hidden="true">·</span>
+            <span>Same-day Nairobi dispatch</span>
+            <span aria-hidden="true">·</span>
+            <span>M-Pesa &amp; Cash on Pickup</span>
           </div>
 
           {(product.benefits || product.usageInstructions || product.ingredients) ? (

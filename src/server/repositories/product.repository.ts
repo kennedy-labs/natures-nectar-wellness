@@ -65,7 +65,7 @@ export async function findFeaturedProducts() {
     orderBy: {
       createdAt: "desc",
     },
-    take: 6,
+    take: 8,
   });
 
   return products.map(mapStorefrontProduct);

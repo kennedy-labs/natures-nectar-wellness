@@ -15,13 +15,19 @@ function normalizeOrigin(raw?: string | null): string | null {
   return `https://${trimmed}`;
 }
 
+export const DEFAULT_PRODUCTION_SITE_URL =
+  "https://natures-nectar-wellness.vercel.app";
+
 export function getSiteUrl(): string {
   return (
     normalizeOrigin(process.env.NEXT_PUBLIC_SITE_URL) ??
     normalizeOrigin(process.env.BETTER_AUTH_URL) ??
     normalizeOrigin(process.env.VERCEL_PROJECT_PRODUCTION_URL) ??
+    normalizeOrigin(process.env.VERCEL_URL) ??
     normalizeOrigin(process.env.APP_URL) ??
-    "http://localhost:3000"
+    (process.env.NODE_ENV === "production"
+      ? DEFAULT_PRODUCTION_SITE_URL
+      : "http://localhost:3000")
   );
 }
 
