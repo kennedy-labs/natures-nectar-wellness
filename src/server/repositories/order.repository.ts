@@ -52,6 +52,9 @@ export async function createOrderRequest(data: CreateOrderRequestData) {
       data.delivery.latitude,
       data.delivery.longitude
     );
+    const hasFreeDelivery =
+      data.delivery.method === "PICKUP" ||
+      data.delivery.method === "LOCAL_DELIVERY";
 
     const order = await transaction.order.create({
       include: {
@@ -68,7 +71,9 @@ export async function createOrderRequest(data: CreateOrderRequestData) {
         deliveryMethod: data.delivery.method,
         deliveryLocation: data.delivery.location,
         deliveryNotes: appendGpsPinToNotes(data.delivery.notes, mapUrl),
+        deliveryFee: hasFreeDelivery ? 0 : null,
         subtotalAmount: data.subtotalAmount,
+        totalAmount: hasFreeDelivery ? data.subtotalAmount : null,
         preferredPaymentMethod: data.preferredPaymentMethod,
         customerNotes: data.customerNotes,
         whatsappMessage: data.whatsappMessage,

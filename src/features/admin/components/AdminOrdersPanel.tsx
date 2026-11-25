@@ -17,7 +17,11 @@ import {
 import { AdminOrdersListSkeleton } from "@/components/skeletons/AdminSkeletons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { parseDeliveryNotesPin } from "@/features/orders/utils/order.utils";
+import {
+  getDeliveryFeeSummary,
+  getDeliveryMethodLabel,
+  parseDeliveryNotesPin,
+} from "@/features/orders/utils/order.utils";
 import { formatKes } from "@/lib/format";
 
 type Payment = {
@@ -477,9 +481,10 @@ export function AdminOrdersPanel() {
                 </p>
                 <p className="text-xs text-muted-foreground tabular-nums">
                   Subtotal {formatKes(order.subtotalAmount)}
-                  {order.deliveryFee !== null && order.deliveryFee !== undefined
-                    ? ` + Delivery ${formatKes(order.deliveryFee)}`
-                    : " (Delivery unquoted)"}
+                  {` · Delivery: ${getDeliveryFeeSummary(
+                    order.deliveryMethod,
+                    order.deliveryFee
+                  )}`}
                 </p>
               </div>
             </div>
@@ -517,7 +522,7 @@ export function AdminOrdersPanel() {
 
               <div className="space-y-1.5 text-xs text-muted-foreground">
                 <p className="font-medium text-foreground">
-                  {order.deliveryMethod.replace(/_/g, " ")}
+                  {getDeliveryMethodLabel(order.deliveryMethod)}
                 </p>
                 {order.deliveryLocation ? (
                   <p>Location: {order.deliveryLocation}</p>

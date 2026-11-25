@@ -21,6 +21,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
 import type { PaymentMethod } from "@/features/checkout/types/checkout.types";
+import {
+  getDeliveryFeeSummary,
+  getDeliveryMethodLabel,
+} from "@/features/orders/utils/order.utils";
 import { readApiData } from "@/lib/api-client";
 import { formatKes } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -80,11 +84,7 @@ function getFriendlyStatusLabel(status: string, isPaid: boolean): string {
 }
 
 function formatDeliveryMethod(method: string): string {
-  return method
-    .toLowerCase()
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  return getDeliveryMethodLabel(method);
 }
 
 function formatDate(iso: string): string {
@@ -593,9 +593,10 @@ export function CustomerOrdersView({
                         <div className="flex justify-between text-muted-foreground">
                           <span>Delivery</span>
                           <span className="tabular-nums">
-                            {order.deliveryFee !== null
-                              ? formatKes(order.deliveryFee)
-                              : "To be confirmed"}
+                            {getDeliveryFeeSummary(
+                              order.deliveryMethod,
+                              order.deliveryFee
+                            )}
                           </span>
                         </div>
                         <div className="flex justify-between pt-1 text-sm font-semibold text-foreground">

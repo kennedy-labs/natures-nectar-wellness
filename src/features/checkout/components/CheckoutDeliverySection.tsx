@@ -35,8 +35,11 @@ type Props = {
 
 const deliveryMethods: { value: DeliveryMethod; label: string }[] = [
   { value: "PICKUP", label: "Pickup (Free)" },
-  { value: "LOCAL_DELIVERY", label: "Local Delivery" },
-  { value: "COUNTRYWIDE_DELIVERY", label: "Countrywide Delivery" },
+  { value: "LOCAL_DELIVERY", label: "Within Nairobi (Free)" },
+  {
+    value: "COUNTRYWIDE_DELIVERY",
+    label: "Outside Nairobi (Admin confirms fee)",
+  },
 ];
 
 export function CheckoutDeliverySection({

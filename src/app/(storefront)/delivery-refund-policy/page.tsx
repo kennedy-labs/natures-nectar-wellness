@@ -29,7 +29,7 @@ export default function DeliveryRefundPolicyPage() {
     >
       <section className="space-y-2">
         <h2 className="font-display text-xl font-medium text-foreground">
-          1. Pickup and delivery across Kenya
+          1. Delivery zones and fees
         </h2>
         <ul className="list-disc space-y-1.5 pl-5">
           <li>
@@ -41,11 +41,17 @@ export default function DeliveryRefundPolicyPage() {
           </li>
           <li>
             <strong className="font-medium text-foreground">
-              Local &amp; Countrywide Delivery:
+              Within Nairobi (Free):
             </strong>{" "}
-            Delivery fees depend on your distance and courier method. Where a
-            delivery fee is not fixed at checkout, our team confirms the exact
-            cost with you before dispatch.
+            Free delivery within Nairobi once your order and drop-off location
+            are confirmed.
+          </li>
+          <li>
+            <strong className="font-medium text-foreground">
+              Outside Nairobi (Admin confirms fee):
+            </strong>{" "}
+            Our team confirms the courier fee with you after checkout before
+            dispatch.
           </li>
         </ul>
       </section>

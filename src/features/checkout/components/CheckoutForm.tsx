@@ -118,6 +118,7 @@ export function CheckoutForm({
   });
 
   const selectedPaymentMethod = watch("preferredPaymentMethod");
+  const selectedDeliveryMethod = watch("delivery.method");
   const mpesaBlockedWithoutDaraja =
     selectedPaymentMethod === "MPESA_BUY_GOODS" &&
     !gatewayAvailability?.darajaEnabled;
@@ -327,7 +328,7 @@ export function CheckoutForm({
       </div>
 
       <div className="order-first lg:order-last">
-        <CheckoutCartSummary />
+        <CheckoutCartSummary deliveryMethod={selectedDeliveryMethod} />
       </div>
     </form>
   );

@@ -1,6 +1,10 @@
 import { getWhatsAppUrl } from "@/config/env.client";
 import { SITE_NAME, getAbsoluteUrl } from "@/config/site";
-import { parseDeliveryNotesPin } from "@/features/orders/utils/order.utils";
+import {
+  getDeliveryFeeSummary,
+  getDeliveryMethodLabel,
+  parseDeliveryNotesPin,
+} from "@/features/orders/utils/order.utils";
 import { formatKes } from "@/lib/format";
 import { db } from "@/server/db/prisma";
 
@@ -31,10 +35,7 @@ function escapeHtml(value: string): string {
 }
 
 function formatDeliveryMethodLabel(method: string): string {
-  if (method === "PICKUP") return "Store Pickup";
-  if (method === "LOCAL_DELIVERY") return "Local Delivery";
-  if (method === "COUNTRYWIDE_DELIVERY") return "Countrywide Delivery";
-  return method;
+  return getDeliveryMethodLabel(method);
 }
 
 function formatPaymentMethodLabel(method: string | null | undefined): string {
@@ -140,6 +141,10 @@ export async function sendOrderNotifications(
   const effectiveTotal = order.totalAmount ?? order.subtotalAmount;
   const formattedTotal = formatKes(effectiveTotal);
   const deliveryLabel = formatDeliveryMethodLabel(order.deliveryMethod);
+  const deliveryFeeLabel = getDeliveryFeeSummary(
+    order.deliveryMethod,
+    order.deliveryFee
+  );
   const paymentLabel = formatPaymentMethodLabel(order.preferredPaymentMethod);
   const receiptRef =
     input.transactionRef?.trim() || verifiedPayment?.transactionRef || null;
@@ -197,7 +202,7 @@ export async function sendOrderNotifications(
       `Phone: ${order.customerPhone}`,
       order.customerEmail ? `Email: ${order.customerEmail}` : null,
       `Payment: ${paymentSummaryText}`,
-      `Delivery: ${deliveryLabel}`,
+      `Delivery: ${deliveryLabel} (${deliveryFeeLabel})`,
       order.deliveryLocation ? `Location: ${order.deliveryLocation}` : null,
       mapUrl ? `GPS Pin: ${mapUrl}` : null,
       cleanNotes ? `Delivery Notes: ${cleanNotes}` : null,
@@ -206,6 +211,7 @@ export async function sendOrderNotifications(
       "Items:",
       itemsText,
       "",
+      `Delivery fee: ${deliveryFeeLabel}`,
       `Total: ${formattedTotal}`,
       `Admin dashboard: ${adminUrl}`,
     ]
@@ -233,7 +239,7 @@ export async function sendOrderNotifications(
               : ""
           }
           <p style="margin:0 0 6px;"><strong>Payment:</strong> ${escapeHtml(paymentSummaryText)}</p>
-          <p style="margin:0 0 6px;"><strong>Delivery:</strong> ${escapeHtml(deliveryLabel)}</p>
+          <p style="margin:0 0 6px;"><strong>Delivery:</strong> ${escapeHtml(deliveryLabel)} (${escapeHtml(deliveryFeeLabel)})</p>
           ${
             order.deliveryLocation
               ? `<p style="margin:0 0 6px;"><strong>Location:</strong> ${escapeHtml(order.deliveryLocation)}</p>`
@@ -259,8 +265,12 @@ export async function sendOrderNotifications(
           <table style="width:100%;border-collapse:collapse;font-size:14px;">
             ${itemsHtml}
             <tr>
-              <td style="padding:12px 0 0;font-weight:700;">Total</td>
-              <td style="padding:12px 0 0;text-align:right;font-weight:700;">${escapeHtml(formattedTotal)}</td>
+              <td style="padding:10px 0 4px;color:#5e6c63;">Delivery</td>
+              <td style="padding:10px 0 4px;text-align:right;color:#5e6c63;">${escapeHtml(deliveryFeeLabel)}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 0 0;font-weight:700;">Total</td>
+              <td style="padding:8px 0 0;text-align:right;font-weight:700;">${escapeHtml(formattedTotal)}</td>
             </tr>
           </table>
         </div>
@@ -298,12 +308,13 @@ export async function sendOrderNotifications(
         : `Thank you for ordering from ${SITE_NAME}. We have received order ${order.orderNumber}.`,
       "",
       `Payment: ${paymentSummaryText}`,
-      `Delivery: ${deliveryLabel}`,
+      `Delivery: ${deliveryLabel} (${deliveryFeeLabel})`,
       order.deliveryLocation ? `Location: ${order.deliveryLocation}` : null,
       "",
       "Order summary:",
       itemsText,
       "",
+      `Delivery fee: ${deliveryFeeLabel}`,
       `Total: ${formattedTotal}`,
       "",
       `Track your order on any device: ${trackingUrl}`,
@@ -335,7 +346,7 @@ export async function sendOrderNotifications(
         <div style="background:#ffffff;border:1px solid #e6e2d8;border-radius:10px;padding:16px;margin-bottom:16px;">
           <p style="margin:0 0 6px;"><strong>Order number:</strong> ${escapeHtml(order.orderNumber)}</p>
           <p style="margin:0 0 6px;"><strong>Payment:</strong> ${escapeHtml(paymentSummaryText)}</p>
-          <p style="margin:0;"><strong>Delivery:</strong> ${escapeHtml(deliveryLabel)}${
+          <p style="margin:0;"><strong>Delivery:</strong> ${escapeHtml(deliveryLabel)} (${escapeHtml(deliveryFeeLabel)})${
             order.deliveryLocation
               ? ` · ${escapeHtml(order.deliveryLocation)}`
               : ""
@@ -345,8 +356,12 @@ export async function sendOrderNotifications(
           <table style="width:100%;border-collapse:collapse;font-size:14px;">
             ${itemsHtml}
             <tr>
-              <td style="padding:12px 0 0;font-weight:700;">Order total</td>
-              <td style="padding:12px 0 0;text-align:right;font-weight:700;">${escapeHtml(formattedTotal)}</td>
+              <td style="padding:10px 0 4px;color:#5e6c63;">Delivery</td>
+              <td style="padding:10px 0 4px;text-align:right;color:#5e6c63;">${escapeHtml(deliveryFeeLabel)}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 0 0;font-weight:700;">Order total</td>
+              <td style="padding:8px 0 0;text-align:right;font-weight:700;">${escapeHtml(formattedTotal)}</td>
             </tr>
           </table>
         </div>

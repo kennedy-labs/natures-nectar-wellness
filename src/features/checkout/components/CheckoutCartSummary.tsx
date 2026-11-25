@@ -5,12 +5,20 @@ import Link from "next/link";
 
 import { CheckoutSummarySkeleton } from "@/components/skeletons/StorefrontSkeletons";
 import { Button } from "@/components/ui/button";
+import type { DeliveryMethod } from "@/features/checkout/types/checkout.types";
+import { getDeliveryFeeSummary } from "@/features/orders/utils/order.utils";
 import { formatKes } from "@/lib/format";
 import { useCartStore } from "@/store/cart.store";
 
 const emptySubscribe = () => () => {};
 
-export function CheckoutCartSummary() {
+type CheckoutCartSummaryProps = {
+  deliveryMethod?: DeliveryMethod;
+};
+
+export function CheckoutCartSummary({
+  deliveryMethod = "PICKUP",
+}: CheckoutCartSummaryProps) {
   const isClient = useSyncExternalStore(
     emptySubscribe,
     () => true,
@@ -25,6 +33,9 @@ export function CheckoutCartSummary() {
 
   const items = rawItems;
   const subtotal = rawSubtotal;
+  const isFreeZone =
+    deliveryMethod === "PICKUP" || deliveryMethod === "LOCAL_DELIVERY";
+  const deliveryFeeText = getDeliveryFeeSummary(deliveryMethod, null);
 
   if (items.length === 0) {
     return (
@@ -71,12 +82,33 @@ export function CheckoutCartSummary() {
         ))}
       </div>
 
-      <div className="mt-5 flex items-center justify-between border-t border-border/80 pt-4">
-        <p className="text-sm text-muted-foreground">Subtotal</p>
+      <div className="mt-5 space-y-2 border-t border-border/80 pt-4 text-sm">
+        <div className="flex items-center justify-between text-muted-foreground">
+          <span>Subtotal</span>
+          <span className="tabular-nums text-foreground">
+            {formatKes(subtotal)}
+          </span>
+        </div>
 
-        <p className="text-lg font-semibold tabular-nums text-foreground">
-          {formatKes(subtotal)}
-        </p>
+        <div className="flex items-center justify-between text-muted-foreground">
+          <span>Delivery</span>
+          <span
+            className={
+              isFreeZone
+                ? "font-medium text-primary"
+                : "text-xs font-medium text-muted-foreground"
+            }
+          >
+            {deliveryFeeText}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-border/70 pt-3">
+          <p className="font-medium text-foreground">Total</p>
+          <p className="text-lg font-semibold tabular-nums text-foreground">
+            {formatKes(subtotal)}
+          </p>
+        </div>
       </div>
     </div>
   );
