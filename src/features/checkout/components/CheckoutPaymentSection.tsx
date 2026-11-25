@@ -8,7 +8,7 @@ import type {
   UseFormSetValue,
   UseFormWatch,
 } from "react-hook-form";
-import { Banknote, CheckCircle2, Smartphone } from "lucide-react";
+import { Banknote, CheckCircle2, Smartphone, Truck } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,10 @@ type Props = {
 };
 
 type PaymentOption = {
-  value: Extract<PaymentMethod, "MPESA_BUY_GOODS" | "CASH_ON_PICKUP">;
+  value: Extract<
+    PaymentMethod,
+    "MPESA_BUY_GOODS" | "CASH_ON_DELIVERY" | "CASH_ON_PICKUP"
+  >;
   title: string;
   subtitle: string;
 };
@@ -38,7 +41,12 @@ const PAYMENT_OPTIONS: PaymentOption[] = [
   {
     value: "MPESA_BUY_GOODS",
     title: "M-Pesa",
-    subtitle: "Opens the Safaricom M-Pesa PIN prompt on your phone to pay now.",
+    subtitle: "Instant M-Pesa PIN prompt on your phone to pay now.",
+  },
+  {
+    value: "CASH_ON_DELIVERY",
+    title: "Pay on Delivery",
+    subtitle: "Confirm via WhatsApp and pay via M-Pesa or cash on arrival.",
   },
   {
     value: "CASH_ON_PICKUP",
@@ -108,12 +116,16 @@ export function CheckoutPaymentSection({
         <div
           role="radiogroup"
           aria-label="Payment method"
-          className="grid gap-3 sm:grid-cols-2"
+          className="grid gap-3 sm:grid-cols-3"
         >
           {PAYMENT_OPTIONS.map((option) => {
             const isSelected = selectedMethod === option.value;
             const Icon =
-              option.value === "MPESA_BUY_GOODS" ? Smartphone : Banknote;
+              option.value === "MPESA_BUY_GOODS"
+                ? Smartphone
+                : option.value === "CASH_ON_DELIVERY"
+                  ? Truck
+                  : Banknote;
 
             return (
               <button
@@ -213,10 +225,17 @@ export function CheckoutPaymentSection({
             ) : (
               <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-950">
                 Online M-Pesa PIN payment is not activated yet on this store.
-                Please select <strong>Cash on Pickup</strong> to submit your
-                order now.
+                Please select <strong>Pay on Delivery</strong> or{" "}
+                <strong>Cash on Pickup</strong> to submit your order now.
               </div>
             )}
+          </div>
+        ) : null}
+
+        {selectedMethod === "CASH_ON_DELIVERY" ? (
+          <div className="rounded-xl border bg-muted/40 p-3.5 text-xs leading-relaxed text-muted-foreground">
+            No upfront online payment needed — your order submits immediately,
+            we confirm delivery timing on WhatsApp, and you pay on arrival.
           </div>
         ) : null}
 

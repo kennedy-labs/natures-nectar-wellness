@@ -40,6 +40,7 @@ export function CheckoutSuccess({
     `https://wa.me/254757122299?text=${encodeURIComponent(whatsappMessage)}`;
 
   const isCashOnPickup = preferredPaymentMethod === "CASH_ON_PICKUP";
+  const isCashOnDelivery = preferredPaymentMethod === "CASH_ON_DELIVERY";
 
   return (
     <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-8">
@@ -56,9 +57,11 @@ export function CheckoutSuccess({
           <p className="text-sm leading-relaxed text-muted-foreground">
             {initialVerified
               ? "Your M-Pesa payment has been verified and your order is now queued for processing."
-              : isCashOnPickup
-                ? "Your order is saved. Pay in cash when collecting your order."
-                : "Your order is received."}
+              : isCashOnDelivery
+                ? "Your order is saved. Confirm delivery timing on WhatsApp and pay on arrival."
+                : isCashOnPickup
+                  ? "Your order is saved. Pay in cash when collecting your order."
+                  : "Your order is received."}
           </p>
         </div>
 
@@ -99,6 +102,20 @@ export function CheckoutSuccess({
                 </strong>
               </p>
             ) : null}
+          </div>
+        ) : isCashOnDelivery ? (
+          <div className="space-y-2 rounded-xl border bg-muted/40 p-4 text-sm">
+            <div className="flex items-center gap-2 font-medium text-foreground">
+              <Banknote className="h-4 w-4 text-primary" />
+              <span>Pay on Delivery / WhatsApp Confirmation</span>
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              No online payment is required now. Tap{" "}
+              <strong>Continue on WhatsApp</strong> below to confirm dispatch,
+              and pay{" "}
+              <strong>{formatKes(amount)}</strong> (plus any agreed delivery
+              fee) via M-Pesa or cash on delivery.
+            </p>
           </div>
         ) : isCashOnPickup ? (
           <div className="space-y-2 rounded-xl border bg-muted/40 p-4 text-sm">
