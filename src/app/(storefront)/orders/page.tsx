@@ -29,15 +29,15 @@ export default async function OrdersPage(props: OrdersPageProps) {
       : undefined;
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
+    <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
       <div className="space-y-2 border-b border-border/80 pb-6">
         <p className="text-sm font-medium text-primary">Your Orders</p>
         <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
           Orders &amp; Tracking
         </h1>
-        <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
-          Select a recent order below or enter your order number and phone
-          number to check an order from another device.
+        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+          Track live delivery progress, check payment confirmation, or pull up
+          an order placed from another device.
         </p>
       </div>
 
