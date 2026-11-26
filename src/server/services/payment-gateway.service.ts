@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getSiteUrl } from "@/config/site";
 import { db } from "@/server/db/prisma";
 import { ApiError } from "@/server/http/api-error";
+import { createMinimalOrderWhatsappMessage } from "@/features/whatsapp/utils/whatsapp.utils";
 import { sendOrderNotifications } from "@/server/services/notification.service";
 
 export type PaymentGatewayAvailability = {
@@ -807,7 +808,15 @@ export async function verifyPaystackTransaction(rawInput: unknown) {
   if (existingVerified) {
     return {
       orderNumber: order.orderNumber,
-      whatsappMessage: order.whatsappMessage ?? "",
+      whatsappMessage: createMinimalOrderWhatsappMessage({
+        orderNumber: order.orderNumber,
+        customerName: order.customerName,
+        deliveryMethod: order.deliveryMethod,
+        deliveryLocation: order.deliveryLocation,
+        paymentStatus: "VERIFIED",
+        preferredPaymentMethod: order.preferredPaymentMethod,
+        isPaid: true,
+      }),
       paymentStatus: "VERIFIED" as const,
       transactionRef: existingVerified.transactionRef,
       amount: existingVerified.amount ?? order.totalAmount ?? order.subtotalAmount,
@@ -909,7 +918,15 @@ export async function verifyPaystackTransaction(rawInput: unknown) {
 
   return {
     orderNumber: order.orderNumber,
-    whatsappMessage: order.whatsappMessage ?? "",
+    whatsappMessage: createMinimalOrderWhatsappMessage({
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      deliveryMethod: order.deliveryMethod,
+      deliveryLocation: order.deliveryLocation,
+      paymentStatus: "VERIFIED",
+      preferredPaymentMethod: order.preferredPaymentMethod,
+      isPaid: true,
+    }),
     paymentStatus: "VERIFIED" as const,
     transactionRef: txData.reference || input.reference,
     amount: paidKes,

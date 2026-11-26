@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 
+import { WhatsAppPageContext } from "@/components/layout/WhatsAppContext";
 import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
 
@@ -25,6 +26,7 @@ export function PolicyPageShell({
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+      <WhatsAppPageContext message={whatsappMessage} />
       <nav
         aria-label="Breadcrumb"
         className="mb-6 flex items-center gap-2 text-xs text-muted-foreground"

@@ -5,6 +5,7 @@ import { MobileNavDrawer } from "@/components/layout/MobileNavDrawer";
 import { getWhatsAppUrl } from "@/config/env.client";
 import { CartDrawer } from "@/features/cart/components/CartDrawer";
 import { OrdersNavLink } from "@/features/orders/components/OrdersNavLink";
+import { DEFAULT_STOREFRONT_WHATSAPP_MESSAGE } from "@/features/whatsapp/utils/whatsapp.utils";
 
 const navLinks = [
   { href: "/products", label: "Products" },
@@ -14,9 +15,7 @@ const navLinks = [
 ];
 
 export function Navbar() {
-  const whatsappUrl = getWhatsAppUrl(
-    "Hello Nature's Nectar Wellness, I have a question about your products."
-  );
+  const whatsappUrl = getWhatsAppUrl(DEFAULT_STOREFRONT_WHATSAPP_MESSAGE);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/80">

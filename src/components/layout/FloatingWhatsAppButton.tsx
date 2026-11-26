@@ -1,11 +1,15 @@
+"use client";
+
 import { MessageCircle } from "lucide-react";
 
+import { useWhatsAppContext } from "@/components/layout/WhatsAppContext";
 import { getWhatsAppUrl } from "@/config/env.client";
+import { DEFAULT_STOREFRONT_WHATSAPP_MESSAGE } from "@/features/whatsapp/utils/whatsapp.utils";
 
 export function FloatingWhatsAppButton() {
-  const whatsappUrl = getWhatsAppUrl(
-    "Hello Nature's Nectar Wellness, I have a question about your products."
-  );
+  const { contextMessage } = useWhatsAppContext();
+  const activeMessage = contextMessage?.trim() || DEFAULT_STOREFRONT_WHATSAPP_MESSAGE;
+  const whatsappUrl = getWhatsAppUrl(activeMessage);
 
   if (!whatsappUrl) {
     return null;

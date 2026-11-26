@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, MessageCircle } from "lucide-react";
 
+import { WhatsAppPageContext } from "@/components/layout/WhatsAppContext";
 import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
 import { DEFAULT_OG_IMAGE, SITE_NAME, getAbsoluteUrl } from "@/config/site";
+import { createTopicInquiryMessage } from "@/features/whatsapp/utils/whatsapp.utils";
 
 export const metadata: Metadata = {
   title: "Frequently Asked Questions",
@@ -63,9 +65,8 @@ const FAQ_ITEMS = [
 ] as const;
 
 export default function FaqPage() {
-  const whatsappUrl = getWhatsAppUrl(
-    "Hello Nature's Nectar Wellness, I have a question that isn't covered on the FAQ page."
-  );
+  const faqWhatsappMessage = createTopicInquiryMessage("your FAQ");
+  const whatsappUrl = getWhatsAppUrl(faqWhatsappMessage);
 
   const faqSchema = {
     "@context": "https://schema.org",
@@ -101,6 +102,7 @@ export default function FaqPage() {
 
   return (
     <article className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
+      <WhatsAppPageContext message={faqWhatsappMessage} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

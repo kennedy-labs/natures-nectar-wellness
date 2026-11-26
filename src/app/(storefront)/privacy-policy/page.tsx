@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { PolicyPageShell } from "@/components/layout/PolicyPageShell";
 import { DEFAULT_OG_IMAGE, SITE_NAME } from "@/config/site";
+import { createTopicInquiryMessage } from "@/features/whatsapp/utils/whatsapp.utils";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -25,7 +26,7 @@ export default function PrivacyPolicyPage() {
       title="Privacy Policy"
       summary="We respect your privacy and only collect the information needed to fulfill your orders, process M-Pesa payments, and coordinate delivery."
       lastUpdated="November 2026"
-      whatsappMessage="Hello Nature's Nectar Wellness, I have a question about your Privacy Policy."
+      whatsappMessage={createTopicInquiryMessage("your Privacy Policy")}
     >
       <section className="space-y-2">
         <h2 className="font-display text-xl font-medium text-foreground">

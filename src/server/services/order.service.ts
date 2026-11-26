@@ -167,12 +167,8 @@ export async function submitOrder(input: unknown) {
     orderNumber,
     customer: data.customer,
     delivery: data.delivery,
-    items: orderItems.map((i) => ({
-      name: i.productName,
-      quantity: i.quantity,
-      lineTotal: i.lineTotal,
-    })),
-    subtotalAmount,
+    preferredPaymentMethod: data.preferredPaymentMethod,
+    isPaid: false,
   });
 
   const order = await createOrderRequest({
@@ -749,6 +745,7 @@ export async function getCustomerOrdersByRefs(rawInput: unknown) {
       return {
         id: order.id,
         orderNumber: order.orderNumber,
+        customerName: order.customerName,
         status: order.status,
         createdAt: order.createdAt.toISOString(),
         deliveryMethod: order.deliveryMethod,

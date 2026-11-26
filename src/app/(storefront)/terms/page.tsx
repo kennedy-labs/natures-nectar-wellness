@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { PolicyPageShell } from "@/components/layout/PolicyPageShell";
 import { DEFAULT_OG_IMAGE, SITE_NAME } from "@/config/site";
+import { createTopicInquiryMessage } from "@/features/whatsapp/utils/whatsapp.utils";
 
 export const metadata: Metadata = {
   title: "Terms & Conditions",
@@ -25,7 +26,7 @@ export default function TermsPage() {
       title="Terms & Conditions"
       summary="Clear terms covering product pricing, order confirmation, payments, and responsible use of our natural wellness formulations."
       lastUpdated="November 2026"
-      whatsappMessage="Hello Nature's Nectar Wellness, I have a question about your Terms & Conditions."
+      whatsappMessage={createTopicInquiryMessage("your Terms & Conditions")}
     >
       <section className="space-y-2">
         <h2 className="font-display text-xl font-medium text-foreground">

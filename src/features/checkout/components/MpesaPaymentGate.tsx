@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Loader2, RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
 
+import { WhatsAppPageContext } from "@/components/layout/WhatsAppContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,11 +11,13 @@ import {
   pollMpesaPaymentStatus,
   releaseUnpaidCheckoutOrder,
 } from "@/features/checkout/api/checkout-api";
+import { createMpesaPendingMessage } from "@/features/whatsapp/utils/whatsapp.utils";
 import { formatKes } from "@/lib/format";
 
 type MpesaPaymentGateProps = {
   orderId: string;
   orderNumber: string;
+  customerName?: string;
   amount: number;
   initialPhone: string;
   darajaEnv?: "sandbox" | "production";
@@ -28,6 +31,7 @@ type MpesaPaymentGateProps = {
 export function MpesaPaymentGate({
   orderId,
   orderNumber,
+  customerName,
   amount,
   initialPhone,
   darajaEnv = "production",
@@ -209,6 +213,9 @@ export function MpesaPaymentGate({
 
   return (
     <div className="mx-auto max-w-lg rounded-2xl border border-border/80 bg-card p-5 shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-8">
+      <WhatsAppPageContext
+        message={createMpesaPendingMessage({ orderNumber, customerName })}
+      />
       <div className="space-y-6">
         <div className="space-y-2 text-center">
           <div className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">

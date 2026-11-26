@@ -7,8 +7,12 @@ import { formatKes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { getProductBySlug } from "@/server/services/product.service";
 import { getInventoryStatus, getInventoryStatusLabel } from "@/features/inventory/utils/inventory.utils";
-import { getProductInquiryUrl } from "@/features/whatsapp/utils/whatsapp.utils";
+import {
+  createProductInquiryMessage,
+  getProductInquiryUrl,
+} from "@/features/whatsapp/utils/whatsapp.utils";
 import { AddToCartButton } from "@/features/cart/components/AddToCartButton";
+import { WhatsAppPageContext } from "@/components/layout/WhatsAppContext";
 import { Button } from "@/components/ui/button";
 import { SkeletonImage } from "@/components/ui/skeleton-image";
 
@@ -129,6 +133,7 @@ export default async function ProductPage(props: ProductPageProps) {
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
+      <WhatsAppPageContext message={createProductInquiryMessage(product.name)} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

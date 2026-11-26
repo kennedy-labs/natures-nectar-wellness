@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { PolicyPageShell } from "@/components/layout/PolicyPageShell";
 import { DEFAULT_OG_IMAGE, SITE_NAME } from "@/config/site";
+import { createTopicInquiryMessage } from "@/features/whatsapp/utils/whatsapp.utils";
 
 export const metadata: Metadata = {
   title: "Delivery & Refund Policy",
@@ -25,7 +26,7 @@ export default function DeliveryRefundPolicyPage() {
       title="Delivery & Refund Policy"
       summary="How pickup, local delivery, countrywide shipping across Kenya, order cancellations, and eligible refunds work."
       lastUpdated="November 2026"
-      whatsappMessage="Hello Nature's Nectar Wellness, I have a question about Delivery or Refunds."
+      whatsappMessage={createTopicInquiryMessage("Delivery & Refunds")}
     >
       <section className="space-y-2">
         <h2 className="font-display text-xl font-medium text-foreground">

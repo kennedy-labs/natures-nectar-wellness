@@ -16,6 +16,7 @@ import {
   XCircle,
 } from "lucide-react";
 
+import { useWhatsAppContext } from "@/components/layout/WhatsAppContext";
 import { CustomerOrdersSkeleton } from "@/components/skeletons/StorefrontSkeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,10 @@ import {
   getDeliveryFeeSummary,
   getDeliveryMethodLabel,
 } from "@/features/orders/utils/order.utils";
+import {
+  createMinimalOrderWhatsappMessage,
+  createOrdersPageHelpMessage,
+} from "@/features/whatsapp/utils/whatsapp.utils";
 import { readApiData } from "@/lib/api-client";
 import { formatKes } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -33,6 +38,7 @@ import { useOrdersStore } from "@/store/orders.store";
 type CustomerOrder = {
   id: string;
   orderNumber: string;
+  customerName?: string;
   status: string;
   createdAt: string;
   deliveryMethod: string;
@@ -109,6 +115,7 @@ export function CustomerOrdersView({
   const savedRefs = useOrdersStore((state) => state.orders);
   const saveOrderRef = useOrdersStore((state) => state.saveOrderRef);
 
+  const { setContextMessage } = useWhatsAppContext();
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -122,6 +129,26 @@ export function CustomerOrdersView({
   const [lookupPhone, setLookupPhone] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
+
+  const expandedOrder = orders.find((o) => o.id === expandedOrderId) ?? null;
+  const activeOrdersWhatsappMessage = expandedOrder
+    ? createMinimalOrderWhatsappMessage({
+        orderNumber: expandedOrder.orderNumber,
+        customerName: expandedOrder.customerName,
+        deliveryMethod: expandedOrder.deliveryMethod,
+        deliveryLocation: expandedOrder.deliveryLocation,
+        paymentStatus: expandedOrder.payment?.status,
+        preferredPaymentMethod: expandedOrder.preferredPaymentMethod,
+        isPaid: expandedOrder.payment?.status === "VERIFIED",
+      })
+    : createOrdersPageHelpMessage();
+
+  useEffect(() => {
+    setContextMessage(activeOrdersWhatsappMessage);
+    return () => {
+      setContextMessage(null);
+    };
+  }, [activeOrdersWhatsappMessage, setContextMessage]);
 
   const refsKey = JSON.stringify(
     savedRefs.map((r) => ({
@@ -437,13 +464,19 @@ export function CustomerOrdersView({
           const itemCount = order.items.reduce((sum, i) => sum + i.quantity, 0);
           const statusLabel = getFriendlyStatusLabel(order.status, isPaid);
 
+          const orderWhatsappMessage = createMinimalOrderWhatsappMessage({
+            orderNumber: order.orderNumber,
+            customerName: order.customerName,
+            deliveryMethod: order.deliveryMethod,
+            deliveryLocation: order.deliveryLocation,
+            paymentStatus: order.payment?.status,
+            preferredPaymentMethod: order.preferredPaymentMethod,
+            isPaid,
+          });
+
           const whatsappUrl =
-            getWhatsAppUrl(
-              `Hello Nature's Nectar Wellness, I am checking on my order ${order.orderNumber}.`
-            ) ??
-            `https://wa.me/254757122299?text=${encodeURIComponent(
-              `Hello Nature's Nectar Wellness, I am checking on my order ${order.orderNumber}.`
-            )}`;
+            getWhatsAppUrl(orderWhatsappMessage) ??
+            `https://wa.me/254757122299?text=${encodeURIComponent(orderWhatsappMessage)}`;
 
           return (
             <div

@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { WhatsAppPageContext } from "@/components/layout/WhatsAppContext";
 import { DEFAULT_OG_IMAGE, getAbsoluteUrl } from "@/config/site";
 import { ProductGrid } from "@/features/products/components/ProductGrid";
+import { createCategoryInquiryMessage } from "@/features/whatsapp/utils/whatsapp.utils";
 import { getCategoryBySlug } from "@/server/services/category.service";
 import { getProductsByCategorySlug } from "@/server/services/product.service";
 
@@ -80,6 +82,9 @@ export default async function CategoryPage(props: CategoryPageProps) {
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+      <WhatsAppPageContext
+        message={createCategoryInquiryMessage(category.name)}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

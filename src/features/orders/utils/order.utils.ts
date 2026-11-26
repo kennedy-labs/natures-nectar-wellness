@@ -1,4 +1,5 @@
 import type { SubmitOrderInput } from "@/features/orders/validations/order.validation";
+import { createMinimalOrderWhatsappMessage } from "@/features/whatsapp/utils/whatsapp.utils";
 
 export function createOrderNumber() {
   const timestamp = Date.now().toString(36).toUpperCase();
@@ -80,45 +81,25 @@ export function getDeliveryFeeSummary(
   return "Admin confirms";
 }
 
-type WhatsappOrderItem = {
-  name: string;
-  quantity: number;
-  lineTotal: number;
-};
-
 export function createWhatsappOrderMessage({
   orderNumber,
   customer,
   delivery,
-  items,
-  subtotalAmount,
+  preferredPaymentMethod,
+  isPaid = false,
 }: {
   orderNumber: string;
-  customer: SubmitOrderInput["customer"];
-  delivery: SubmitOrderInput["delivery"];
-  items: WhatsappOrderItem[];
-  subtotalAmount: number;
+  customer: Pick<SubmitOrderInput["customer"], "name">;
+  delivery: Pick<SubmitOrderInput["delivery"], "method" | "location">;
+  preferredPaymentMethod?: string | null;
+  isPaid?: boolean;
 }) {
-  const itemLines = items
-    .map((item) => `- ${item.name} x${item.quantity}: KES ${item.lineTotal}`)
-    .join("\n");
-  const mapUrl = buildGoogleMapsPinUrl(delivery.latitude, delivery.longitude);
-  const deliveryLabel = getDeliveryMethodLabel(delivery.method);
-  const deliveryFeeLabel = getDeliveryFeeSummary(delivery.method, null);
-
-  return [
-    `New order request: ${orderNumber}`,
-    `Customer: ${customer.name}`,
-    `Phone: ${customer.phone}`,
-    `Delivery: ${deliveryLabel}`,
-    delivery.location ? `Location: ${delivery.location}` : null,
-    mapUrl ? `Map Pin: ${mapUrl}` : null,
-    delivery.notes ? `Notes: ${delivery.notes}` : null,
-    "Items:",
-    itemLines,
-    `Subtotal: KES ${subtotalAmount}`,
-    `Delivery fee: ${deliveryFeeLabel}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  return createMinimalOrderWhatsappMessage({
+    orderNumber,
+    customerName: customer.name,
+    deliveryMethod: delivery.method,
+    deliveryLocation: delivery.location,
+    preferredPaymentMethod,
+    isPaid,
+  });
 }

@@ -2,11 +2,10 @@ import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 
 import { getWhatsAppUrl } from "@/config/env.client";
+import { DEFAULT_STOREFRONT_WHATSAPP_MESSAGE } from "@/features/whatsapp/utils/whatsapp.utils";
 
 export function Footer() {
-  const whatsappUrl = getWhatsAppUrl(
-    "Hello Nature's Nectar Wellness, I would like to place an order."
-  );
+  const whatsappUrl = getWhatsAppUrl(DEFAULT_STOREFRONT_WHATSAPP_MESSAGE);
 
   return (
     <footer className="border-t border-border/80 bg-muted/45">

@@ -5,6 +5,7 @@ import { ArrowRight, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
 import { DEFAULT_OG_IMAGE, SITE_NAME, getAbsoluteUrl } from "@/config/site";
+import { DEFAULT_STOREFRONT_WHATSAPP_MESSAGE } from "@/features/whatsapp/utils/whatsapp.utils";
 
 export const metadata: Metadata = {
   title: "About Us",
@@ -30,9 +31,7 @@ export const metadata: Metadata = {
 };
 
 export default function AboutPage() {
-  const whatsappUrl = getWhatsAppUrl(
-    "Hello Nature's Nectar Wellness, I would like to learn more about your formulations."
-  );
+  const whatsappUrl = getWhatsAppUrl(DEFAULT_STOREFRONT_WHATSAPP_MESSAGE);
 
   const aboutSchema = {
     "@context": "https://schema.org",

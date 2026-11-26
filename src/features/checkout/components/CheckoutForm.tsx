@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";
 
+import { WhatsAppPageContext } from "@/components/layout/WhatsAppContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiClientError } from "@/lib/api-client";
 
@@ -14,6 +15,7 @@ import { CheckoutDeliverySection } from "@/features/checkout/components/Checkout
 import { CheckoutPaymentSection } from "@/features/checkout/components/CheckoutPaymentSection";
 import { CheckoutSuccess } from "@/features/checkout/components/CheckoutSuccess";
 import { MpesaPaymentGate } from "@/features/checkout/components/MpesaPaymentGate";
+import { createCheckoutHelpMessage } from "@/features/whatsapp/utils/whatsapp.utils";
 
 import { useCheckout } from "@/features/checkout/hooks/useCheckout";
 
@@ -228,6 +230,7 @@ export function CheckoutForm({
         <MpesaPaymentGate
           orderId={result.id}
           orderNumber={result.orderNumber}
+          customerName={result.customerName}
           amount={result.totalAmount ?? result.subtotalAmount}
           initialPhone={submittedMpesaPhone || result.customerPhone}
           darajaEnv={gatewayAvailability?.darajaEnv}
@@ -257,8 +260,11 @@ export function CheckoutForm({
         orderNumber={result.orderNumber}
         whatsappMessage={result.whatsappMessage}
         amount={result.totalAmount ?? result.subtotalAmount}
+        customerName={result.customerName}
         customerPhone={result.customerPhone}
         customerEmail={result.customerEmail}
+        deliveryMethod={result.deliveryMethod}
+        deliveryLocation={result.deliveryLocation}
         preferredPaymentMethod={result.preferredPaymentMethod}
         initialVerified={verifiedMpesaReceipt}
       />
@@ -270,6 +276,7 @@ export function CheckoutForm({
       onSubmit={handleSubmit(onSubmit)}
       className="grid gap-8 lg:grid-cols-[1fr_380px]"
     >
+      <WhatsAppPageContext message={createCheckoutHelpMessage()} />
       <div className="space-y-6">
         <CheckoutCustomerSection register={register} errors={errors} />
 

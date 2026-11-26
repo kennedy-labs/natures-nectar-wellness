@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { Banknote, CheckCircle2, MessageCircle } from "lucide-react";
 
+import { WhatsAppPageContext } from "@/components/layout/WhatsAppContext";
 import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
 import type {
+  DeliveryMethod,
   GatewayAvailability,
   PaymentMethod,
 } from "@/features/checkout/types/checkout.types";
+import { createMinimalOrderWhatsappMessage } from "@/features/whatsapp/utils/whatsapp.utils";
 import { formatKes } from "@/lib/format";
 
 type CheckoutSuccessProps = {
@@ -16,8 +19,11 @@ type CheckoutSuccessProps = {
   orderNumber: string;
   whatsappMessage: string;
   amount: number;
+  customerName?: string;
   customerPhone?: string;
   customerEmail?: string | null;
+  deliveryMethod?: DeliveryMethod;
+  deliveryLocation?: string | null;
   preferredPaymentMethod?: PaymentMethod | null;
   gatewayAvailability?: GatewayAvailability;
   initialVerified?: {
@@ -31,18 +37,35 @@ export function CheckoutSuccess({
   orderNumber,
   whatsappMessage,
   amount,
+  customerName,
   customerEmail,
+  deliveryMethod,
+  deliveryLocation,
   preferredPaymentMethod,
   initialVerified = null,
 }: CheckoutSuccessProps) {
+  const resolvedWhatsappMessage =
+    customerName || deliveryMethod
+      ? createMinimalOrderWhatsappMessage({
+          orderNumber,
+          customerName,
+          deliveryMethod,
+          deliveryLocation,
+          preferredPaymentMethod,
+          paymentStatus: initialVerified ? "VERIFIED" : undefined,
+          isPaid: Boolean(initialVerified),
+        })
+      : whatsappMessage;
+
   const whatsappUrl =
-    getWhatsAppUrl(whatsappMessage) ??
-    `https://wa.me/254757122299?text=${encodeURIComponent(whatsappMessage)}`;
+    getWhatsAppUrl(resolvedWhatsappMessage) ??
+    `https://wa.me/254757122299?text=${encodeURIComponent(resolvedWhatsappMessage)}`;
 
   const isCashOnPickup = preferredPaymentMethod === "CASH_ON_PICKUP";
 
   return (
     <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-8">
+      <WhatsAppPageContext message={resolvedWhatsappMessage} />
       <div className="mx-auto max-w-lg space-y-6">
         <div className="space-y-2 text-center">
           <p className="text-sm font-medium text-primary">

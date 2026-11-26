@@ -42,8 +42,11 @@ export type CheckoutSubmitResponse = {
   whatsappMessage: string;
   subtotalAmount: number;
   totalAmount?: number | null;
+  customerName?: string;
   customerPhone: string;
   customerEmail?: string | null;
+  deliveryMethod?: DeliveryMethod;
+  deliveryLocation?: string | null;
   preferredPaymentMethod?: PaymentMethod | null;
 };
 
