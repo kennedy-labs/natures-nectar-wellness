@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, MessageCircle } from "lucide-react";
+import { ArrowRight, ExternalLink, MapPin, MessageCircle, Phone } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
-import { DEFAULT_OG_IMAGE, SITE_NAME, getAbsoluteUrl } from "@/config/site";
+import {
+  BUSINESS_LOCATION,
+  DEFAULT_OG_IMAGE,
+  SITE_NAME,
+  getAbsoluteUrl,
+} from "@/config/site";
 import { DEFAULT_STOREFRONT_WHATSAPP_MESSAGE } from "@/features/whatsapp/utils/whatsapp.utils";
 
 export const metadata: Metadata = {
@@ -171,6 +176,55 @@ export default function AboutPage() {
               </a>
             </Button>
           ) : null}
+        </div>
+      </section>
+
+      <section
+        id="visit-us"
+        className="mt-10 grid gap-6 rounded-xl border border-border/80 bg-card p-6 shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-8 lg:grid-cols-12 lg:items-center"
+      >
+        <div className="space-y-4 lg:col-span-5">
+          <p className="text-xs font-medium text-primary">Visit Our Nairobi Shop</p>
+          <h2 className="font-display text-2xl font-medium text-foreground">
+            Pickup &amp; in-person assistance
+          </h2>
+          <div className="space-y-2.5 text-sm text-muted-foreground">
+            <p className="flex items-start gap-2">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <span className="text-foreground">{BUSINESS_LOCATION.fullAddress}</span>
+            </p>
+            <p className="flex items-center gap-2">
+              <Phone className="h-4 w-4 shrink-0 text-primary" />
+              <a
+                href={BUSINESS_LOCATION.phoneHref}
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                {BUSINESS_LOCATION.phoneDisplay}
+              </a>
+            </p>
+          </div>
+          <div className="flex flex-col gap-2.5 pt-1 sm:flex-row sm:flex-wrap">
+            <Button asChild className="min-h-11 w-full sm:w-auto">
+              <a
+                href={BUSINESS_LOCATION.googleMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Get directions
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </Button>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-xl border border-border/80 bg-muted/40 lg:col-span-7">
+          <iframe
+            title="Nature's Nectar Wellness location at Kooni Mall, Tsavo Street, Nairobi"
+            src={BUSINESS_LOCATION.googleMapsEmbedUrl}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            className="h-64 w-full border-0 sm:h-72"
+          />
         </div>
       </section>
     </article>

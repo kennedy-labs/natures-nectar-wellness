@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Banknote, CheckCircle2, MessageCircle } from "lucide-react";
+import { Banknote, CheckCircle2, ExternalLink, MapPin, MessageCircle } from "lucide-react";
 
 import { WhatsAppPageContext } from "@/components/layout/WhatsAppContext";
 import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
+import { BUSINESS_LOCATION } from "@/config/site";
 import type {
   DeliveryMethod,
   GatewayAvailability,
@@ -59,7 +60,7 @@ export function CheckoutSuccess({
 
   const whatsappUrl =
     getWhatsAppUrl(resolvedWhatsappMessage) ??
-    `https://wa.me/254757122299?text=${encodeURIComponent(resolvedWhatsappMessage)}`;
+    `https://wa.me/${BUSINESS_LOCATION.phoneDigits}?text=${encodeURIComponent(resolvedWhatsappMessage)}`;
 
   const isCashOnPickup = preferredPaymentMethod === "CASH_ON_PICKUP";
 
@@ -134,6 +135,33 @@ export function CheckoutSuccess({
               <strong>{formatKes(amount)}</strong> ready in cash when picking up
               your order, or message us on WhatsApp to coordinate pickup timing.
             </p>
+          </div>
+        ) : null}
+
+        {deliveryMethod === "PICKUP" ? (
+          <div className="space-y-1.5 rounded-xl border border-border/80 bg-muted/35 p-4 text-sm">
+            <div className="flex items-center gap-2 font-medium text-foreground">
+              <MapPin className="h-4 w-4 shrink-0 text-primary" />
+              <span>Pickup Location</span>
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {BUSINESS_LOCATION.fullAddress} · Tel:{" "}
+              <a
+                href={BUSINESS_LOCATION.phoneHref}
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                {BUSINESS_LOCATION.phoneDisplay}
+              </a>
+            </p>
+            <a
+              href={BUSINESS_LOCATION.googleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-9 items-center gap-1.5 text-xs font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Get directions on Google Maps
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
           </div>
         ) : null}
 

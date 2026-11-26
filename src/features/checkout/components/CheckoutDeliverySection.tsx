@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BUSINESS_LOCATION } from "@/config/site";
 import type {
   CheckoutFormValues,
   DeliveryMethod,
@@ -174,8 +175,39 @@ export function CheckoutDeliverySection({
           ) : null}
         </div>
 
-        {/* LOCATION (conditional) */}
-        {requiresLocation ? (
+        {/* PICKUP SHOP LOCATION OR DELIVERY LOCATION */}
+        {!requiresLocation ? (
+          <div className="space-y-2 rounded-lg border border-border/80 bg-muted/35 p-3.5 text-sm">
+            <div className="flex items-start gap-2.5">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <div className="min-w-0 space-y-1">
+                <p className="font-medium text-foreground">
+                  Pickup Location: {BUSINESS_LOCATION.fullAddress}
+                </p>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  We&apos;ll notify you once your order is packed and ready for
+                  collection. Questions? Call{" "}
+                  <a
+                    href={BUSINESS_LOCATION.phoneHref}
+                    className="font-medium text-foreground underline-offset-4 hover:underline"
+                  >
+                    {BUSINESS_LOCATION.phoneDisplay}
+                  </a>
+                  .
+                </p>
+                <a
+                  href={BUSINESS_LOCATION.googleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-9 items-center gap-1.5 text-xs font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  View shop on Google Maps
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            </div>
+          </div>
+        ) : (
           <div className="space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <label className="text-sm font-medium">Delivery location</label>
@@ -253,7 +285,7 @@ export function CheckoutDeliverySection({
               </p>
             ) : null}
           </div>
-        ) : null}
+        )}
 
         {/* NOTES */}
         <div className="space-y-2">

@@ -7,6 +7,7 @@ import {
   Check,
   CheckCircle2,
   Clock,
+  ExternalLink,
   MapPin,
   MessageCircle,
   Package,
@@ -17,6 +18,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
+import { BUSINESS_LOCATION } from "@/config/site";
 import type { PaymentMethod } from "@/features/checkout/types/checkout.types";
 import {
   getDeliveryFeeSummary,
@@ -133,7 +135,7 @@ export function FeaturedOrderStage({
 
   const whatsappUrl =
     getWhatsAppUrl(orderWhatsappMessage) ??
-    `https://wa.me/254757122299?text=${encodeURIComponent(orderWhatsappMessage)}`;
+    `https://wa.me/${BUSINESS_LOCATION.phoneDigits}?text=${encodeURIComponent(orderWhatsappMessage)}`;
 
   const progressWidthPercent = (progressIndex / (trackingSteps.length - 1)) * 100;
 
@@ -497,6 +499,22 @@ export function FeaturedOrderStage({
                   <dd className="flex items-start gap-1.5 pt-0.5 text-xs text-muted-foreground">
                     <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
                     <span>{order.deliveryLocation}</span>
+                  </dd>
+                ) : order.deliveryMethod === "PICKUP" ? (
+                  <dd className="space-y-1 pt-0.5 text-xs text-muted-foreground">
+                    <div className="flex items-start gap-1.5">
+                      <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span>{BUSINESS_LOCATION.fullAddress}</span>
+                    </div>
+                    <a
+                      href={BUSINESS_LOCATION.googleMapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 pl-5 font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      Get shop directions
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
                   </dd>
                 ) : null}
                 {order.deliveryQuoteNotes ? (

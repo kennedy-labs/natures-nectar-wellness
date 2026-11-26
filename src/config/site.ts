@@ -5,6 +5,21 @@ export const SITE_DESCRIPTION =
   "Shop herbal supplements, raw forest honey, mineral resins, and natural wellness teas delivered across Kenya.";
 export const DEFAULT_OG_IMAGE = "/images/mau-forest-honey.jpg";
 
+export const BUSINESS_LOCATION = {
+  shopName: "Nature's Nectar Wellness",
+  streetAddress: "Kooni Mall, Shop Number B4, Tsavo Street",
+  city: "Nairobi",
+  country: "Kenya",
+  fullAddress: "Kooni Mall, Shop Number B4, Tsavo Street, Nairobi",
+  phoneDisplay: "+254 721 3320 97",
+  phoneDigits: "254721332097",
+  phoneHref: "tel:+254721332097",
+  googleMapsUrl:
+    "https://www.google.com/maps/search/?api=1&query=Kooni+Mall%2C+Tsavo+Street%2C+Nairobi",
+  googleMapsEmbedUrl:
+    "https://maps.google.com/maps?q=kooni%20mall%20tsavo%20street%20nairobi&t=m&z=16&output=embed&iwloc=near",
+} as const;
+
 function normalizeOrigin(raw?: string | null): string | null {
   if (!raw) return null;
   const trimmed = raw.trim().replace(/\/+$/, "");

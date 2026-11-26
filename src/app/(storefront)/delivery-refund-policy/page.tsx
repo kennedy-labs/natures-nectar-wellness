@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { PolicyPageShell } from "@/components/layout/PolicyPageShell";
-import { DEFAULT_OG_IMAGE, SITE_NAME } from "@/config/site";
+import { BUSINESS_LOCATION, DEFAULT_OG_IMAGE, SITE_NAME } from "@/config/site";
 import { createTopicInquiryMessage } from "@/features/whatsapp/utils/whatsapp.utils";
 
 export const metadata: Metadata = {
@@ -37,8 +37,16 @@ export default function DeliveryRefundPolicyPage() {
             <strong className="font-medium text-foreground">
               Pickup (Free):
             </strong>{" "}
-            Collect your order directly once we confirm readiness and pickup
-            timing with you.
+            Collect your order directly from our shop at{" "}
+            <a
+              href={BUSINESS_LOCATION.googleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              {BUSINESS_LOCATION.fullAddress}
+            </a>{" "}
+            once we confirm readiness and pickup timing with you.
           </li>
           <li>
             <strong className="font-medium text-foreground">

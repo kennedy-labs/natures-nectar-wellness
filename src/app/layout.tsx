@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 
 import { QueryProvider } from "@/components/providers/query-provider";
 import {
+  BUSINESS_LOCATION,
   DEFAULT_OG_IMAGE,
   SITE_DESCRIPTION,
   SITE_NAME,
@@ -92,7 +93,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const siteUrl = getSiteUrl();
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.trim();
+  const whatsappNumber =
+    process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.trim() ||
+    BUSINESS_LOCATION.phoneDisplay;
 
   const organizationSchema = {
     "@context": "https://schema.org",
@@ -101,11 +104,18 @@ export default function RootLayout({
     url: siteUrl,
     description: SITE_DESCRIPTION,
     logo: `${siteUrl}${DEFAULT_OG_IMAGE}`,
+    telephone: whatsappNumber,
+    hasMap: BUSINESS_LOCATION.googleMapsUrl,
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: BUSINESS_LOCATION.streetAddress,
+      addressLocality: BUSINESS_LOCATION.city,
+      addressCountry: "KE",
+    },
     areaServed: {
       "@type": "Country",
       name: "Kenya",
     },
-    ...(whatsappNumber ? { telephone: whatsappNumber } : {}),
   };
 
   const websiteSchema = {
