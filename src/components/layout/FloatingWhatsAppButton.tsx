@@ -4,11 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, MessageCircle, X } from "lucide-react";
 
 import { useWhatsAppContext } from "@/components/layout/WhatsAppContext";
+import { Textarea } from "@/components/ui/textarea";
 import { getWhatsAppUrl } from "@/config/env.client";
 import {
   createTopicInquiryMessage,
   DEFAULT_STOREFRONT_WHATSAPP_MESSAGE,
 } from "@/features/whatsapp/utils/whatsapp.utils";
+import { cn } from "@/lib/utils";
 
 const WHISPER_DISMISSED_KEY = "nnw_wa_whisper_dismissed";
 const WHISPER_DWELL_MS = 10_000;
@@ -39,9 +41,17 @@ export function FloatingWhatsAppButton() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [whisperVisible, setWhisperVisible] = useState(false);
+  const [draftState, setDraftState] = useState<{ base: string; text: string }>({
+    base: activeMessage,
+    text: activeMessage,
+  });
+
+  const draftMessage =
+    draftState.base === activeMessage ? draftState.text : activeMessage;
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     if (!directWhatsappUrl) return;
@@ -117,6 +127,14 @@ export function FloatingWhatsAppButton() {
     setIsOpen(false);
   }
 
+  function handleSelectTopic(message: string) {
+    setDraftState({ base: activeMessage, text: message });
+    textareaRef.current?.focus();
+  }
+
+  const finalMessage = draftMessage.trim() || activeMessage;
+  const submitWhatsappUrl = getWhatsAppUrl(finalMessage) ?? directWhatsappUrl;
+
   return (
     <div
       ref={containerRef}
@@ -148,12 +166,28 @@ export function FloatingWhatsAppButton() {
             </button>
           </div>
 
-          <p className="mt-3 rounded-lg bg-muted/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-            &ldquo;{activeMessage}&rdquo;
-          </p>
+          <div className="mt-3 space-y-1.5">
+            <label
+              htmlFor="whatsapp-draft-message"
+              className="sr-only"
+            >
+              Your WhatsApp message
+            </label>
+            <Textarea
+              ref={textareaRef}
+              id="whatsapp-draft-message"
+              rows={3}
+              value={draftMessage}
+              onChange={(event) =>
+                setDraftState({ base: activeMessage, text: event.target.value })
+              }
+              placeholder={activeMessage}
+              className="min-h-[4.75rem] resize-none bg-background/80 text-base leading-relaxed md:text-sm"
+            />
+          </div>
 
           <a
-            href={directWhatsappUrl}
+            href={submitWhatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
             onClick={handleClose}
@@ -170,20 +204,22 @@ export function FloatingWhatsAppButton() {
             </p>
             <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
               {OPTIONAL_TOPICS.map((topic) => {
-                const topicUrl = getWhatsAppUrl(topic.message);
-                if (!topicUrl) return null;
+                const isSelected = draftMessage.trim() === topic.message;
 
                 return (
-                  <a
+                  <button
                     key={topic.id}
-                    href={topicUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={handleClose}
-                    className="inline-flex min-h-7 items-center text-xs text-primary underline-offset-4 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    type="button"
+                    onClick={() => handleSelectTopic(topic.message)}
+                    className={cn(
+                      "inline-flex min-h-7 items-center text-left text-xs underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      isSelected
+                        ? "font-medium text-foreground underline"
+                        : "text-primary"
+                    )}
                   >
                     {topic.label}
-                  </a>
+                  </button>
                 );
               })}
             </div>
