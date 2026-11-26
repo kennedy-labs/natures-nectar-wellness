@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Leaf } from "lucide-react";
 
+import { SkeletonImage } from "@/components/ui/skeleton-image";
 import { DEFAULT_OG_IMAGE } from "@/config/site";
 import { getStorefrontCategories } from "@/server/services/category.service";
 
@@ -50,24 +51,46 @@ export default async function CategoriesPage() {
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {categories.map((category) => (
           <Link
-            className="group flex flex-col justify-between rounded-xl border border-border/80 bg-card p-6 text-card-foreground shadow-[0_1px_2px_rgba(24,42,32,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_12px_28px_-14px_rgba(24,42,32,0.14)]"
+            className="group flex flex-col overflow-hidden rounded-xl border border-border/80 bg-card text-card-foreground shadow-[0_1px_2px_rgba(24,42,32,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_12px_28px_-14px_rgba(24,42,32,0.14)]"
             href={`/categories/${category.slug}`}
             key={category.id}
           >
-            <div>
-              <h2 className="font-display text-xl font-medium text-foreground transition-colors group-hover:text-primary">
-                {category.name}
-              </h2>
-              {category.description ? (
-                <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
-                  {category.description}
-                </p>
-              ) : null}
+            <div className="relative aspect-[16/10] overflow-hidden bg-muted/50">
+              {category.image ? (
+                <SkeletonImage
+                  src={category.image}
+                  alt={category.name}
+                  useNextImage={!category.image.startsWith("data:")}
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  className="transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(47,93,67,0.10),transparent_70%)] text-primary/70">
+                  <Leaf className="h-7 w-7" />
+                </div>
+              )}
             </div>
-            <span className="mt-5 inline-flex items-center gap-1.5 text-xs font-medium text-primary">
-              Browse collection
-              <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
-            </span>
+
+            <div className="flex flex-1 flex-col justify-between p-6">
+              <div>
+                <p className="text-xs font-medium text-primary">
+                  {category.productCount}{" "}
+                  {category.productCount === 1 ? "formulation" : "formulations"}
+                </p>
+                <h2 className="mt-1 font-display text-xl font-medium text-foreground transition-colors group-hover:text-primary">
+                  {category.name}
+                </h2>
+                {category.description ? (
+                  <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+                    {category.description}
+                  </p>
+                ) : null}
+              </div>
+              <span className="mt-5 inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+                Browse collection
+                <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
+              </span>
+            </div>
           </Link>
         ))}
       </div>

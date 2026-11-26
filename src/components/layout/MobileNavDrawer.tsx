@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Grid2x2,
+  HelpCircle,
   Home,
+  Info,
   Leaf,
   Menu,
   MessageCircle,
@@ -30,6 +32,8 @@ const NAV_ITEMS = [
   { href: "/", label: "Home", icon: Home },
   { href: "/products", label: "Products", icon: ShoppingBag },
   { href: "/categories", label: "Categories", icon: Grid2x2 },
+  { href: "/about", label: "About Us", icon: Info },
+  { href: "/faq", label: "FAQ", icon: HelpCircle },
   { href: "/orders", label: "Orders", icon: Package },
 ] as const;
 

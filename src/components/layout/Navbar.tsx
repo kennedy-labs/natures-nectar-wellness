@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { Leaf, MessageCircle } from "lucide-react";
+import { Leaf } from "lucide-react";
 
 import { MobileNavDrawer } from "@/components/layout/MobileNavDrawer";
-import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
 import { CartDrawer } from "@/features/cart/components/CartDrawer";
 import { OrdersNavLink } from "@/features/orders/components/OrdersNavLink";
@@ -10,6 +9,8 @@ import { OrdersNavLink } from "@/features/orders/components/OrdersNavLink";
 const navLinks = [
   { href: "/products", label: "Products" },
   { href: "/categories", label: "Categories" },
+  { href: "/about", label: "About" },
+  { href: "/faq", label: "FAQ" },
 ];
 
 export function Navbar() {
@@ -33,7 +34,7 @@ export function Navbar() {
 
         <nav
           aria-label="Primary navigation"
-          className="hidden items-center gap-7 text-sm font-medium md:flex"
+          className="hidden items-center gap-6 text-sm font-medium md:flex lg:gap-7"
         >
           {navLinks.map((link) => (
             <Link
@@ -49,19 +50,6 @@ export function Navbar() {
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <OrdersNavLink />
           <CartDrawer />
-          {whatsappUrl ? (
-            <a
-              href={whatsappUrl}
-              rel="noopener noreferrer"
-              target="_blank"
-              className="hidden sm:inline-flex"
-            >
-              <Button size="sm" variant="outline" className="min-h-9">
-                <MessageCircle className="text-primary" />
-                WhatsApp
-              </Button>
-            </a>
-          ) : null}
         </div>
       </div>
     </header>

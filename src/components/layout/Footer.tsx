@@ -37,6 +37,18 @@ export function Footer() {
             </Link>
             <Link
               className="inline-flex min-h-10 items-center py-1 transition-colors hover:text-foreground"
+              href="/about"
+            >
+              About Us
+            </Link>
+            <Link
+              className="inline-flex min-h-10 items-center py-1 transition-colors hover:text-foreground"
+              href="/faq"
+            >
+              FAQ
+            </Link>
+            <Link
+              className="inline-flex min-h-10 items-center py-1 transition-colors hover:text-foreground"
               href="/orders"
             >
               Orders

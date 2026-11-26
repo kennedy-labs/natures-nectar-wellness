@@ -71,6 +71,129 @@ export async function findFeaturedProducts() {
   return products.map(mapStorefrontProduct);
 }
 
+export async function findPopularProducts(limit = 6) {
+  const safeLimit = Math.max(1, Math.min(limit, 12));
+
+  const rankedDemand = await db.orderItem.groupBy({
+    by: ["productId"],
+    where: {
+      order: {
+        status: {
+          not: "CANCELLED",
+        },
+        NOT: {
+          AND: [
+            { preferredPaymentMethod: "MPESA_BUY_GOODS" },
+            { status: "AWAITING_PAYMENT" },
+          ],
+        },
+      },
+    },
+    _sum: {
+      quantity: true,
+    },
+    orderBy: {
+      _sum: {
+        quantity: "desc",
+      },
+    },
+    take: safeLimit * 2,
+  });
+
+  const orderedIds = rankedDemand.map((item) => item.productId);
+  const demandProducts = orderedIds.length
+    ? await db.product.findMany({
+        include: {
+          category: true,
+        },
+        where: {
+          id: {
+            in: orderedIds,
+          },
+          isActive: true,
+          stockQuantity: {
+            gt: 0,
+          },
+        },
+      })
+    : [];
+
+  const productById = new Map(demandProducts.map((p) => [p.id, p]));
+  const selected = orderedIds
+    .map((id) => productById.get(id))
+    .filter((p): p is NonNullable<typeof p> => Boolean(p))
+    .slice(0, safeLimit);
+
+  if (selected.length < safeLimit) {
+    const excludeIds = selected.map((p) => p.id);
+    const backfill = await db.product.findMany({
+      include: {
+        category: true,
+      },
+      where: {
+        isActive: true,
+        ...(excludeIds.length > 0
+          ? {
+              id: {
+                notIn: excludeIds,
+              },
+            }
+          : {}),
+      },
+      orderBy: [{ isFeatured: "desc" }, { createdAt: "desc" }],
+      take: safeLimit - selected.length,
+    });
+
+    selected.push(...backfill);
+  }
+
+  return selected.map(mapStorefrontProduct);
+}
+
+export async function searchActiveProducts(params: {
+  query?: string;
+  categorySlug?: string;
+  limit?: number;
+}) {
+  const trimmedQuery = params.query?.trim();
+  const trimmedCategory = params.categorySlug?.trim();
+
+  const products = await db.product.findMany({
+    include: {
+      category: true,
+    },
+    where: {
+      isActive: true,
+      ...(trimmedCategory
+        ? {
+            category: {
+              slug: trimmedCategory,
+            },
+          }
+        : {}),
+      ...(trimmedQuery
+        ? {
+            OR: [
+              { name: { contains: trimmedQuery, mode: "insensitive" } },
+              { description: { contains: trimmedQuery, mode: "insensitive" } },
+              { benefits: { contains: trimmedQuery, mode: "insensitive" } },
+              { ingredients: { contains: trimmedQuery, mode: "insensitive" } },
+              {
+                category: {
+                  name: { contains: trimmedQuery, mode: "insensitive" },
+                },
+              },
+            ],
+          }
+        : {}),
+    },
+    orderBy: [{ isFeatured: "desc" }, { createdAt: "desc" }],
+    ...(params.limit ? { take: Math.max(1, Math.min(params.limit, 50)) } : {}),
+  });
+
+  return products.map(mapStorefrontProduct);
+}
+
 export async function findAllProductsForAdmin() {
   return db.product.findMany({
     include: {

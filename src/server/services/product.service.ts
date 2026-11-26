@@ -14,6 +14,8 @@ import {
   findActiveProductsByCategorySlug,
   findActiveProductBySlug,
   findFeaturedProducts,
+  findPopularProducts,
+  searchActiveProducts,
   updateProduct as updateProductRecord,
 } from "@/server/repositories/product.repository";
 
@@ -27,6 +29,12 @@ const getCachedFeaturedProducts = unstable_cache(
   async () => findFeaturedProducts(),
   ["storefront-featured-products"],
   { revalidate: 60, tags: ["products"] }
+);
+
+const getCachedPopularProducts = unstable_cache(
+  async (limit: number) => findPopularProducts(limit),
+  ["storefront-popular-products"],
+  { revalidate: 60, tags: ["products", "orders"] }
 );
 
 const getCachedProductsByCategorySlug = unstable_cache(
@@ -46,6 +54,29 @@ export const getAllProducts = cache(async () => getCachedAllProducts());
 export const getFeaturedProducts = cache(async () =>
   getCachedFeaturedProducts()
 );
+
+export const getPopularProducts = cache(async (limit = 6) =>
+  getCachedPopularProducts(limit)
+);
+
+export async function searchStorefrontProducts(params: {
+  query?: string;
+  categorySlug?: string;
+  limit?: number;
+}) {
+  const query = params.query?.trim().slice(0, 80) || undefined;
+  const categorySlug = params.categorySlug?.trim().slice(0, 80) || undefined;
+
+  if (!query && !categorySlug && !params.limit) {
+    return getAllProducts();
+  }
+
+  return searchActiveProducts({
+    query,
+    categorySlug,
+    limit: params.limit,
+  });
+}
 
 export async function getAllProductsForAdmin() {
   return findAllProductsForAdmin();

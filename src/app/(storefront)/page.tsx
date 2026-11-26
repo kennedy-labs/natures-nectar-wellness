@@ -1,17 +1,23 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Leaf } from "lucide-react";
 
 import heroApothecaryImg from "@/assets/images/hero_botanical_apothecary_1795510308614.jpg";
+import { InlineBotanicalSearch } from "@/components/layout/InlineBotanicalSearch";
 import { Button } from "@/components/ui/button";
+import { SkeletonImage } from "@/components/ui/skeleton-image";
 import {
   DEFAULT_OG_IMAGE,
   SITE_DESCRIPTION,
   SITE_TITLE,
 } from "@/config/site";
 import { ProductGrid } from "@/features/products/components/ProductGrid";
-import { getFeaturedProducts } from "@/server/services/product.service";
+import { getStorefrontCategories } from "@/server/services/category.service";
+import {
+  getFeaturedProducts,
+  getPopularProducts,
+} from "@/server/services/product.service";
 
 export const revalidate = 60;
 
@@ -39,10 +45,24 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const featuredProducts = await getFeaturedProducts();
+  const [categories, popularProducts, featuredProducts] = await Promise.all([
+    getStorefrontCategories(),
+    getPopularProducts(6),
+    getFeaturedProducts(),
+  ]);
+
+  const activeCategories = categories.filter((cat) => cat.productCount > 0);
+  const shelfCategories = (
+    activeCategories.length > 0 ? activeCategories : categories
+  ).slice(0, 6);
+
+  const popularIds = new Set(popularProducts.map((product) => product.id));
+  const distinctFeatured = featuredProducts.filter(
+    (product) => !popularIds.has(product.id)
+  );
 
   return (
-    <section className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-8 sm:gap-12 sm:px-6 sm:py-12 md:gap-16 md:py-14">
+    <section className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-8 sm:gap-14 sm:px-6 sm:py-12 md:gap-16 md:py-14">
       <div className="grid items-stretch gap-8 lg:grid-cols-12 lg:gap-12">
         <div className="flex flex-col justify-center space-y-6 lg:col-span-6">
           <div className="space-y-4">
@@ -58,6 +78,12 @@ export default async function HomePage() {
               personal delivery coordination across Kenya.
             </p>
           </div>
+
+          <InlineBotanicalSearch
+            variant="hero"
+            placeholder="Search raw honey, shilajit, hibiscus tea..."
+            className="max-w-lg"
+          />
 
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Button asChild size="lg" className="min-h-11 w-full sm:w-auto">
@@ -125,21 +151,97 @@ export default async function HomePage() {
             03. Delivery across Kenya
           </h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Free pickup available alongside flexible local and countrywide
-            dispatch options.
+            Free pickup and Nairobi delivery alongside flexible countrywide
+            courier dispatch.
           </p>
         </div>
       </div>
 
-      {featuredProducts.length > 0 ? (
+      {shelfCategories.length > 0 ? (
         <div className="space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="space-y-1.5">
-              <h2 className="font-display text-2xl font-medium tracking-tight sm:text-3xl">
-                Featured Formulations
+              <h2 className="font-display text-2xl font-medium tracking-tight text-foreground sm:text-3xl">
+                Shop by Category
               </h2>
               <p className="text-sm text-muted-foreground sm:text-base">
-                Handpicked herbal essentials highlighted from our apothecary.
+                Jump straight to the teas, raw honey, resins, and herbal blends
+                tailored to your routine.
+              </p>
+            </div>
+            <Link
+              href="/categories"
+              className="inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 transition-colors hover:underline"
+            >
+              All categories
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {shelfCategories.map((category) => (
+              <Link
+                key={category.id}
+                href={`/categories/${category.slug}`}
+                className="group flex flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-[0_1px_2px_rgba(24,42,32,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_12px_28px_-14px_rgba(24,42,32,0.14)]"
+              >
+                <div className="relative aspect-[16/10] overflow-hidden bg-muted/50">
+                  {category.image ? (
+                    <SkeletonImage
+                      src={category.image}
+                      alt={category.name}
+                      useNextImage={!category.image.startsWith("data:")}
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      className="transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(47,93,67,0.10),transparent_70%)] text-primary/70">
+                      <Leaf className="h-7 w-7" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-1 flex-col justify-between p-5">
+                  <div>
+                    <p className="text-xs font-medium text-primary">
+                      {category.productCount}{" "}
+                      {category.productCount === 1
+                        ? "formulation"
+                        : "formulations"}
+                    </p>
+                    <h3 className="mt-1 font-display text-xl font-medium text-foreground transition-colors group-hover:text-primary">
+                      {category.name}
+                    </h3>
+                    {category.description ? (
+                      <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                        {category.description}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+                    Explore {category.name}
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {popularProducts.length > 0 ? (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="space-y-1.5">
+              <h2 className="font-display text-2xl font-medium tracking-tight text-foreground sm:text-3xl">
+                {distinctFeatured.length > 0
+                  ? "Popular in Kenya"
+                  : "Popular & Featured Formulations"}
+              </h2>
+              <p className="text-sm text-muted-foreground sm:text-base">
+                Most-ordered botanical favorites and trusted daily essentials
+                from our apothecary.
               </p>
             </div>
             <Link
@@ -151,7 +253,31 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <ProductGrid products={featuredProducts} />
+          <ProductGrid products={popularProducts} />
+        </div>
+      ) : null}
+
+      {distinctFeatured.length > 0 ? (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="space-y-1.5">
+              <h2 className="font-display text-2xl font-medium tracking-tight text-foreground sm:text-3xl">
+                Featured Formulations
+              </h2>
+              <p className="text-sm text-muted-foreground sm:text-base">
+                Handpicked herbal essentials highlighted from our apothecary.
+              </p>
+            </div>
+            <Link
+              href="/products"
+              className="inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 transition-colors hover:underline"
+            >
+              Browse full catalog
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          <ProductGrid products={distinctFeatured} />
         </div>
       ) : null}
     </section>

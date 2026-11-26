@@ -22,6 +22,7 @@ export function ProductGrid({ products }: ProductGridProps) {
             name={product.name}
             description={product.description}
             benefits={product.benefits}
+            categoryName={product.category?.name}
             price={product.price}
             stockQuantity={product.stockQuantity}
             image={product.image}

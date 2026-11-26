@@ -1,12 +1,23 @@
 import { revalidatePath, revalidateTag } from "next/cache";
+import { z } from "zod";
 
 import {
   createProduct,
   getAllProducts,
   getAllProductsForAdmin,
+  getPopularProducts,
+  searchStorefrontProducts,
 } from "@/server/services/product.service";
 import { requireAdminRequest } from "@/server/auth/admin-auth";
 import { apiCreated, apiFail, apiOk, readJson } from "@/server/http/api-response";
+import { enforceRateLimit } from "@/server/http/rate-limit";
+
+const productQuerySchema = z.object({
+  q: z.string().trim().max(80).optional(),
+  category: z.string().trim().max(80).optional(),
+  popular: z.enum(["1", "true"]).optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+});
 
 export async function GET(req: Request) {
   try {
@@ -15,12 +26,49 @@ export async function GET(req: Request) {
 
     if (isAdminScope) {
       await requireAdminRequest(req);
+      const products = await getAllProductsForAdmin();
+      return apiOk(products);
     }
 
-    const products = isAdminScope
-      ? await getAllProductsForAdmin()
-      : await getAllProducts();
+    const rawQ = url.searchParams.get("q") ?? undefined;
+    const rawCategory = url.searchParams.get("category") ?? undefined;
+    const rawPopular = url.searchParams.get("popular") ?? undefined;
+    const rawLimit = url.searchParams.get("limit") ?? undefined;
 
+    if (
+      rawQ !== undefined ||
+      rawCategory !== undefined ||
+      rawPopular !== undefined ||
+      rawLimit !== undefined
+    ) {
+      enforceRateLimit(req, {
+        keyPrefix: "public-products-search",
+        limit: 90,
+        windowMs: 60_000,
+      });
+
+      const parsed = productQuerySchema.parse({
+        q: rawQ || undefined,
+        category: rawCategory || undefined,
+        popular: rawPopular || undefined,
+        limit: rawLimit || undefined,
+      });
+
+      if (parsed.popular && !parsed.q && !parsed.category) {
+        const products = await getPopularProducts(parsed.limit ?? 5);
+        return apiOk(products);
+      }
+
+      const products = await searchStorefrontProducts({
+        query: parsed.q,
+        categorySlug: parsed.category,
+        limit: parsed.limit,
+      });
+
+      return apiOk(products);
+    }
+
+    const products = await getAllProducts();
     return apiOk(products);
   } catch (error) {
     return apiFail(error);

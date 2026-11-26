@@ -20,6 +20,7 @@ type ProductCardProps = {
   name: string;
   description: string;
   benefits?: string | null;
+  categoryName?: string | null;
   price: number;
   stockQuantity: number;
   image?: string | null;
@@ -32,6 +33,7 @@ export function ProductCard({
   name,
   description,
   benefits,
+  categoryName,
   price,
   stockQuantity,
   image,
@@ -65,7 +67,17 @@ export function ProductCard({
       </div>
 
       <CardHeader className="space-y-2 p-5 pb-2">
-        <div className="flex items-center justify-between gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs">
+          {categoryName ? (
+            <>
+              <span className="truncate font-medium text-muted-foreground">
+                {categoryName}
+              </span>
+              <span aria-hidden="true" className="text-muted-foreground/70">
+                ·
+              </span>
+            </>
+          ) : null}
           <span
             className={cn(
               "font-medium",
@@ -80,7 +92,7 @@ export function ProductCard({
           </span>
         </div>
 
-        <CardTitle className="font-display text-xl font-medium leading-snug tracking-tight text-foreground">
+        <CardTitle className="font-display text-xl font-medium leading-snug tracking-tight text-foreground text-balance">
           {name}
         </CardTitle>
 
