@@ -5,6 +5,7 @@ import { ArrowRight, Leaf } from "lucide-react";
 
 import heroApothecaryImg from "@/assets/images/hero_botanical_apothecary_1795510308614.jpg";
 import { InlineBotanicalSearch } from "@/components/layout/InlineBotanicalSearch";
+import { StorefrontWhatsAppInvitation } from "@/components/layout/StorefrontWhatsAppInvitation";
 import { Button } from "@/components/ui/button";
 import { SkeletonImage } from "@/components/ui/skeleton-image";
 import {
@@ -280,6 +281,8 @@ export default async function HomePage() {
           <ProductGrid products={distinctFeatured} />
         </div>
       ) : null}
+
+      <StorefrontWhatsAppInvitation />
     </section>
   );
 }
