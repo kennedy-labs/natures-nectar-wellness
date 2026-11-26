@@ -154,3 +154,22 @@ export function createMinimalOrderWhatsappMessage({
     .filter(Boolean)
     .join(" | ");
 }
+
+export function createCancelledOrderRefundWhatsappMessage({
+  orderNumber,
+  customerName,
+}: {
+  orderNumber: string;
+  customerName?: string | null;
+}): string {
+  const safeOrder = sanitizeWhatsappField(orderNumber, 40);
+  const safeName = sanitizeWhatsappField(customerName, 50);
+
+  if (safeOrder && safeName) {
+    return `Order ${safeOrder} (${safeName}) — cancelled, requesting M-Pesa refund.`;
+  }
+  if (safeOrder) {
+    return `Order ${safeOrder} — cancelled, requesting M-Pesa refund.`;
+  }
+  return "Hi, I cancelled a paid order and need help with an M-Pesa refund.";
+}

@@ -8,6 +8,7 @@ import { useWhatsAppContext } from "@/components/layout/WhatsAppContext";
 import { CustomerOrdersSkeleton } from "@/components/skeletons/StorefrontSkeletons";
 import { Button } from "@/components/ui/button";
 import {
+  createCancelledOrderRefundWhatsappMessage,
   createMinimalOrderWhatsappMessage,
   createOrdersPageHelpMessage,
 } from "@/features/whatsapp/utils/whatsapp.utils";
@@ -15,11 +16,13 @@ import { readApiData } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { useOrdersStore } from "@/store/orders.store";
 
+import { CancelOrderDialog } from "./CancelOrderDialog";
 import {
   type CustomerOrderRecord,
   FeaturedOrderStage,
 } from "./FeaturedOrderStage";
 import { OrderHistoryList } from "./OrderHistoryList";
+import { isOrderClosed } from "./order-visual-tone";
 
 const emptySubscribe = () => () => {};
 
@@ -37,13 +40,18 @@ export function CustomerOrdersView({
   );
   const savedRefs = useOrdersStore((state) => state.orders);
   const saveOrderRef = useOrdersStore((state) => state.saveOrderRef);
+  const removeOrderRef = useOrdersStore((state) => state.removeOrderRef);
+  const removeOrderRefs = useOrdersStore((state) => state.removeOrderRefs);
 
   const { setContextMessage } = useWhatsAppContext();
   const [orders, setOrders] = useState<CustomerOrderRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [cancelTargetOrder, setCancelTargetOrder] =
+    useState<CustomerOrderRecord | null>(null);
 
   const [lookupOpen, setLookupOpen] = useState(Boolean(initialOrderNumber));
   const [lookupOrderNumber, setLookupOrderNumber] = useState(
@@ -57,15 +65,21 @@ export function CustomerOrdersView({
     orders.find((order) => order.id === selectedOrderId) ?? orders[0] ?? null;
 
   const activeOrdersWhatsappMessage = featuredOrder
-    ? createMinimalOrderWhatsappMessage({
-        orderNumber: featuredOrder.orderNumber,
-        customerName: featuredOrder.customerName,
-        deliveryMethod: featuredOrder.deliveryMethod,
-        deliveryLocation: featuredOrder.deliveryLocation,
-        paymentStatus: featuredOrder.payment?.status,
-        preferredPaymentMethod: featuredOrder.preferredPaymentMethod,
-        isPaid: featuredOrder.payment?.status === "VERIFIED",
-      })
+    ? featuredOrder.status === "CANCELLED" &&
+      featuredOrder.payment?.status === "VERIFIED"
+      ? createCancelledOrderRefundWhatsappMessage({
+          orderNumber: featuredOrder.orderNumber,
+          customerName: featuredOrder.customerName,
+        })
+      : createMinimalOrderWhatsappMessage({
+          orderNumber: featuredOrder.orderNumber,
+          customerName: featuredOrder.customerName,
+          deliveryMethod: featuredOrder.deliveryMethod,
+          deliveryLocation: featuredOrder.deliveryLocation,
+          paymentStatus: featuredOrder.payment?.status,
+          preferredPaymentMethod: featuredOrder.preferredPaymentMethod,
+          isPaid: featuredOrder.payment?.status === "VERIFIED",
+        })
     : createOrdersPageHelpMessage();
 
   useEffect(() => {
@@ -144,6 +158,7 @@ export function CustomerOrdersView({
     if (!isClient || savedRefs.length === 0) return;
     setRefreshing(true);
     setError(null);
+    setNotice(null);
 
     try {
       const data = await fetchOrdersFromApi(refsKey);
@@ -178,6 +193,7 @@ export function CustomerOrdersView({
 
     setLookupLoading(true);
     setLookupError(null);
+    setNotice(null);
 
     try {
       const matched = await fetchOrdersFromApi(
@@ -214,6 +230,7 @@ export function CustomerOrdersView({
 
   function handleSelectHistoryOrder(orderId: string) {
     setSelectedOrderId(orderId);
+    setNotice(null);
     const stageEl = document.getElementById("featured-order-stage");
     if (stageEl) {
       const rect = stageEl.getBoundingClientRect();
@@ -222,6 +239,59 @@ export function CustomerOrdersView({
       }
     }
   }
+
+  function handleCancelSuccess(updatedOrder: CustomerOrderRecord) {
+    setOrders((prev) =>
+      prev.map((order) => (order.id === updatedOrder.id ? updatedOrder : order))
+    );
+    setSelectedOrderId(updatedOrder.id);
+    setCancelTargetOrder(null);
+    setError(null);
+    setNotice(
+      updatedOrder.payment?.status === "VERIFIED"
+        ? `Order ${updatedOrder.orderNumber} has been cancelled. Message us on WhatsApp to arrange your M-Pesa refund.`
+        : `Order ${updatedOrder.orderNumber} has been cancelled and items were returned to stock.`
+    );
+  }
+
+  function handleRemoveClosedOrder(order: CustomerOrderRecord) {
+    if (!isOrderClosed(order.status)) return;
+
+    removeOrderRef(order.orderNumber);
+    const remaining = orders.filter((existing) => existing.id !== order.id);
+    setOrders(remaining);
+    setSelectedOrderId((prev) =>
+      prev === order.id ? (remaining[0]?.id ?? null) : prev
+    );
+    setNotice(
+      `Removed ${order.orderNumber} from this device. You can look it up again anytime with your order number and phone.`
+    );
+  }
+
+  function handleClearClosedOrders() {
+    const closedOrders = orders.filter((order) => isOrderClosed(order.status));
+    if (closedOrders.length === 0) return;
+
+    removeOrderRefs(closedOrders.map((order) => order.orderNumber));
+    const remaining = orders.filter((order) => !isOrderClosed(order.status));
+    setOrders(remaining);
+    setSelectedOrderId((prev) =>
+      prev && remaining.some((order) => order.id === prev)
+        ? prev
+        : (remaining[0]?.id ?? null)
+    );
+    setNotice(
+      `Removed ${closedOrders.length} closed ${closedOrders.length === 1 ? "order" : "orders"} from this device.`
+    );
+  }
+
+  const cancelTargetPhone = cancelTargetOrder
+    ? (savedRefs.find(
+        (ref) =>
+          ref.orderNumber.toUpperCase() ===
+          cancelTargetOrder.orderNumber.toUpperCase()
+      )?.phone ?? null)
+    : null;
 
   function renderLookupCard(compactHeading?: boolean) {
     return (
@@ -323,6 +393,12 @@ export function CustomerOrdersView({
   if (savedRefs.length === 0) {
     return (
       <div className="space-y-5">
+        {notice ? (
+          <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/90 p-4 text-sm text-emerald-950">
+            {notice}
+          </div>
+        ) : null}
+
         {renderLookupCard(false)}
 
         <div className="rounded-2xl border border-border/80 bg-card p-6 text-center shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-8">
@@ -354,6 +430,12 @@ export function CustomerOrdersView({
   if (orders.length === 0) {
     return (
       <div className="space-y-5">
+        {notice ? (
+          <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/90 p-4 text-sm text-emerald-950">
+            {notice}
+          </div>
+        ) : null}
+
         {renderLookupCard(false)}
 
         <div className="rounded-2xl border border-border/80 bg-card p-6 text-center shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-8">
@@ -413,18 +495,38 @@ export function CustomerOrdersView({
 
       {lookupOpen ? renderLookupCard(true) : null}
 
+      {notice ? (
+        <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/90 p-4 text-sm text-emerald-950">
+          {notice}
+        </div>
+      ) : null}
+
       {error ? (
         <div className="rounded-xl border border-destructive/30 bg-rose-50/90 p-4 text-sm text-destructive">
           {error}
         </div>
       ) : null}
 
-      {featuredOrder ? <FeaturedOrderStage order={featuredOrder} /> : null}
+      {featuredOrder ? (
+        <FeaturedOrderStage
+          order={featuredOrder}
+          onRequestCancel={(target) => setCancelTargetOrder(target)}
+          onRemoveClosedOrder={handleRemoveClosedOrder}
+        />
+      ) : null}
 
       <OrderHistoryList
         orders={orders}
         selectedOrderId={featuredOrder?.id ?? null}
         onSelectOrder={handleSelectHistoryOrder}
+        onClearClosedOrders={handleClearClosedOrders}
+      />
+
+      <CancelOrderDialog
+        order={cancelTargetOrder}
+        checkoutPhone={cancelTargetPhone}
+        onClose={() => setCancelTargetOrder(null)}
+        onCancelled={handleCancelSuccess}
       />
     </div>
   );

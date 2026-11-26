@@ -10,6 +10,7 @@ import {
   MapPin,
   MessageCircle,
   Package,
+  Trash2,
   Truck,
   XCircle,
 } from "lucide-react";
@@ -21,7 +22,10 @@ import {
   getDeliveryFeeSummary,
   getDeliveryMethodLabel,
 } from "@/features/orders/utils/order.utils";
-import { createMinimalOrderWhatsappMessage } from "@/features/whatsapp/utils/whatsapp.utils";
+import {
+  createCancelledOrderRefundWhatsappMessage,
+  createMinimalOrderWhatsappMessage,
+} from "@/features/whatsapp/utils/whatsapp.utils";
 import { formatKes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +33,8 @@ import {
   getOrderVisualProfile,
   getProgressIndex,
   getTrackingStepsForMethod,
+  isCustomerCancellable,
+  isOrderClosed,
 } from "./order-visual-tone";
 
 export type CustomerOrderRecord = {
@@ -82,12 +88,21 @@ function renderHeaderStatusIcon(
 
 type FeaturedOrderStageProps = {
   order: CustomerOrderRecord;
+  onRequestCancel?: (order: CustomerOrderRecord) => void;
+  onRemoveClosedOrder?: (order: CustomerOrderRecord) => void;
 };
 
-export function FeaturedOrderStage({ order }: FeaturedOrderStageProps) {
+export function FeaturedOrderStage({
+  order,
+  onRequestCancel,
+  onRemoveClosedOrder,
+}: FeaturedOrderStageProps) {
   const isPaid = order.payment?.status === "VERIFIED";
   const isCancelled = order.status === "CANCELLED";
   const isDelivered = order.status === "DELIVERED";
+  const canCancel = isCustomerCancellable(order.status);
+  const canRemoveClosed = isOrderClosed(order.status);
+  const isDispatched = order.status === "OUT_FOR_DELIVERY";
   const progressIndex = getProgressIndex(order.status);
   const trackingSteps = getTrackingStepsForMethod(order.deliveryMethod);
   const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -100,15 +115,21 @@ export function FeaturedOrderStage({ order }: FeaturedOrderStageProps) {
     paymentStatus: order.payment?.status,
   });
 
-  const orderWhatsappMessage = createMinimalOrderWhatsappMessage({
-    orderNumber: order.orderNumber,
-    customerName: order.customerName,
-    deliveryMethod: order.deliveryMethod,
-    deliveryLocation: order.deliveryLocation,
-    paymentStatus: order.payment?.status,
-    preferredPaymentMethod: order.preferredPaymentMethod,
-    isPaid,
-  });
+  const orderWhatsappMessage =
+    isCancelled && isPaid
+      ? createCancelledOrderRefundWhatsappMessage({
+          orderNumber: order.orderNumber,
+          customerName: order.customerName,
+        })
+      : createMinimalOrderWhatsappMessage({
+          orderNumber: order.orderNumber,
+          customerName: order.customerName,
+          deliveryMethod: order.deliveryMethod,
+          deliveryLocation: order.deliveryLocation,
+          paymentStatus: order.payment?.status,
+          preferredPaymentMethod: order.preferredPaymentMethod,
+          isPaid,
+        });
 
   const whatsappUrl =
     getWhatsAppUrl(orderWhatsappMessage) ??
@@ -202,8 +223,9 @@ export function FeaturedOrderStage({ order }: FeaturedOrderStageProps) {
                 Fulfillment stopped — Order cancelled
               </p>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                If you believe this was cancelled in error, reach out on WhatsApp
-                with order number{" "}
+                {isPaid
+                  ? "Your M-Pesa payment is verified and eligible for a refund. Message us on WhatsApp with order number "
+                  : "If you need help or want to reorder, reach out on WhatsApp with order number "}
                 <span className="font-mono font-medium text-foreground">
                   {order.orderNumber}
                 </span>
@@ -512,13 +534,47 @@ export function FeaturedOrderStage({ order }: FeaturedOrderStageProps) {
             </dl>
           </div>
 
-          <div className="space-y-2 border-t border-border/60 pt-4">
+          <div className="space-y-2.5 border-t border-border/60 pt-4">
             <Button asChild variant="outline" className="min-h-11 w-full">
               <a href={whatsappUrl} rel="noopener noreferrer" target="_blank">
                 <MessageCircle className="mr-2 h-4 w-4 text-primary" />
-                Ask about this order
+                {isCancelled && isPaid
+                  ? "Request M-Pesa refund on WhatsApp"
+                  : "Ask about this order"}
               </a>
             </Button>
+
+            {canCancel && onRequestCancel ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onRequestCancel(order)}
+                className="min-h-11 w-full border-destructive/30 text-destructive hover:border-destructive/50 hover:bg-destructive/5 hover:text-destructive"
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Cancel order
+              </Button>
+            ) : null}
+
+            {isDispatched ? (
+              <p className="text-center text-xs leading-relaxed text-muted-foreground">
+                {order.deliveryMethod === "PICKUP"
+                  ? "Already packed for pickup — message us on WhatsApp for changes."
+                  : "Already out for delivery — message us on WhatsApp for urgent changes."}
+              </p>
+            ) : null}
+
+            {canRemoveClosed && onRemoveClosedOrder ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => onRemoveClosedOrder(order)}
+                className="min-h-10 w-full text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                Remove from this device
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>

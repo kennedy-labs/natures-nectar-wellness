@@ -68,6 +68,20 @@ export function getFriendlyStatusLabel(
   return "Order Placed";
 }
 
+export function isOrderClosed(status: string): boolean {
+  return status === "DELIVERED" || status === "CANCELLED";
+}
+
+export function isCustomerCancellable(status: string): boolean {
+  return (
+    status === "PENDING" ||
+    status === "REVIEWING_DELIVERY" ||
+    status === "AWAITING_PAYMENT" ||
+    status === "PAID" ||
+    status === "PROCESSING"
+  );
+}
+
 export function getOrderVisualProfile(input: {
   status: string;
   deliveryMethod: string;
@@ -106,15 +120,17 @@ export function getOrderVisualProfile(input: {
     return {
       tone: "alert",
       statusLabel,
-      statusDescription: "This order was cancelled. You can place a new order anytime.",
-      paymentLabel,
+      statusDescription: isPaid
+        ? "This order was cancelled. Your M-Pesa payment was verified — message us on WhatsApp with your order number to arrange your refund."
+        : "This order was cancelled. You can place a new order anytime.",
+      paymentLabel: isPaid ? "Paid via M-Pesa (Refund pending)" : paymentLabel,
       paymentPaid: isPaid,
-      paymentNeedsAttention: false,
+      paymentNeedsAttention: isPaid,
       headerSurfaceClass: "bg-rose-50/90",
       headerBorderClass: "border-rose-200/80",
       headerTitleClass: "text-rose-950",
       headerIconClass: "text-destructive",
-      paymentTextClass: "text-destructive",
+      paymentTextClass: isPaid ? "text-amber-800" : "text-destructive",
       rowBadgeIconClass: "text-destructive bg-rose-50 border-rose-200",
       stepperAccentTone: "botanical",
     };

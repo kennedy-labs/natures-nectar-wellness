@@ -5,15 +5,17 @@ import {
   ChevronRight,
   Clock,
   Package,
+  Trash2,
   Truck,
   XCircle,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { formatKes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import type { CustomerOrderRecord } from "./FeaturedOrderStage";
-import { getOrderVisualProfile } from "./order-visual-tone";
+import { getOrderVisualProfile, isOrderClosed } from "./order-visual-tone";
 
 function formatShortDate(iso: string): string {
   return new Intl.DateTimeFormat("en-KE", {
@@ -37,26 +39,47 @@ type OrderHistoryListProps = {
   orders: CustomerOrderRecord[];
   selectedOrderId: string | null;
   onSelectOrder: (orderId: string) => void;
+  onClearClosedOrders?: () => void;
 };
 
 export function OrderHistoryList({
   orders,
   selectedOrderId,
   onSelectOrder,
+  onClearClosedOrders,
 }: OrderHistoryListProps) {
   if (orders.length <= 1) {
     return null;
   }
 
+  const closedCount = orders.filter((order) =>
+    isOrderClosed(order.status)
+  ).length;
+
   return (
     <section aria-label="All saved orders" className="space-y-3 pt-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="font-display text-lg font-medium text-foreground">
-          All orders on this browser
-        </h2>
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {orders.length} orders
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-baseline gap-2.5">
+          <h2 className="font-display text-lg font-medium text-foreground">
+            All orders on this browser
+          </h2>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {orders.length} orders
+          </span>
+        </div>
+
+        {closedCount > 0 && onClearClosedOrders ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClearClosedOrders}
+            className="min-h-9 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Clear closed ({closedCount})
+          </Button>
+        ) : null}
       </div>
 
       <div className="divide-y divide-border/70 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_1px_2px_rgba(24,42,32,0.04)]">

@@ -10,6 +10,8 @@ export type SavedOrderRef = {
 type OrdersStoreState = {
   orders: SavedOrderRef[];
   saveOrderRef: (input: { orderNumber: string; phone: string }) => void;
+  removeOrderRef: (orderNumber: string) => void;
+  removeOrderRefs: (orderNumbers: string[]) => void;
   clearSavedOrders: () => void;
 };
 
@@ -40,6 +42,30 @@ export const useOrdersStore = create<OrdersStoreState>()(
 
           return { orders: next };
         });
+      },
+
+      removeOrderRef: (orderNumber) => {
+        const normalizedOrder = orderNumber.trim().toUpperCase();
+        if (!normalizedOrder) return;
+
+        set((state) => ({
+          orders: state.orders.filter(
+            (item) => item.orderNumber.toUpperCase() !== normalizedOrder
+          ),
+        }));
+      },
+
+      removeOrderRefs: (orderNumbers) => {
+        const toRemove = new Set(
+          orderNumbers.map((num) => num.trim().toUpperCase()).filter(Boolean)
+        );
+        if (toRemove.size === 0) return;
+
+        set((state) => ({
+          orders: state.orders.filter(
+            (item) => !toRemove.has(item.orderNumber.toUpperCase())
+          ),
+        }));
       },
 
       clearSavedOrders: () => set({ orders: [] }),

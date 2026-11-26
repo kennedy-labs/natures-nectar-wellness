@@ -767,3 +767,210 @@ export async function getCustomerOrdersByRefs(rawInput: unknown) {
       };
     });
 }
+
+const CUSTOMER_CANCELLABLE_STATUSES: PrismaOrderStatus[] = [
+  "PENDING",
+  "REVIEWING_DELIVERY",
+  "AWAITING_PAYMENT",
+  "PAID",
+  "PROCESSING",
+];
+
+const customerCancelOrderSchema = z.object({
+  orderNumber: z.string().trim().min(4).max(40),
+  phone: z.string().trim().min(7).max(25),
+  reason: z.string().trim().max(200).optional(),
+});
+
+export async function cancelCustomerOrder(rawInput: unknown) {
+  const input = customerCancelOrderSchema.parse(rawInput);
+  const normalizedOrderNumber = input.orderNumber.toUpperCase();
+  const phoneTail = extractPhoneTail(input.phone);
+
+  if (!phoneTail || phoneTail.length < 7) {
+    throw new ApiError(
+      400,
+      "INVALID_PHONE",
+      "Please verify using the phone number used at checkout."
+    );
+  }
+
+  const order = await db.order.findUnique({
+    where: { orderNumber: normalizedOrderNumber },
+    include: {
+      items: {
+        select: {
+          id: true,
+          productId: true,
+          productName: true,
+          productSlug: true,
+          quantity: true,
+          priceAtPurchase: true,
+          lineTotal: true,
+        },
+      },
+      payments: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          method: true,
+          status: true,
+          amount: true,
+          verifiedAt: true,
+        },
+      },
+    },
+  });
+
+  if (!order || extractPhoneTail(order.customerPhone) !== phoneTail) {
+    throw new ApiError(
+      404,
+      "ORDER_NOT_FOUND",
+      "No matching order was found for that order number and phone number."
+    );
+  }
+
+  if (order.status === "CANCELLED") {
+    throw new ApiError(
+      400,
+      "ORDER_ALREADY_CANCELLED",
+      "This order is already cancelled."
+    );
+  }
+
+  if (!CUSTOMER_CANCELLABLE_STATUSES.includes(order.status)) {
+    throw new ApiError(
+      400,
+      "CANNOT_CANCEL_DISPATCHED",
+      "This order is already out for delivery or completed. Please message us on WhatsApp for help."
+    );
+  }
+
+  const sanitizedReason = input.reason
+    ? input.reason
+        .replace(/[\u0000-\u001F\u007F]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 200)
+    : "";
+
+  const updatedNotes = sanitizedReason
+    ? order.customerNotes?.trim()
+      ? `${order.customerNotes.trim()}\n[Cancelled by customer: ${sanitizedReason}]`
+      : `[Cancelled by customer: ${sanitizedReason}]`
+    : undefined;
+
+  const cancelledOrder = await db.$transaction(async (tx) => {
+    const guard = await tx.order.updateMany({
+      where: {
+        id: order.id,
+        status: { in: CUSTOMER_CANCELLABLE_STATUSES },
+      },
+      data: {
+        status: "CANCELLED",
+        ...(updatedNotes !== undefined ? { customerNotes: updatedNotes } : {}),
+      },
+    });
+
+    if (guard.count === 0) {
+      throw new ApiError(
+        409,
+        "CANNOT_CANCEL_ORDER",
+        "This order's status just changed and can no longer be cancelled online."
+      );
+    }
+
+    for (const item of order.items) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: {
+          stockQuantity: {
+            increment: item.quantity,
+          },
+        },
+      });
+    }
+
+    await tx.payment.updateMany({
+      where: {
+        orderId: order.id,
+        status: {
+          in: ["PENDING", "AWAITING_VERIFICATION"],
+        },
+      },
+      data: {
+        status: "FAILED",
+        notes: "Cancelled by customer; pending payment voided.",
+      },
+    });
+
+    await tx.orderStatusHistory.create({
+      data: {
+        orderId: order.id,
+        status: "CANCELLED",
+      },
+    });
+
+    return tx.order.findUniqueOrThrow({
+      where: { id: order.id },
+      include: {
+        items: {
+          select: {
+            id: true,
+            productName: true,
+            productSlug: true,
+            quantity: true,
+            priceAtPurchase: true,
+            lineTotal: true,
+          },
+        },
+        payments: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            method: true,
+            status: true,
+            amount: true,
+            verifiedAt: true,
+          },
+        },
+      },
+    });
+  });
+
+  await sendOrderNotifications({
+    orderId: cancelledOrder.id,
+    event: "ORDER_CANCELLED",
+    cancelReason: sanitizedReason || null,
+  }).catch((err) => {
+    console.error("[OrderService] Notification failed after customer cancel:", err);
+  });
+
+  const verifiedPayment =
+    cancelledOrder.payments.find((p) => p.status === "VERIFIED") ?? null;
+  const latestPayment = verifiedPayment ?? cancelledOrder.payments[0] ?? null;
+
+  return {
+    id: cancelledOrder.id,
+    orderNumber: cancelledOrder.orderNumber,
+    customerName: cancelledOrder.customerName,
+    status: cancelledOrder.status,
+    createdAt: cancelledOrder.createdAt.toISOString(),
+    deliveryMethod: cancelledOrder.deliveryMethod,
+    deliveryLocation: cancelledOrder.deliveryLocation,
+    deliveryFee: cancelledOrder.deliveryFee,
+    deliveryQuoteNotes: cancelledOrder.deliveryQuoteNotes,
+    subtotalAmount: cancelledOrder.subtotalAmount,
+    totalAmount: cancelledOrder.totalAmount ?? cancelledOrder.subtotalAmount,
+    preferredPaymentMethod: cancelledOrder.preferredPaymentMethod,
+    whatsappMessage: cancelledOrder.whatsappMessage ?? "",
+    items: cancelledOrder.items,
+    payment: latestPayment
+      ? {
+          status: latestPayment.status,
+          method: latestPayment.method,
+          amount: latestPayment.amount,
+        }
+      : null,
+  };
+}

@@ -8,13 +8,17 @@ import {
 import { formatKes } from "@/lib/format";
 import { db } from "@/server/db/prisma";
 
-export type OrderNotificationEvent = "ORDER_PLACED" | "PAYMENT_VERIFIED";
+export type OrderNotificationEvent =
+  | "ORDER_PLACED"
+  | "PAYMENT_VERIFIED"
+  | "ORDER_CANCELLED";
 
 type SendOrderNotificationsInput = {
   orderId: string;
   event: OrderNotificationEvent;
   transactionRef?: string | null;
   paidAmount?: number | null;
+  cancelReason?: string | null;
 };
 
 type EmailSendResult = {
@@ -179,8 +183,18 @@ export async function sendOrderNotifications(
     )
     .join("");
 
-  const paymentSummaryText =
-    input.event === "PAYMENT_VERIFIED" || verifiedPayment
+  const isCancelledEvent = input.event === "ORDER_CANCELLED";
+  const isPaidVerified =
+    input.event === "PAYMENT_VERIFIED" || Boolean(verifiedPayment);
+  const cleanCancelReason = input.cancelReason
+    ? input.cancelReason.replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, 200)
+    : null;
+
+  const paymentSummaryText = isCancelledEvent
+    ? verifiedPayment
+      ? `Paid (${paymentLabel}${receiptRef ? ` - Ref: ${receiptRef}` : ""}) — Refund required`
+      : `${paymentLabel} (No payment charged)`
+    : isPaidVerified
       ? `Paid (${paymentLabel})${receiptRef ? ` - Ref: ${receiptRef}` : ""}`
       : `${paymentLabel} (Payment pending)`;
 
@@ -188,15 +202,24 @@ export async function sendOrderNotifications(
     [];
 
   if (cfg.alertRecipients.length > 0) {
-    const adminSubject =
-      input.event === "PAYMENT_VERIFIED"
+    const adminSubject = isCancelledEvent
+      ? `[${SITE_NAME}] Order Cancelled by Customer: ${order.orderNumber} (${formattedTotal})`
+      : input.event === "PAYMENT_VERIFIED"
         ? `[${SITE_NAME}] Payment Verified: ${order.orderNumber} (${formattedTotal})`
         : `[${SITE_NAME}] New Order: ${order.orderNumber} (${formattedTotal})`;
 
     const adminText = [
-      input.event === "PAYMENT_VERIFIED"
-        ? `Payment verified for order ${order.orderNumber}.`
-        : `New order received: ${order.orderNumber}.`,
+      isCancelledEvent
+        ? `Customer cancelled order ${order.orderNumber}. Stock has been restored automatically.`
+        : input.event === "PAYMENT_VERIFIED"
+          ? `Payment verified for order ${order.orderNumber}.`
+          : `New order received: ${order.orderNumber}.`,
+      isCancelledEvent && verifiedPayment
+        ? "ACTION NEEDED: This order had a verified M-Pesa payment. Please coordinate a refund."
+        : null,
+      isCancelledEvent && cleanCancelReason
+        ? `Reason: ${cleanCancelReason}`
+        : null,
       "",
       `Customer: ${order.customerName}`,
       `Phone: ${order.customerPhone}`,
@@ -220,16 +243,33 @@ export async function sendOrderNotifications(
 
     const adminHtml = `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f8f6f1;color:#1b2a21;">
-        <p style="margin:0 0 6px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#21543d;font-weight:700;">
+        <p style="margin:0 0 6px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${isCancelledEvent ? "#9f1239" : "#21543d"};font-weight:700;">
           ${escapeHtml(SITE_NAME)} · Admin Alert
         </p>
         <h1 style="margin:0 0 16px;font-size:22px;color:#1b2a21;">
           ${
-            input.event === "PAYMENT_VERIFIED"
-              ? `Payment Verified: ${escapeHtml(order.orderNumber)}`
-              : `New Order: ${escapeHtml(order.orderNumber)}`
+            isCancelledEvent
+              ? `Order Cancelled: ${escapeHtml(order.orderNumber)}`
+              : input.event === "PAYMENT_VERIFIED"
+                ? `Payment Verified: ${escapeHtml(order.orderNumber)}`
+                : `New Order: ${escapeHtml(order.orderNumber)}`
           }
         </h1>
+        ${
+          isCancelledEvent
+            ? `<div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:10px;padding:12px 16px;margin-bottom:16px;color:#881337;font-size:14px;">
+                <strong>Cancelled by customer.</strong> Stock was restored automatically.${
+                  verifiedPayment
+                    ? " <strong>M-Pesa payment was verified — please process refund.</strong>"
+                    : ""
+                }${
+                  cleanCancelReason
+                    ? `<br/><span>Reason: ${escapeHtml(cleanCancelReason)}</span>`
+                    : ""
+                }
+              </div>`
+            : ""
+        }
         <div style="background:#ffffff;border:1px solid #e6e2d8;border-radius:10px;padding:16px;margin-bottom:16px;">
           <p style="margin:0 0 6px;"><strong>Customer:</strong> ${escapeHtml(order.customerName)}</p>
           <p style="margin:0 0 6px;"><strong>Phone:</strong> ${escapeHtml(order.customerPhone)}</p>
@@ -295,17 +335,22 @@ export async function sendOrderNotifications(
 
   const customerEmails = parseRecipientEmails(order.customerEmail);
   if (customerEmails.length > 0) {
-    const customerSubject =
-      input.event === "PAYMENT_VERIFIED"
+    const customerSubject = isCancelledEvent
+      ? `Order ${order.orderNumber} cancelled – ${SITE_NAME}`
+      : input.event === "PAYMENT_VERIFIED"
         ? `Payment confirmed for order ${order.orderNumber} – ${SITE_NAME}`
         : `Order ${order.orderNumber} received – ${SITE_NAME}`;
 
     const customerText = [
       `Hello ${order.customerName},`,
       "",
-      input.event === "PAYMENT_VERIFIED"
-        ? `Thank you for your payment. Your order ${order.orderNumber} is confirmed and queued for preparation.`
-        : `Thank you for ordering from ${SITE_NAME}. We have received order ${order.orderNumber}.`,
+      isCancelledEvent
+        ? verifiedPayment
+          ? `Your order ${order.orderNumber} has been cancelled. Since your M-Pesa payment was verified, please message us on WhatsApp with your order number to coordinate your refund.`
+          : `Your order ${order.orderNumber} has been cancelled as requested.`
+        : input.event === "PAYMENT_VERIFIED"
+          ? `Thank you for your payment. Your order ${order.orderNumber} is confirmed and queued for preparation.`
+          : `Thank you for ordering from ${SITE_NAME}. We have received order ${order.orderNumber}.`,
       "",
       `Payment: ${paymentSummaryText}`,
       `Delivery: ${deliveryLabel} (${deliveryFeeLabel})`,
@@ -331,16 +376,22 @@ export async function sendOrderNotifications(
         </p>
         <h1 style="margin:0 0 10px;font-size:22px;color:#1b2a21;">
           ${
-            input.event === "PAYMENT_VERIFIED"
-              ? "Payment confirmed"
-              : "Thank you for your order"
+            isCancelledEvent
+              ? "Order cancelled"
+              : input.event === "PAYMENT_VERIFIED"
+                ? "Payment confirmed"
+                : "Thank you for your order"
           }
         </h1>
         <p style="margin:0 0 18px;font-size:15px;line-height:1.5;color:#4a5a50;">
           Hello ${escapeHtml(order.customerName)}, ${
-            input.event === "PAYMENT_VERIFIED"
-              ? `your payment for order <strong>${escapeHtml(order.orderNumber)}</strong> has been verified.`
-              : `we have received your order <strong>${escapeHtml(order.orderNumber)}</strong>.`
+            isCancelledEvent
+              ? verifiedPayment
+                ? `your order <strong>${escapeHtml(order.orderNumber)}</strong> has been cancelled. Because your M-Pesa payment was verified, please message us on WhatsApp with your order number so we can arrange your refund.`
+                : `your order <strong>${escapeHtml(order.orderNumber)}</strong> has been cancelled as requested.`
+              : input.event === "PAYMENT_VERIFIED"
+                ? `your payment for order <strong>${escapeHtml(order.orderNumber)}</strong> has been verified.`
+                : `we have received your order <strong>${escapeHtml(order.orderNumber)}</strong>.`
           }
         </p>
         <div style="background:#ffffff;border:1px solid #e6e2d8;border-radius:10px;padding:16px;margin-bottom:16px;">
@@ -366,7 +417,7 @@ export async function sendOrderNotifications(
           </table>
         </div>
         <a href="${escapeHtml(trackingUrl)}" style="display:inline-block;background:#21543d;color:#ffffff;text-decoration:none;padding:11px 20px;border-radius:8px;font-size:14px;font-weight:600;">
-          Track your order
+          View your order
         </a>
         <p style="margin:14px 0 0;font-size:12px;line-height:1.5;color:#5e6c63;">
           Opening this link on another device? Enter order number <strong>${escapeHtml(order.orderNumber)}</strong> and the phone number used at checkout to view live status.
