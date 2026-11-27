@@ -1,11 +1,14 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 
+import { Prisma } from "@prisma/client";
+
 import {
   createProductSchema,
   updateProductSchema,
 } from "@/features/products/validations/product.validation";
 import { createProductSlug } from "@/features/products/utils/product.utils";
+import { ApiError } from "@/server/http/api-error";
 import {
   createProduct as createProductRecord,
   deleteProduct as deleteProductRecord,
@@ -15,6 +18,7 @@ import {
   findActiveProductBySlug,
   findFeaturedProducts,
   findPopularProducts,
+  permanentlyDeleteProduct as permanentlyDeleteProductRecord,
   searchActiveProducts,
   updateProduct as updateProductRecord,
 } from "@/server/repositories/product.repository";
@@ -130,4 +134,34 @@ export async function updateProduct(id: string, input: unknown) {
 
 export async function deleteProduct(id: string) {
   return deleteProductRecord(id);
+}
+
+export async function permanentlyDeleteProduct(id: string) {
+  try {
+    const deleted = await permanentlyDeleteProductRecord(id);
+    if (!deleted) {
+      throw new ApiError(
+        404,
+        "NOT_FOUND",
+        "That product no longer exists."
+      );
+    }
+    return deleted;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    if (
+      (error instanceof Error && error.message === "PRODUCT_HAS_ORDERS") ||
+      (error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2003")
+    ) {
+      throw new ApiError(
+        409,
+        "PRODUCT_HAS_ORDERS",
+        "This product is linked to existing customer orders and cannot be permanently erased. Archive it instead to hide it from the storefront."
+      );
+    }
+    throw error;
+  }
 }

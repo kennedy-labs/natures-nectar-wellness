@@ -4,6 +4,7 @@ import { requireAdminRequest } from "@/server/auth/admin-auth";
 import { apiFail, apiOk, readJson } from "@/server/http/api-response";
 import {
   deleteProduct,
+  permanentlyDeleteProduct,
   updateProduct,
 } from "@/server/services/product.service";
 
@@ -40,14 +41,21 @@ export async function DELETE(
     await requireAdminRequest(req);
 
     const { id } = await context.params;
-    const product = await deleteProduct(id);
+    const permanent = new URL(req.url).searchParams.get("permanent") === "true";
+
+    const result = permanent
+      ? await permanentlyDeleteProduct(id)
+      : await deleteProduct(id);
 
     revalidateTag("products", { expire: 0 });
     revalidatePath("/");
     revalidatePath("/products");
     revalidatePath("/categories");
+    if (result?.slug) {
+      revalidatePath(`/products/${result.slug}`);
+    }
 
-    return apiOk(product);
+    return apiOk(result);
   } catch (error) {
     return apiFail(error);
   }

@@ -51,3 +51,13 @@ export async function removeProduct(id: string): Promise<Product> {
 
   return readApiData<Product>(response);
 }
+
+export async function permanentlyRemoveProduct(
+  id: string
+): Promise<{ id: string; slug: string; name: string }> {
+  const response = await fetch(`/api/products/${id}?permanent=true`, {
+    method: "DELETE",
+  });
+
+  return readApiData<{ id: string; slug: string; name: string }>(response);
+}

@@ -312,6 +312,41 @@ export async function deleteProduct(id: string) {
   });
 }
 
+export async function permanentlyDeleteProduct(id: string) {
+  const existing = await db.product.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      _count: {
+        select: {
+          orderItems: true,
+        },
+      },
+    },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  if (existing._count.orderItems > 0) {
+    throw new Error(
+      "PRODUCT_HAS_ORDERS"
+    );
+  }
+
+  return db.product.delete({
+    where: { id },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+    },
+  });
+}
+
 export async function decrementProductStock(productId: string, quantity: number) {
   return db.product.update({
     where: { id: productId },

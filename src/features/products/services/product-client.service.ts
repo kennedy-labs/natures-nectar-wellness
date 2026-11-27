@@ -2,6 +2,7 @@ import {
   fetchAdminProducts,
   fetchProducts,
   patchProduct,
+  permanentlyRemoveProduct,
   postProduct,
   removeProduct,
 } from "@/features/products/api/product-api";
@@ -28,4 +29,8 @@ export function updateProductFromClient(id: string, input: UpdateProductInput) {
 
 export function deleteProductFromClient(id: string) {
   return removeProduct(id);
+}
+
+export function permanentlyDeleteProductFromClient(id: string) {
+  return permanentlyRemoveProduct(id);
 }

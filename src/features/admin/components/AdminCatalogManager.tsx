@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
+  ArchiveRestore,
   ArrowLeft,
   FolderPlus,
   ImageOff,
@@ -17,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AdminBulkDraftUploader } from "@/features/admin/components/AdminBulkDraftUploader";
 import { AdminImageDropzone } from "@/features/admin/components/AdminImageDropzone";
+import { AdminProductActionDialog } from "@/features/admin/components/AdminProductActionDialog";
 import {
   createCategoryFromClient,
   deleteCategoryFromClient,
@@ -27,6 +29,7 @@ import { getInventoryStatus } from "@/features/inventory/utils/inventory.utils";
 import {
   createProductFromClient,
   deleteProductFromClient,
+  permanentlyDeleteProductFromClient,
   updateProductFromClient,
 } from "@/features/products/services/product-client.service";
 import type { Product } from "@/features/products/types/product.types";
@@ -268,11 +271,26 @@ export function AdminCatalogManager({
 
   const [isSaving, setIsSaving] = useState(false);
   const [isImageProcessing, setIsImageProcessing] = useState(false);
+  const [actionProduct, setActionProduct] = useState<Product | null>(null);
+  const [pressingProductId, setPressingProductId] = useState<string | null>(
+    null
+  );
+  const longPressTimerRef = useRef<number | null>(null);
+  const pressOriginRef = useRef<{ x: number; y: number } | null>(null);
+
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
     text: string;
     details?: string[];
   } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current !== null) {
+        window.clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
 
   const categoryById = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -285,6 +303,35 @@ export function AdminCatalogManager({
       counts.set(p.categoryId, (counts.get(p.categoryId) ?? 0) + 1);
     }
     return counts;
+  }, [products]);
+
+  const filterCounts = useMemo(() => {
+    let active = 0;
+    let missingPhoto = 0;
+    let lowStock = 0;
+    let inactive = 0;
+
+    for (const p of products) {
+      if (p.isActive) {
+        active += 1;
+        if (p.stockQuantity <= 5) {
+          lowStock += 1;
+        }
+      } else {
+        inactive += 1;
+      }
+      if (!p.image) {
+        missingPhoto += 1;
+      }
+    }
+
+    return {
+      all: products.length,
+      active,
+      missing_photo: missingPhoto,
+      low_stock: lowStock,
+      inactive,
+    };
   }, [products]);
 
   const filteredProducts = useMemo(() => {
@@ -451,18 +498,32 @@ export function AdminCatalogManager({
     }
   }
 
-  async function handleDeactivateProduct(product: Product) {
+  async function handleArchiveProduct(product: Product) {
+    setFeedback(null);
+    const updated = await deleteProductFromClient(product.id);
+    setProducts((prev) =>
+      prev.map((item) => (item.id === updated.id ? updated : item))
+    );
+    setFeedback({
+      type: "success",
+      text: `${product.name} moved to Archived.`,
+    });
+  }
+
+  async function handleUnarchiveProduct(product: Product) {
     setIsSaving(true);
     setFeedback(null);
 
     try {
-      const updated = await deleteProductFromClient(product.id);
+      const updated = await updateProductFromClient(product.id, {
+        isActive: true,
+      });
       setProducts((prev) =>
         prev.map((item) => (item.id === updated.id ? updated : item))
       );
       setFeedback({
         type: "success",
-        text: `${product.name} marked inactive.`,
+        text: `${product.name} restored to your active storefront.`,
       });
     } catch (error) {
       setFeedback({
@@ -470,10 +531,64 @@ export function AdminCatalogManager({
         text:
           error instanceof Error
             ? error.message
-            : "Could not deactivate product.",
+            : "Could not unarchive product.",
       });
+      throw error;
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handlePermanentDeleteProduct(product: Product) {
+    setFeedback(null);
+    await permanentlyDeleteProductFromClient(product.id);
+    setProducts((prev) => prev.filter((item) => item.id !== product.id));
+    if (editingProductId === product.id) {
+      closeProductEditor();
+    }
+    setFeedback({
+      type: "success",
+      text: `${product.name} was permanently deleted.`,
+    });
+  }
+
+  function clearLongPressTimer() {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    pressOriginRef.current = null;
+    setPressingProductId(null);
+  }
+
+  function startLongPress(
+    event: React.PointerEvent<HTMLDivElement>,
+    product: Product
+  ) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("button, a, input, select, textarea")) {
+      return;
+    }
+
+    clearLongPressTimer();
+    pressOriginRef.current = { x: event.clientX, y: event.clientY };
+    setPressingProductId(product.id);
+
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTimerRef.current = null;
+      pressOriginRef.current = null;
+      setPressingProductId(null);
+      setActionProduct(product);
+    }, 480);
+  }
+
+  function checkLongPressMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!pressOriginRef.current) return;
+    const dx = Math.abs(event.clientX - pressOriginRef.current.x);
+    const dy = Math.abs(event.clientY - pressOriginRef.current.y);
+    if (dx > 10 || dy > 10) {
+      clearLongPressTimer();
     }
   }
 
@@ -1097,42 +1212,49 @@ export function AdminCatalogManager({
           ) : null}
 
           {/* Search & Filters */}
-          <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative flex-1 sm:max-w-xs">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products..."
-                className="h-10 pl-9"
-              />
+          <div className="space-y-3 rounded-xl border border-border/80 bg-white p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search products..."
+                  className="h-10 pl-9"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    { key: "all", label: "All" },
+                    { key: "active", label: "Active" },
+                    { key: "missing_photo", label: "No photo" },
+                    { key: "low_stock", label: "Low stock" },
+                    { key: "inactive", label: "Archived" },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setProductFilter(tab.key)}
+                    className={`min-h-9 rounded-md px-3 text-xs font-medium tabular-nums transition-colors whitespace-nowrap ${
+                      productFilter === tab.key
+                        ? "bg-foreground text-background"
+                        : "bg-muted/60 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {tab.label} ({filterCounts[tab.key]})
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-1.5">
-              {(
-                [
-                  { key: "all", label: "All" },
-                  { key: "active", label: "Active" },
-                  { key: "missing_photo", label: "No photo" },
-                  { key: "low_stock", label: "Low stock" },
-                  { key: "inactive", label: "Archived" },
-                ] as const
-              ).map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setProductFilter(tab.key)}
-                  className={`min-h-9 rounded-md px-3 text-xs font-medium transition-colors whitespace-nowrap ${
-                    productFilter === tab.key
-                      ? "bg-foreground text-background"
-                      : "bg-muted/60 text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Press and hold any product row (or right-click) to archive,
+              unarchive, or delete permanently.
+            </p>
           </div>
 
           {categories.length === 0 ? (
@@ -1161,11 +1283,28 @@ export function AdminCatalogManager({
               {filteredProducts.map((product) => {
                 const status = getInventoryStatus(product.stockQuantity);
                 const category = categoryById.get(product.categoryId);
+                const isPressing = pressingProductId === product.id;
 
                 return (
                   <div
                     key={product.id}
-                    className="flex flex-col gap-4 p-4 transition-colors hover:bg-muted/20 sm:flex-row sm:items-center sm:justify-between"
+                    onPointerDown={(e) => startLongPress(e, product)}
+                    onPointerMove={checkLongPressMove}
+                    onPointerUp={clearLongPressTimer}
+                    onPointerCancel={clearLongPressTimer}
+                    onPointerLeave={clearLongPressTimer}
+                    onContextMenu={(e) => {
+                      const target = e.target as HTMLElement | null;
+                      if (target?.closest("button, a, input, select, textarea")) {
+                        return;
+                      }
+                      e.preventDefault();
+                      clearLongPressTimer();
+                      setActionProduct(product);
+                    }}
+                    className={`flex select-none touch-pan-y flex-col gap-4 p-4 transition-colors sm:flex-row sm:items-center sm:justify-between ${
+                      isPressing ? "bg-muted/50" : "hover:bg-muted/20"
+                    }`}
                   >
                     <div className="flex min-w-0 items-start gap-3.5 sm:items-center">
                       <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/30">
@@ -1174,6 +1313,7 @@ export function AdminCatalogManager({
                           <img
                             src={product.image}
                             alt={product.name}
+                            draggable={false}
                             referrerPolicy="no-referrer"
                             className="h-full w-full object-cover"
                           />
@@ -1226,6 +1366,24 @@ export function AdminCatalogManager({
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2 sm:pl-4">
+                      {!product.isActive ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isSaving}
+                          className="min-h-10 flex-1 sm:flex-initial"
+                          onClick={() => {
+                            void handleUnarchiveProduct(product).catch(
+                              () => undefined
+                            );
+                          }}
+                        >
+                          <ArchiveRestore className="mr-1.5 h-3.5 w-3.5 text-primary" />
+                          Unarchive
+                        </Button>
+                      ) : null}
+
                       <Button
                         type="button"
                         variant="outline"
@@ -1236,24 +1394,25 @@ export function AdminCatalogManager({
                         <Pencil className="mr-1.5 h-3.5 w-3.5" />
                         Edit
                       </Button>
-
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                        disabled={isSaving || !product.isActive}
-                        aria-label={`Archive ${product.name}`}
-                        onClick={() => handleDeactivateProduct(product)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
+
+          <AdminProductActionDialog
+            product={actionProduct}
+            categoryName={
+              actionProduct
+                ? categoryById.get(actionProduct.categoryId)?.name
+                : undefined
+            }
+            onClose={() => setActionProduct(null)}
+            onArchive={handleArchiveProduct}
+            onUnarchive={handleUnarchiveProduct}
+            onPermanentDelete={handlePermanentDeleteProduct}
+          />
         </div>
       ) : (
         <div className="space-y-5">
