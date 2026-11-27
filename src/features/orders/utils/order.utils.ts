@@ -71,9 +71,14 @@ export function getDeliveryFeeSummary(
   confirmedFee?: number | null
 ): string {
   if (typeof confirmedFee === "number" && Number.isFinite(confirmedFee)) {
-    return confirmedFee === 0
-      ? "Free"
-      : `KES ${confirmedFee.toLocaleString("en-KE")}`;
+    if (confirmedFee === 0) return "Free";
+    const rounded = Math.round(confirmedFee * 100) / 100;
+    const fixed = Number.isInteger(rounded)
+      ? String(rounded)
+      : rounded.toFixed(2).replace(/\.?0+$/, "");
+    const [intPart, decPart] = fixed.split(".");
+    const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return `KES ${decPart ? `${grouped}.${decPart}` : grouped}`;
   }
   if (method === "PICKUP" || method === "LOCAL_DELIVERY") {
     return "Free";

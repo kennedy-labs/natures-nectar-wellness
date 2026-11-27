@@ -5,6 +5,11 @@ import { ImagePlus, Link2, Trash2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  ACCEPTED_IMAGE_TYPES,
+  estimateDataUrlKb,
+  optimizeAdminImageFile,
+} from "@/features/admin/utils/image-optimize";
 
 type AdminImageDropzoneProps = {
   id: string;
@@ -15,17 +20,6 @@ type AdminImageDropzoneProps = {
   error?: string;
   helperText?: string;
 };
-
-const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB raw upload guard
-const ACCEPTED_TYPES =
-  ".jpg,.jpeg,.jfif,.png,.webp,.gif,.avif,.svg,.bmp,.ico,image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml,image/bmp,image/x-icon";
-
-function estimateDataUrlKb(dataUrl: string): number {
-  const base64Index = dataUrl.indexOf(",");
-  if (base64Index === -1) return 0;
-  const base64Length = dataUrl.length - base64Index - 1;
-  return Math.max(1, Math.round((base64Length * 3) / 4 / 1024));
-}
 
 export function AdminImageDropzone({
   id,
@@ -47,144 +41,22 @@ export function AdminImageDropzone({
     onProcessingChange?.(next);
   }
 
-  function processFile(file: File) {
+  async function processFile(file: File) {
     setUploadError(null);
-
-    if (file.size > MAX_FILE_BYTES) {
-      setUploadError("File is larger than 10 MB. Please choose a smaller image.");
-      return;
-    }
-
-    const mime = file.type.toLowerCase();
-    const isHeic =
-      mime === "image/heic" ||
-      mime === "image/heif" ||
-      /\.(heic|heif)$/i.test(file.name);
-
-    if (isHeic) {
-      setUploadError(
-        "iPhone HEIC/HEIF photos cannot be decoded directly in most browsers. Please export or save it as JPG or PNG first."
-      );
-      return;
-    }
-
-    const looksLikeImage =
-      mime.startsWith("image/") ||
-      /\.(jpe?g|jfif|png|webp|gif|avif|svg|bmp|ico)$/i.test(file.name);
-
-    if (!looksLikeImage) {
-      setUploadError(
-        "Unsupported file type. Choose a JPG, PNG, WebP, GIF, AVIF, or SVG image."
-      );
-      return;
-    }
-
     setProcessingState(true);
-    const reader = new FileReader();
 
-    reader.onerror = () => {
+    try {
+      const encoded = await optimizeAdminImageFile(file);
+      onChange(encoded);
+    } catch (err) {
+      setUploadError(
+        err instanceof Error
+          ? err.message
+          : "Could not process this image file. Please try another file."
+      );
+    } finally {
       setProcessingState(false);
-      setUploadError("Could not read that image file. Please try another file.");
-    };
-
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-      if (!result) {
-        setProcessingState(false);
-        setUploadError("Image file was empty.");
-        return;
-      }
-
-      // Preserve compact vector SVGs and animated GIFs directly without rasterizing
-      if (
-        (mime === "image/svg+xml" || mime === "image/gif") &&
-        result.startsWith("data:image/") &&
-        result.length <= 500_000
-      ) {
-        onChange(result);
-        setProcessingState(false);
-        return;
-      }
-
-      const img = new window.Image();
-      img.onerror = () => {
-        setProcessingState(false);
-        setUploadError(
-          "Your browser could not decode this image file. Try saving or exporting it as JPG, PNG, or WebP."
-        );
-      };
-
-      img.onload = () => {
-        const maxSide = 720;
-        const largestDim = Math.max(img.width, img.height);
-        const scale = largestDim > maxSide ? maxSide / largestDim : 1;
-        const width = Math.max(1, Math.round(img.width * scale));
-        const height = Math.max(1, Math.round(img.height * scale));
-
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-
-        if (!ctx) {
-          setProcessingState(false);
-          setUploadError("Image processing is unavailable in this browser.");
-          return;
-        }
-
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(img, 0, 0, width, height);
-
-        const preserveTransparency =
-          mime === "image/png" ||
-          mime === "image/webp" ||
-          mime === "image/avif" ||
-          mime === "image/svg+xml";
-
-        let encoded = canvas.toDataURL(
-          preserveTransparency ? "image/webp" : "image/jpeg",
-          0.78
-        );
-
-        // Keep payloads lean (~<= 120 KB) so saving to PostgreSQL stays fast
-        if (encoded.length > 160_000) {
-          encoded = canvas.toDataURL("image/jpeg", 0.68);
-        }
-
-        if (encoded.length > 220_000) {
-          const compactScale = 540 / Math.max(width, height);
-          if (compactScale < 1) {
-            const compactCanvas = document.createElement("canvas");
-            compactCanvas.width = Math.max(1, Math.round(width * compactScale));
-            compactCanvas.height = Math.max(
-              1,
-              Math.round(height * compactScale)
-            );
-            const compactCtx = compactCanvas.getContext("2d");
-            if (compactCtx) {
-              compactCtx.imageSmoothingEnabled = true;
-              compactCtx.imageSmoothingQuality = "high";
-              compactCtx.drawImage(
-                canvas,
-                0,
-                0,
-                compactCanvas.width,
-                compactCanvas.height
-              );
-              encoded = compactCanvas.toDataURL("image/jpeg", 0.68);
-            }
-          }
-        }
-
-        onChange(encoded);
-        setProcessingState(false);
-      };
-
-      img.src = result;
-    };
-
-    reader.readAsDataURL(file);
+    }
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -228,7 +100,7 @@ export function AdminImageDropzone({
         ref={inputRef}
         id={id}
         type="file"
-        accept={ACCEPTED_TYPES}
+        accept={ACCEPTED_IMAGE_TYPES}
         onChange={handleFileChange}
         className="sr-only"
       />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";
 
@@ -34,11 +34,19 @@ type CheckoutFormProps = {
   initialPaystackReturn?: PaystackReturnParams | null;
 };
 
+const emptySubscribe = () => () => {};
+
 export function CheckoutForm({
   gatewayAvailability,
   initialPaystackReturn = null,
 }: CheckoutFormProps) {
-  const cartItems = useCartStore((state) => state.items);
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+  const rawCartItems = useCartStore((state) => state.items);
+  const cartItems = isClient ? rawCartItems : [];
   const clearCart = useCartStore((state) => state.clearCart);
   const saveOrderRef = useOrdersStore((state) => state.saveOrderRef);
 

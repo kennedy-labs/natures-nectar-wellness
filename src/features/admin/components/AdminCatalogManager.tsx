@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   FolderPlus,
   ImageOff,
+  Images,
   Pencil,
   Plus,
   Search,
@@ -14,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { AdminBulkDraftUploader } from "@/features/admin/components/AdminBulkDraftUploader";
 import { AdminImageDropzone } from "@/features/admin/components/AdminImageDropzone";
 import {
   createCategoryFromClient,
@@ -248,6 +250,7 @@ export function AdminCatalogManager({
   const [productFilter, setProductFilter] = useState<ProductFilter>("all");
 
   const [isProductEditorOpen, setIsProductEditorOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [productForm, setProductForm] =
     useState<ProductFormState>(emptyProductForm);
@@ -328,6 +331,7 @@ export function AdminCatalogManager({
   function openNewProductEditor() {
     setFeedback(null);
     setProductFieldErrors({});
+    setIsBulkUploadOpen(false);
     setEditingProductId(null);
     setProductForm({
       ...emptyProductForm,
@@ -337,9 +341,18 @@ export function AdminCatalogManager({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function openBulkUploadPanel() {
+    setFeedback(null);
+    setIsProductEditorOpen(false);
+    setEditingProductId(null);
+    setIsBulkUploadOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function openEditProductEditor(product: Product) {
     setFeedback(null);
     setProductFieldErrors({});
+    setIsBulkUploadOpen(false);
     setEditingProductId(product.id);
     setProductForm(toProductForm(product));
     setIsProductEditorOpen(true);
@@ -615,16 +628,28 @@ export function AdminCatalogManager({
           </button>
         </div>
 
-        {section === "products" && !isProductEditorOpen ? (
-          <Button
-            type="button"
-            onClick={openNewProductEditor}
-            disabled={categories.length === 0}
-            className="min-h-11 w-full sm:w-auto"
-          >
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add product
-          </Button>
+        {section === "products" && !isProductEditorOpen && !isBulkUploadOpen ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={openBulkUploadPanel}
+              disabled={categories.length === 0}
+              className="min-h-11 w-full sm:w-auto"
+            >
+              <Images className="mr-1.5 h-4 w-4" />
+              Bulk upload drafts
+            </Button>
+            <Button
+              type="button"
+              onClick={openNewProductEditor}
+              disabled={categories.length === 0}
+              className="min-h-11 w-full sm:w-auto"
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add product
+            </Button>
+          </div>
         ) : null}
 
         {section === "categories" && !isCategoryEditorOpen ? (
@@ -661,6 +686,32 @@ export function AdminCatalogManager({
 
       {section === "products" ? (
         <div className="space-y-5">
+          {isBulkUploadOpen ? (
+            <AdminBulkDraftUploader
+              categories={categories}
+              existingProducts={products}
+              onProductCreated={(created) => {
+                setProducts((prev) => [created, ...prev]);
+              }}
+              onComplete={({ savedCount, failedCount }) => {
+                setProductFilter("inactive");
+                if (failedCount === 0) {
+                  setIsBulkUploadOpen(false);
+                  setFeedback({
+                    type: "success",
+                    text: `Saved ${savedCount} draft ${savedCount === 1 ? "product" : "products"} under Archived. Click Edit on any item to enter its real name, price, description, and check "Visible in storefront".`,
+                  });
+                } else {
+                  setFeedback({
+                    type: "error",
+                    text: `Saved ${savedCount} draft products, while ${failedCount} failed. Check the items marked in red below to retry.`,
+                  });
+                }
+              }}
+              onCancel={() => setIsBulkUploadOpen(false)}
+            />
+          ) : null}
+
           {isProductEditorOpen ? (
             <div className="rounded-xl border border-border/80 bg-white p-5 sm:p-6">
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-4">
