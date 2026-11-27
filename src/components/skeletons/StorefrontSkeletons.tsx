@@ -4,7 +4,7 @@ export function ProductCardSkeleton() {
   return (
     <div
       aria-hidden="true"
-      className="flex h-full flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-[0_1px_2px_rgba(24,42,32,0.04)]"
+      className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card"
     >
       <Skeleton className="aspect-[4/3] w-full rounded-none" />
 
@@ -127,7 +127,7 @@ export function ProductDetailSkeleton() {
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Skeleton className="h-8 w-56" />
-              <Skeleton className="h-5 w-20 rounded-full" />
+              <Skeleton className="h-4 w-24" />
             </div>
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-5/6" />
@@ -262,7 +262,7 @@ export function CustomerOrdersSkeleton() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_1px_3px_rgba(24,42,32,0.05)]">
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
         {/* Tinted header band skeleton */}
         <div className="flex flex-col justify-between gap-4 border-b border-border/70 bg-muted/35 px-5 py-5 sm:flex-row sm:items-center sm:px-7 sm:py-6">
           <div className="space-y-2">

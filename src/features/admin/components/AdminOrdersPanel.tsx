@@ -9,6 +9,7 @@ import {
   MessageCircle,
   Package,
   Phone,
+  RefreshCw,
   Search,
   Truck,
   XCircle,
@@ -23,6 +24,7 @@ import {
   parseDeliveryNotesPin,
 } from "@/features/orders/utils/order.utils";
 import { formatKes } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 type Payment = {
   id: string;
@@ -39,7 +41,7 @@ type Payment = {
     | "REFUNDED";
   amount?: number | null;
   transactionRef?: string | null;
-  verifiedAt?: string | null;
+  verifiedAt?: Date | string | null;
 };
 
 type OrderItem = {
@@ -50,7 +52,7 @@ type OrderItem = {
   lineTotal: number;
 };
 
-type Order = {
+export type AdminOrder = {
   id: string;
   orderNumber: string;
   status: string;
@@ -66,9 +68,14 @@ type Order = {
   totalAmount?: number | null;
   preferredPaymentMethod?: string | null;
   customerNotes?: string | null;
-  createdAt: string;
+  createdAt: Date | string;
   items?: OrderItem[];
   payments?: Payment[];
+};
+
+type AdminOrdersPanelProps = {
+  initialOrders?: AdminOrder[];
+  onOrdersChange?: (orders: AdminOrder[]) => void;
 };
 
 type OrderFilter =
@@ -91,7 +98,7 @@ function toWhatsAppPhone(phone: string) {
 
 function getStatusTextClass(status: string): string {
   if (status === "PAID" || status === "DELIVERED") {
-    return "text-emerald-700";
+    return "text-primary";
   }
   if (status === "CANCELLED") {
     return "text-destructive";
@@ -102,9 +109,13 @@ function getStatusTextClass(status: string): string {
   return "text-foreground";
 }
 
-export function AdminOrdersPanel() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+export function AdminOrdersPanel({
+  initialOrders,
+  onOrdersChange,
+}: AdminOrdersPanelProps = {}) {
+  const [orders, setOrders] = useState<AdminOrder[]>(initialOrders ?? []);
+  const [loading, setLoading] = useState(initialOrders === undefined);
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<OrderFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
@@ -124,10 +135,17 @@ export function AdminOrdersPanel() {
   >({});
 
   async function load() {
-    const res = await fetch("/api/orders");
-    const data = await res.json();
-    setOrders(data?.data ?? data ?? []);
-    setLoading(false);
+    setRefreshing(true);
+    try {
+      const res = await fetch("/api/orders");
+      const data = await res.json();
+      const nextOrders: AdminOrder[] = data?.data ?? data ?? [];
+      setOrders(nextOrders);
+      onOrdersChange?.(nextOrders);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }
 
   function setOrderError(orderId: string, message: string | null) {
@@ -204,7 +222,7 @@ export function AdminOrdersPanel() {
     }
   }
 
-  async function verifyPayment(payment: Payment, order: Order) {
+  async function verifyPayment(payment: Payment, order: AdminOrder) {
     const expectedTotal =
       order.totalAmount ?? order.subtotalAmount + (order.deliveryFee ?? 0);
     const input = verifyByOrderId[order.id] ?? {
@@ -304,9 +322,11 @@ export function AdminOrdersPanel() {
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, []);
+    if (initialOrders === undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void load();
+    }
+  }, [initialOrders]);
 
   const filteredOrders = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -342,9 +362,9 @@ export function AdminOrdersPanel() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-white p-4">
+    <div className="space-y-5">
+      {/* Unified Filter & Action Toolbar */}
+      <div className="rounded-xl border border-border bg-white p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1 sm:max-w-xs">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -353,24 +373,40 @@ export function AdminOrdersPanel() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search order #, name, phone..."
-              className="h-10 pl-9"
+              className="h-10 bg-white pl-9"
             />
           </div>
 
-          <Button
-            disabled={expiring}
-            onClick={expireOldUnpaidOrders}
-            size="sm"
-            type="button"
-            variant="outline"
-            className="min-h-10 w-full sm:w-auto"
-          >
-            <Clock className="mr-1.5 h-4 w-4" />
-            {expiring ? "Checking..." : "Expire unpaid (>24h)"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={refreshing}
+              onClick={() => void load()}
+              size="sm"
+              type="button"
+              variant="outline"
+              className="min-h-10 flex-1 bg-white sm:flex-initial"
+            >
+              <RefreshCw
+                className={`mr-1.5 h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+              />
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </Button>
+
+            <Button
+              disabled={expiring}
+              onClick={expireOldUnpaidOrders}
+              size="sm"
+              type="button"
+              variant="outline"
+              className="min-h-10 flex-1 bg-white sm:flex-initial"
+            >
+              <Clock className="mr-1.5 h-4 w-4" />
+              {expiring ? "Checking..." : "Expire unpaid (>24h)"}
+            </Button>
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-1.5 border-t border-border/60 pt-3">
+        <div className="mt-3 flex gap-1 overflow-x-auto border-t border-border pt-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {(
             [
               { key: "all", label: `All (${orders.length})` },
@@ -379,31 +415,35 @@ export function AdminOrdersPanel() {
               { key: "delivered", label: "Delivered" },
               { key: "cancelled", label: "Cancelled" },
             ] as const
-          ).map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setFilter(item.key)}
-              className={`min-h-9 rounded-md px-3 text-xs font-medium transition-colors whitespace-nowrap ${
-                filter === item.key
-                  ? "bg-foreground text-background"
-                  : "bg-muted/60 text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+          ).map((item) => {
+            const active = filter === item.key;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setFilter(item.key)}
+                className={cn(
+                  "min-h-9 shrink-0 rounded-md px-3 text-xs font-medium tabular-nums transition-colors whitespace-nowrap",
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-[#F6F7F5] hover:text-foreground"
+                )}
+              >
+                {item.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {panelMessage ? (
-        <div className="rounded-xl border border-border bg-white px-4 py-3 text-sm">
+        <div className="rounded-xl border border-border bg-white px-4 py-3 text-sm text-foreground">
           {panelMessage}
         </div>
       ) : null}
 
       {filteredOrders.length === 0 ? (
-        <div className="rounded-xl border border-border/80 bg-white p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-xl border border-border bg-white p-8 text-center text-sm text-muted-foreground">
           No orders match your current filter.
         </div>
       ) : null}
@@ -438,13 +478,13 @@ export function AdminOrdersPanel() {
         return (
           <div
             key={order.id}
-            className="space-y-4 rounded-xl border border-border/80 bg-white p-4 sm:p-5"
+            className="overflow-hidden rounded-xl border border-border bg-white"
           >
-            {/* Header Row */}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            {/* Header Ledger Band */}
+            <div className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <p className="font-mono text-sm font-semibold">
+                  <p className="font-mono text-sm font-semibold text-foreground">
                     {order.orderNumber}
                   </p>
                   <span
@@ -456,7 +496,7 @@ export function AdminOrdersPanel() {
                     <span
                       className={`text-xs font-medium ${
                         paymentStatus === "VERIFIED"
-                          ? "text-emerald-700"
+                          ? "text-primary"
                           : "text-muted-foreground"
                       }`}
                     >
@@ -476,7 +516,7 @@ export function AdminOrdersPanel() {
               </div>
 
               <div className="sm:text-right">
-                <p className="text-lg font-semibold tabular-nums">
+                <p className="font-display text-xl font-medium tracking-tight tabular-nums text-foreground">
                   {formatKes(total)}
                 </p>
                 <p className="text-xs text-muted-foreground tabular-nums">
@@ -489,22 +529,22 @@ export function AdminOrdersPanel() {
               </div>
             </div>
 
-            {/* Customer & Delivery Strip */}
-            <div className="grid gap-4 rounded-lg bg-muted/35 p-3.5 text-sm md:grid-cols-2">
-              <div className="space-y-2">
+            {/* Single-Elevation Hairline Customer & Delivery Ledger */}
+            <div className="grid divide-y divide-border border-t border-border text-sm md:grid-cols-2 md:divide-x md:divide-y-0">
+              <div className="space-y-2.5 px-5 py-4">
                 <p className="font-medium text-foreground">
                   {order.customerName}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <a
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border bg-white px-2.5 text-xs font-medium text-foreground hover:bg-muted/50"
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border bg-white px-2.5 text-xs font-medium tabular-nums text-foreground transition-colors hover:bg-[#F6F7F5]"
                     href={`tel:${order.customerPhone}`}
                   >
                     <Phone className="h-3.5 w-3.5" />
                     {order.customerPhone}
                   </a>
                   <a
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 text-xs font-medium text-primary hover:bg-primary/15"
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 text-xs font-medium text-primary transition-colors hover:bg-primary/15"
                     href={waHref}
                     rel="noopener noreferrer"
                     target="_blank"
@@ -520,7 +560,7 @@ export function AdminOrdersPanel() {
                 ) : null}
               </div>
 
-              <div className="space-y-1.5 text-xs text-muted-foreground">
+              <div className="space-y-1.5 px-5 py-4 text-xs text-muted-foreground">
                 <p className="font-medium text-foreground">
                   {getDeliveryMethodLabel(order.deliveryMethod)}
                 </p>
@@ -533,7 +573,7 @@ export function AdminOrdersPanel() {
                       href={mapUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-2.5 text-xs font-medium text-primary hover:bg-primary/10"
                     >
                       <MapPin className="h-3.5 w-3.5" />
                       Open Map Pin
@@ -550,21 +590,21 @@ export function AdminOrdersPanel() {
               </div>
             </div>
 
-            {/* Items List */}
+            {/* Items Ledger */}
             {order.items && order.items.length > 0 ? (
-              <div className="space-y-1.5 border-t border-border/60 pt-3">
+              <div className="space-y-1.5 border-t border-border bg-[#F6F7F5]/40 px-5 py-3.5">
                 {order.items.map((item) => (
                   <div
                     className="flex justify-between gap-2 text-xs tabular-nums"
                     key={item.id}
                   >
                     <span className="text-muted-foreground">
-                      <strong className="text-foreground">
+                      <strong className="font-medium text-foreground">
                         {item.quantity}×
                       </strong>{" "}
                       {item.productName}
                     </span>
-                    <span className="font-medium">
+                    <span className="font-medium text-foreground">
                       {formatKes(item.lineTotal)}
                     </span>
                   </div>
@@ -573,7 +613,7 @@ export function AdminOrdersPanel() {
             ) : null}
 
             {errorByOrderId[order.id] ? (
-              <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <div className="border-t border-destructive/30 bg-destructive/10 px-5 py-2.5 text-xs font-medium text-destructive">
                 {errorByOrderId[order.id]}
               </div>
             ) : null}
@@ -581,9 +621,9 @@ export function AdminOrdersPanel() {
             {/* Step 1: Delivery Quote */}
             {(order.status === "PENDING" ||
               order.status === "REVIEWING_DELIVERY") && (
-              <div className="grid gap-2 border-t border-border/60 pt-3 sm:grid-cols-[150px_1fr_auto]">
+              <div className="grid gap-2 border-t border-border px-5 py-4 sm:grid-cols-[150px_1fr_auto]">
                 <Input
-                  className="h-10 tabular-nums"
+                  className="h-10 bg-white tabular-nums"
                   min="0"
                   placeholder="Delivery fee (KES)"
                   step="1"
@@ -597,7 +637,7 @@ export function AdminOrdersPanel() {
                   }
                 />
                 <Input
-                  className="h-10"
+                  className="h-10 bg-white"
                   placeholder="Delivery notes (optional)"
                   type="text"
                   value={quote.notes}
@@ -624,9 +664,9 @@ export function AdminOrdersPanel() {
               (paymentStatus === "PENDING" ||
                 paymentStatus === "AWAITING_VERIFICATION") &&
               !isClosed && (
-                <div className="grid gap-2 border-t border-border/60 pt-3 sm:grid-cols-[1fr_140px_auto]">
+                <div className="grid gap-2 border-t border-border px-5 py-4 sm:grid-cols-[1fr_140px_auto]">
                   <Input
-                    className="h-10"
+                    className="h-10 bg-white"
                     placeholder={
                       payment.method === "MPESA_BUY_GOODS" ||
                       payment.method === "BANK_TRANSFER"
@@ -646,7 +686,7 @@ export function AdminOrdersPanel() {
                     }
                   />
                   <Input
-                    className="h-10 tabular-nums"
+                    className="h-10 bg-white tabular-nums"
                     min="1"
                     placeholder="Amount (KES)"
                     step="0.01"
@@ -673,7 +713,7 @@ export function AdminOrdersPanel() {
 
             {/* Step 3: Fulfillment & Cancel */}
             {!isClosed ? (
-              <div className="flex flex-col gap-3 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 border-t border-border px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap gap-2">
                   {canFulfill &&
                     order.status !== "PROCESSING" &&
@@ -684,7 +724,7 @@ export function AdminOrdersPanel() {
                         size="sm"
                         type="button"
                         variant="outline"
-                        className="min-h-10"
+                        className="min-h-10 bg-white"
                       >
                         <Package className="mr-1.5 h-4 w-4" />
                         Start processing
@@ -700,7 +740,7 @@ export function AdminOrdersPanel() {
                       size="sm"
                       type="button"
                       variant="outline"
-                      className="min-h-10"
+                      className="min-h-10 bg-white"
                     >
                       <Truck className="mr-1.5 h-4 w-4" />
                       Out for delivery
@@ -714,7 +754,7 @@ export function AdminOrdersPanel() {
                       size="sm"
                       type="button"
                       variant="outline"
-                      className="min-h-10"
+                      className="min-h-10 bg-white"
                     >
                       <CheckCircle2 className="mr-1.5 h-4 w-4" />
                       Mark delivered

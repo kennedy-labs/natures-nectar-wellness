@@ -1,12 +1,50 @@
 import { toStorefrontMediaUrl } from "@/lib/media";
 import { db } from "@/server/db/prisma";
 
+function mapCategoryMedia<
+  T extends {
+    id: string;
+    image: string | null;
+    updatedAt: Date;
+  },
+>(category: T): T {
+  return {
+    ...category,
+    image: toStorefrontMediaUrl(
+      "categories",
+      category.id,
+      category.image,
+      category.updatedAt
+    ),
+  };
+}
+
 export async function findAllCategories() {
-  return db.category.findMany({
-    orderBy: {
-      name: "asc",
-    },
-  });
+  return db.$queryRaw<
+    Array<{
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      image: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }>
+  >`
+    SELECT
+      "id",
+      "name",
+      "slug",
+      "description",
+      CASE
+        WHEN "image" LIKE 'data:%' THEN CONCAT('/api/media/categories/', "id", '?v=', FLOOR(EXTRACT(EPOCH FROM ("updatedAt" AT TIME ZONE 'UTC')) * 1000)::bigint::text)
+        ELSE "image"
+      END AS "image",
+      "createdAt",
+      "updatedAt"
+    FROM "Category"
+    ORDER BY "name" ASC
+  `;
 }
 
 export async function findStorefrontCategories() {
@@ -81,9 +119,11 @@ type CreateCategoryData = {
 };
 
 export async function createCategory(data: CreateCategoryData) {
-  return db.category.create({
+  const created = await db.category.create({
     data,
   });
+
+  return mapCategoryMedia(created);
 }
 
 type UpdateCategoryData = Partial<Omit<CreateCategoryData, "image">> & {
@@ -91,12 +131,14 @@ type UpdateCategoryData = Partial<Omit<CreateCategoryData, "image">> & {
 };
 
 export async function updateCategory(id: string, data: UpdateCategoryData) {
-  return db.category.update({
+  const updated = await db.category.update({
     where: {
       id,
     },
     data,
   });
+
+  return mapCategoryMedia(updated);
 }
 
 export async function deleteCategory(id: string) {

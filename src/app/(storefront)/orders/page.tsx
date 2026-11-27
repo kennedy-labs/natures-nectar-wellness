@@ -29,19 +29,21 @@ export default async function OrdersPage(props: OrdersPageProps) {
       : undefined;
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
-      <div className="space-y-2 border-b border-border/80 pb-6">
-        <p className="text-sm font-medium text-primary">Your Orders</p>
+    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+      <header className="space-y-2 border-b border-border pb-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+          Post-Purchase Tracking
+        </p>
         <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
           Orders &amp; Tracking
         </h1>
         <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-          Track live delivery progress, check payment confirmation, or pull up
+          Inspect live fulfillment milestones, payment confirmation, or pull up
           an order placed from another device.
         </p>
-      </div>
+      </header>
 
-      <div className="mt-6 sm:mt-8">
+      <div className="mt-8">
         <CustomerOrdersView initialOrderNumber={initialOrderNumber} />
       </div>
     </main>

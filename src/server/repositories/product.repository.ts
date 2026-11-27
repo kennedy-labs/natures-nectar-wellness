@@ -195,14 +195,80 @@ export async function searchActiveProducts(params: {
 }
 
 export async function findAllProductsForAdmin() {
-  return db.product.findMany({
-    include: {
-      category: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  const [products, categories] = await Promise.all([
+    db.$queryRaw<
+      Array<{
+        id: string;
+        name: string;
+        slug: string;
+        description: string;
+        benefits: string | null;
+        usageInstructions: string | null;
+        ingredients: string | null;
+        price: number;
+        stockQuantity: number;
+        image: string | null;
+        isFeatured: boolean;
+        isActive: boolean;
+        categoryId: string;
+        createdAt: Date;
+        updatedAt: Date;
+      }>
+    >`
+      SELECT
+        "id",
+        "name",
+        "slug",
+        "description",
+        "benefits",
+        "usageInstructions",
+        "ingredients",
+        "price",
+        "stockQuantity",
+        CASE
+          WHEN "image" LIKE 'data:%' THEN CONCAT('/api/media/products/', "id", '?v=', FLOOR(EXTRACT(EPOCH FROM ("updatedAt" AT TIME ZONE 'UTC')) * 1000)::bigint::text)
+          ELSE "image"
+        END AS "image",
+        "isFeatured",
+        "isActive",
+        "categoryId",
+        "createdAt",
+        "updatedAt"
+      FROM "Product"
+      ORDER BY "createdAt" DESC
+    `,
+    db.$queryRaw<
+      Array<{
+        id: string;
+        name: string;
+        slug: string;
+        description: string | null;
+        image: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }>
+    >`
+      SELECT
+        "id",
+        "name",
+        "slug",
+        "description",
+        CASE
+          WHEN "image" LIKE 'data:%' THEN CONCAT('/api/media/categories/', "id", '?v=', FLOOR(EXTRACT(EPOCH FROM ("updatedAt" AT TIME ZONE 'UTC')) * 1000)::bigint::text)
+          ELSE "image"
+        END AS "image",
+        "createdAt",
+        "updatedAt"
+      FROM "Category"
+    `,
+  ]);
+
+  const categoryById = new Map(categories.map((cat) => [cat.id, cat]));
+
+  return products.map((product) => ({
+    ...product,
+    category: categoryById.get(product.categoryId)!,
+  }));
 }
 
 export async function findActiveProductsByCategorySlug(categorySlug: string) {
@@ -276,18 +342,20 @@ type CreateProductData = {
 };
 
 export async function createProduct(data: CreateProductData) {
-  return db.product.create({
+  const created = await db.product.create({
     include: {
       category: true,
     },
     data,
   });
+
+  return mapStorefrontProduct(created);
 }
 
 type UpdateProductData = Partial<CreateProductData>;
 
 export async function updateProduct(id: string, data: UpdateProductData) {
-  return db.product.update({
+  const updated = await db.product.update({
     where: {
       id,
     },
@@ -296,10 +364,12 @@ export async function updateProduct(id: string, data: UpdateProductData) {
     },
     data,
   });
+
+  return mapStorefrontProduct(updated);
 }
 
 export async function deleteProduct(id: string) {
-  return db.product.update({
+  const updated = await db.product.update({
     where: {
       id,
     },
@@ -310,6 +380,8 @@ export async function deleteProduct(id: string) {
       isActive: false,
     },
   });
+
+  return mapStorefrontProduct(updated);
 }
 
 export async function permanentlyDeleteProduct(id: string) {

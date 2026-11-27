@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Fraunces } from "next/font/google";
 import localFont from "next/font/local";
 
 import { QueryProvider } from "@/components/providers/query-provider";
@@ -29,13 +28,6 @@ const dmSans = localFont({
     },
   ],
   variable: "--font-sans",
-  display: "swap",
-});
-
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-display",
   display: "swap",
 });
 
@@ -135,7 +127,7 @@ export default function RootLayout({
 
   return (
     <html lang="en">
-      <body className={`${dmSans.variable} ${fraunces.variable} font-sans antialiased`}>
+      <body className={`${dmSans.variable} font-sans antialiased`}>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

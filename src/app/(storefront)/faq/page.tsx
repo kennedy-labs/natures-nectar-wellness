@@ -6,6 +6,10 @@ import { WhatsAppPageContext } from "@/components/layout/WhatsAppContext";
 import { Button } from "@/components/ui/button";
 import { getWhatsAppUrl } from "@/config/env.client";
 import { DEFAULT_OG_IMAGE, SITE_NAME, getAbsoluteUrl } from "@/config/site";
+import {
+  FaqAccordion,
+  type FaqItem,
+} from "@/features/faq/components/FaqAccordion";
 import { createTopicInquiryMessage } from "@/features/whatsapp/utils/whatsapp.utils";
 
 export const metadata: Metadata = {
@@ -31,38 +35,44 @@ export const metadata: Metadata = {
   },
 };
 
-const FAQ_ITEMS = [
+const FAQ_ITEMS: readonly FaqItem[] = [
   {
+    topic: "M-Pesa & Payments",
     question: "How do I pay for my order using M-Pesa?",
     answer:
       "At checkout, choose M-Pesa and enter your Safaricom phone number. You will receive an instant M-Pesa STK prompt on your handset to authorize payment with your PIN, and your order updates automatically once confirmed.",
   },
   {
+    topic: "Delivery",
     question: "What are your delivery zones and fees across Kenya?",
     answer:
       "We offer three straightforward options: Pickup (Free) once readiness is confirmed, Within Nairobi (Free) once your drop-off location is coordinated, and Outside Nairobi (Admin confirms fee) where our team confirms the exact countrywide courier rate with you before dispatch.",
   },
   {
+    topic: "Delivery",
     question: "How can I track my order after checkout?",
     answer:
       "Visit the Track Orders page from the top menu anytime and enter your order number together with the phone number or email used at checkout to see live payment and delivery status across any device.",
   },
   {
+    topic: "Returns & Safety",
     question: "Can I ask questions about an herb or blend before ordering?",
     answer:
       "Yes. Every product page, the floating WhatsApp button, and the store footer let you message our team directly for preparation tips, availability checks, or delivery coordination.",
   },
   {
+    topic: "Returns & Safety",
     question: "What is your return and refund policy?",
     answer:
       "Please inspect your items upon collection or delivery. Because our catalog includes consumable teas, raw honey, and herbal extracts, opened or unsealed items cannot be returned for hygiene reasons unless damaged or incorrect. If an item arrives damaged or missing, message us on WhatsApp within 48 hours with a clear photo and your order number; approved refunds on paid M-Pesa orders are processed within 3 to 5 business days.",
   },
   {
+    topic: "Returns & Safety",
     question: "Are your herbal formulations medical treatments?",
     answer:
       "No. Our herbal teas, mineral resins, raw honey, and botanical supplements are natural wellness foods and traditional preparations for everyday balance, and are not intended to diagnose, treat, cure, or replace guidance from a qualified healthcare professional.",
   },
-] as const;
+];
 
 export default function FaqPage() {
   const faqWhatsappMessage = createTopicInquiryMessage("your FAQ");
@@ -124,8 +134,10 @@ export default function FaqPage() {
         <span className="font-medium text-foreground">FAQ</span>
       </nav>
 
-      <header className="space-y-3 border-b border-border/80 pb-6">
-        <p className="text-sm font-medium text-primary">Customer Help</p>
+      <header className="space-y-3 pb-8">
+        <p className="text-xs font-medium tracking-[0.04em] text-primary uppercase">
+          Customer Help
+        </p>
         <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
           Frequently Asked Questions
         </h1>
@@ -135,32 +147,16 @@ export default function FaqPage() {
         </p>
       </header>
 
-      <div className="mt-8 space-y-4">
-        {FAQ_ITEMS.map((item, index) => (
-          <section
-            key={item.question}
-            className="rounded-xl border border-border/80 bg-card p-6 shadow-[0_1px_2px_rgba(24,42,32,0.04)]"
-          >
-            <p className="text-xs font-medium text-primary">
-              0{index + 1}
-            </p>
-            <h2 className="mt-1 font-display text-xl font-medium text-foreground">
-              {item.question}
-            </h2>
-            <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground sm:text-[15px]">
-              {item.answer}
-            </p>
-          </section>
-        ))}
-      </div>
+      <FaqAccordion items={FAQ_ITEMS} />
 
-      <section className="mt-10 flex flex-col gap-4 rounded-xl border border-border/80 bg-card p-6 shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:flex-row sm:items-center sm:justify-between">
+      <section className="mt-10 flex flex-col gap-4 rounded-xl border border-border bg-card p-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <h2 className="font-display text-lg font-medium text-foreground">
             Need help with a specific product or delivery?
           </h2>
           <p className="text-sm text-muted-foreground">
-            Message us on WhatsApp or review our full delivery and refund policy.
+            Message us on WhatsApp or review our full delivery and refund
+            policy.
           </p>
         </div>
 
@@ -173,7 +169,11 @@ export default function FaqPage() {
               </a>
             </Button>
           ) : null}
-          <Button asChild variant="outline" className="min-h-10 w-full sm:w-auto">
+          <Button
+            asChild
+            variant="outline"
+            className="min-h-10 w-full bg-background sm:w-auto"
+          >
             <Link href="/delivery-refund-policy">
               Delivery policy
               <ArrowRight className="h-4 w-4" />

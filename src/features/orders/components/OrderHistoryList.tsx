@@ -57,14 +57,14 @@ export function OrderHistoryList({
   ).length;
 
   return (
-    <section aria-label="All saved orders" className="space-y-3 pt-2">
+    <section aria-label="Saved orders" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-baseline gap-2.5">
+        <div className="flex items-baseline gap-2">
           <h2 className="font-display text-lg font-medium text-foreground">
-            All orders on this browser
+            Saved orders
           </h2>
           <span className="text-xs text-muted-foreground tabular-nums">
-            {orders.length} orders
+            ({orders.length})
           </span>
         </div>
 
@@ -74,15 +74,15 @@ export function OrderHistoryList({
             variant="ghost"
             size="sm"
             onClick={onClearClosedOrders}
-            className="min-h-9 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            Clear closed ({closedCount})
+            Clear closed
           </Button>
         ) : null}
       </div>
 
-      <div className="divide-y divide-border/70 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_1px_2px_rgba(24,42,32,0.04)]">
+      <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
         {orders.map((order) => {
           const isSelected = order.id === selectedOrderId;
           const itemCount = order.items.reduce(
@@ -104,25 +104,25 @@ export function OrderHistoryList({
               aria-pressed={isSelected}
               onClick={() => onSelectOrder(order.id)}
               className={cn(
-                "flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition-colors duration-150 sm:px-6",
+                "flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors duration-150",
                 isSelected
-                  ? "bg-primary/[0.06]"
+                  ? "border-l-2 border-l-primary bg-primary/[0.06]"
                   : "hover:bg-muted/40"
               )}
             >
-              <div className="flex min-w-0 items-start gap-3.5 sm:items-center">
+              <div className="flex min-w-0 items-start gap-3">
                 <span
                   className={cn(
-                    "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border sm:mt-0",
+                    "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border",
                     profile.rowBadgeIconClass
                   )}
                 >
                   {renderRowIcon(order.status, profile.tone)}
                 </span>
 
-                <div className="min-w-0 space-y-1">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <span className="font-mono text-sm font-semibold text-foreground">
+                <div className="min-w-0 space-y-0.5">
+                  <div className="flex flex-wrap items-center gap-x-2">
+                    <span className="font-mono text-xs font-semibold text-foreground">
                       {order.orderNumber}
                     </span>
                     <span
@@ -137,36 +137,27 @@ export function OrderHistoryList({
                     >
                       {profile.statusLabel}
                     </span>
-                    {isSelected ? (
-                      <span className="text-xs text-muted-foreground">
-                        · Viewing above
-                      </span>
-                    ) : null}
                   </div>
 
-                  <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                  <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground tabular-nums">
                     <span>{formatShortDate(order.createdAt)}</span>
                     <span aria-hidden="true">·</span>
-                    <span className="tabular-nums">
+                    <span>
                       {itemCount} {itemCount === 1 ? "item" : "items"}
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span className={profile.paymentTextClass}>
-                      {profile.paymentLabel}
                     </span>
                   </p>
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center gap-2.5">
-                <span className="text-sm font-semibold tabular-nums text-foreground sm:text-base">
+              <div className="flex shrink-0 items-center gap-1.5">
+                <span className="text-sm font-semibold tabular-nums text-foreground">
                   {formatKes(order.totalAmount)}
                 </span>
                 <ChevronRight
                   className={cn(
                     "h-4 w-4 transition-transform duration-150",
                     isSelected
-                      ? "text-primary"
+                      ? "translate-x-0.5 text-primary"
                       : "text-muted-foreground"
                   )}
                 />

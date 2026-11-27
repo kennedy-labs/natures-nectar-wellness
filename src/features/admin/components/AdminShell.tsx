@@ -14,6 +14,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 
 export type AdminTab = "overview" | "orders" | "catalog";
 
@@ -72,26 +73,32 @@ export function AdminShell({
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F8F6] text-foreground">
+    <div className="min-h-screen bg-[#F6F7F5] text-foreground">
       {/* Desktop Fixed Sidebar (lg+) */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-60 lg:flex-col lg:border-r lg:border-border/80 lg:bg-white">
-        <div className="flex h-16 items-center gap-2.5 border-b border-border/70 px-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-60 lg:flex-col lg:border-r lg:border-border lg:bg-white">
+        <div className="flex h-16 items-center gap-2.5 border-b border-border px-5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <Leaf className="h-4 w-4" />
           </div>
-          <span className="truncate text-sm font-semibold tracking-tight">
-            Nature&apos;s Nectar
-          </span>
+          <div className="min-w-0">
+            <p className="truncate font-display text-sm font-medium leading-tight tracking-tight text-foreground">
+              Nature&apos;s Nectar
+            </p>
+            <p className="text-[11px] tracking-[0.04em] text-muted-foreground uppercase">
+              Operations
+            </p>
+          </div>
         </div>
 
         <nav aria-label="Admin sidebar navigation" className="flex-1 space-y-1 p-3">
           {navItems.map((item) => {
             const isActive = activeTab === item.key;
-            const itemClass = `flex w-full min-h-11 items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors whitespace-nowrap ${
+            const itemClass = cn(
+              "flex w-full min-h-11 items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors whitespace-nowrap",
               isActive
                 ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-            }`;
+                : "text-muted-foreground hover:bg-[#F6F7F5] hover:text-foreground"
+            );
 
             const inner = (
               <>
@@ -101,11 +108,12 @@ export function AdminShell({
                 </span>
                 {item.count !== undefined ? (
                   <span
-                    className={`rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums ${
+                    className={cn(
+                      "border-l pl-2 text-xs font-medium tabular-nums",
                       isActive
-                        ? "bg-white/20 text-white"
-                        : "bg-muted text-foreground"
-                    }`}
+                        ? "border-white/25 text-white/90"
+                        : "border-border text-foreground"
+                    )}
                   >
                     {item.count}
                   </span>
@@ -140,18 +148,18 @@ export function AdminShell({
           })}
         </nav>
 
-        <div className="space-y-3 border-t border-border/70 p-4">
+        <div className="space-y-3 border-t border-border p-4">
           <Link
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex min-h-10 items-center justify-between rounded-lg border border-border/80 px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted/50"
+            className="flex min-h-10 items-center justify-between rounded-md border border-border bg-[#F6F7F5]/60 px-3 text-xs font-medium text-foreground transition-colors hover:bg-[#F6F7F5]"
           >
             <span>View storefront</span>
             <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
           </Link>
 
-          <div className="space-y-2 pt-1">
+          <div className="space-y-1.5 pt-1">
             <p className="truncate text-xs text-muted-foreground">{adminEmail}</p>
             <Button
               type="button"
@@ -171,17 +179,17 @@ export function AdminShell({
       {/* Main Content Area */}
       <div className="flex min-h-screen flex-col lg:pl-60">
         {/* Top Bar (Desktop Breadcrumb + Mobile Compact Bar) */}
-        <header className="sticky top-0 z-30 border-b border-border/80 bg-white/95 backdrop-blur">
+        <header className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur">
           <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
             <div className="flex min-w-0 items-center gap-2">
               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground lg:hidden">
                 <Leaf className="h-4 w-4" />
               </div>
-              <span className="truncate text-sm font-semibold lg:hidden">
-                Admin
+              <span className="truncate font-display text-sm font-medium lg:hidden">
+                Nature&apos;s Nectar Admin
               </span>
-              <span className="hidden items-center gap-2 text-sm text-muted-foreground lg:flex">
-                <span>Store Admin</span>
+              <span className="hidden items-center gap-2 text-xs text-muted-foreground lg:flex">
+                <span className="tracking-[0.04em] uppercase">Operations</span>
                 <span aria-hidden="true">/</span>
                 <span className="font-medium capitalize text-foreground">
                   {activeTab}
@@ -194,7 +202,7 @@ export function AdminShell({
                 href="/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border/80 px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted/50 whitespace-nowrap"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-[#F6F7F5] whitespace-nowrap"
               >
                 <span>View store</span>
                 <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
@@ -216,15 +224,16 @@ export function AdminShell({
           {/* Mobile Horizontal Tab Switcher */}
           <nav
             aria-label="Admin sections"
-            className="grid grid-cols-3 border-t border-border/60 bg-white px-2 py-1.5 lg:hidden"
+            className="grid grid-cols-3 border-t border-border bg-white px-2 py-1.5 lg:hidden"
           >
             {navItems.map((item) => {
               const isActive = activeTab === item.key;
-              const mobileItemClass = `flex min-h-10 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors whitespace-nowrap ${
+              const mobileItemClass = cn(
+                "flex min-h-10 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors whitespace-nowrap",
                 isActive
                   ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-              }`;
+                  : "text-muted-foreground hover:bg-[#F6F7F5] hover:text-foreground"
+              );
 
               const inner = (
                 <>
@@ -232,11 +241,12 @@ export function AdminShell({
                   <span>{item.label}</span>
                   {item.count !== undefined ? (
                     <span
-                      className={`rounded px-1 text-[11px] tabular-nums ${
-                        isActive ? "bg-white/20 text-white" : "bg-muted text-foreground"
-                      }`}
+                      className={cn(
+                        "text-[11px] tabular-nums",
+                        isActive ? "text-white/90" : "text-muted-foreground"
+                      )}
                     >
-                      {item.count}
+                      ({item.count})
                     </span>
                   ) : null}
                 </>

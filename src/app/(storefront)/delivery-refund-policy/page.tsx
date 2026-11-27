@@ -27,12 +27,25 @@ export default function DeliveryRefundPolicyPage() {
       summary="How pickup, local delivery, countrywide shipping across Kenya, order cancellations, and eligible refunds work."
       lastUpdated="November 2026"
       whatsappMessage={createTopicInquiryMessage("Delivery & Refunds")}
+      highlights={[
+        { label: "Shop Pickup", value: "Free" },
+        { label: "Within Nairobi", value: "Free" },
+        { label: "Outside Nairobi", value: "Quoted before dispatch" },
+        { label: "Damage Claim Window", value: "48 hours" },
+        { label: "M-Pesa Refund SLA", value: "3–5 business days" },
+      ]}
+      sections={[
+        { id: "delivery-zones", title: "1. Delivery zones and fees" },
+        { id: "inspection-returns", title: "2. Inspection and eligible returns" },
+        { id: "damaged-items", title: "3. Damaged, incorrect, or missing items" },
+        { id: "cancellations-refunds", title: "4. Cancellations and refund timing" },
+      ]}
     >
-      <section className="space-y-2">
+      <section id="delivery-zones" className="scroll-mt-24 space-y-2.5 border-b border-border/70 pb-7">
         <h2 className="font-display text-xl font-medium text-foreground">
           1. Delivery zones and fees
         </h2>
-        <ul className="list-disc space-y-1.5 pl-5">
+        <ul className="list-disc space-y-2 pl-5">
           <li>
             <strong className="font-medium text-foreground">
               Pickup (Free):
@@ -65,7 +78,7 @@ export default function DeliveryRefundPolicyPage() {
         </ul>
       </section>
 
-      <section className="space-y-2">
+      <section id="inspection-returns" className="scroll-mt-24 space-y-2.5 border-b border-border/70 pb-7">
         <h2 className="font-display text-xl font-medium text-foreground">
           2. Inspection and eligible returns
         </h2>
@@ -77,7 +90,7 @@ export default function DeliveryRefundPolicyPage() {
         </p>
       </section>
 
-      <section className="space-y-2">
+      <section id="damaged-items" className="scroll-mt-24 space-y-2.5 border-b border-border/70 pb-7">
         <h2 className="font-display text-xl font-medium text-foreground">
           3. Damaged, incorrect, or missing items
         </h2>
@@ -88,7 +101,7 @@ export default function DeliveryRefundPolicyPage() {
         </p>
       </section>
 
-      <section className="space-y-2">
+      <section id="cancellations-refunds" className="scroll-mt-24 space-y-2.5">
         <h2 className="font-display text-xl font-medium text-foreground">
           4. Cancellations and refund timing
         </h2>

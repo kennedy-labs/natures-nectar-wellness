@@ -35,10 +35,10 @@ export function StorefrontWhatsAppInvitation() {
   return (
     <section
       aria-labelledby="apothecary-guidance-heading"
-      className="border-t border-border/80 pt-10 text-center sm:pt-12"
+      className="border-t border-border pt-12 text-center sm:pt-14"
     >
       <div className="mx-auto max-w-xl space-y-4">
-        <p className="text-xs font-medium tracking-wide text-primary">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
           Personal Botanical Guidance
         </p>
         <h2
@@ -48,8 +48,8 @@ export function StorefrontWhatsAppInvitation() {
           Have a question before you order?
         </h2>
         <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
-          Message us directly on WhatsApp for gentle product advice, usage
-          notes, or Nairobi delivery help.
+          Message our apothecary team on WhatsApp for usage guidance, ingredient
+          questions, or Nairobi delivery timing.
         </p>
 
         <div className="pt-1">

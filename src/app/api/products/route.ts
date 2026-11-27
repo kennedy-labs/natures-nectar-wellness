@@ -27,7 +27,9 @@ export async function GET(req: Request) {
     if (isAdminScope) {
       await requireAdminRequest(req);
       const products = await getAllProductsForAdmin();
-      return apiOk(products);
+      return apiOk(products, {
+        headers: { "Cache-Control": "private, no-cache, no-store" },
+      });
     }
 
     const rawQ = url.searchParams.get("q") ?? undefined;
@@ -56,7 +58,11 @@ export async function GET(req: Request) {
 
       if (parsed.popular && !parsed.q && !parsed.category) {
         const products = await getPopularProducts(parsed.limit ?? 5);
-        return apiOk(products);
+        return apiOk(products, {
+          headers: {
+            "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+          },
+        });
       }
 
       const products = await searchStorefrontProducts({
@@ -65,11 +71,19 @@ export async function GET(req: Request) {
         limit: parsed.limit,
       });
 
-      return apiOk(products);
+      return apiOk(products, {
+        headers: {
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+        },
+      });
     }
 
     const products = await getAllProducts();
-    return apiOk(products);
+    return apiOk(products, {
+      headers: {
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+      },
+    });
   } catch (error) {
     return apiFail(error);
   }

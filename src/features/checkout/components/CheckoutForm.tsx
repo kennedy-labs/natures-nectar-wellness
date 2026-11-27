@@ -6,8 +6,6 @@ import { Loader2 } from "lucide-react";
 
 import { WhatsAppPageContext } from "@/components/layout/WhatsAppContext";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiClientError } from "@/lib/api-client";
-
 import { verifyPaystackCheckout } from "@/features/checkout/api/checkout-api";
 import { CheckoutCartSummary } from "@/features/checkout/components/CheckoutCartSummary";
 import { CheckoutCustomerSection } from "@/features/checkout/components/CheckoutCustomerSection";
@@ -15,17 +13,15 @@ import { CheckoutDeliverySection } from "@/features/checkout/components/Checkout
 import { CheckoutPaymentSection } from "@/features/checkout/components/CheckoutPaymentSection";
 import { CheckoutSuccess } from "@/features/checkout/components/CheckoutSuccess";
 import { MpesaPaymentGate } from "@/features/checkout/components/MpesaPaymentGate";
-import { createCheckoutHelpMessage } from "@/features/whatsapp/utils/whatsapp.utils";
-
 import { useCheckout } from "@/features/checkout/hooks/useCheckout";
-
 import type {
   CheckoutFormValues,
   GatewayAvailability,
   PaystackReturnParams,
   PaystackVerifyResponse,
 } from "@/features/checkout/types/checkout.types";
-
+import { createCheckoutHelpMessage } from "@/features/whatsapp/utils/whatsapp.utils";
+import { ApiClientError } from "@/lib/api-client";
 import { useCartStore } from "@/store/cart.store";
 import { useOrdersStore } from "@/store/orders.store";
 
@@ -112,7 +108,6 @@ export function CheckoutForm({
         phone: "",
         email: "",
       },
-
       delivery: {
         method: "PICKUP",
         location: "",
@@ -120,7 +115,6 @@ export function CheckoutForm({
         latitude: undefined,
         longitude: undefined,
       },
-
       preferredPaymentMethod: undefined,
       mpesaPhone: "",
       customerNotes: "",
@@ -158,7 +152,6 @@ export function CheckoutForm({
     try {
       const response = await submit(values, cartItems);
 
-      // Only clear cart and record order immediately for Cash on Pickup; M-Pesa waits until Safaricom verifies payment.
       if (response.preferredPaymentMethod !== "MPESA_BUY_GOODS") {
         clearCart();
         saveOrderRef({
@@ -195,18 +188,14 @@ export function CheckoutForm({
 
   if (verifyingPaystack) {
     return (
-      <div className="space-y-4 rounded-xl border bg-card p-6 sm:p-8">
+      <div className="space-y-4 rounded-xl border border-border bg-card p-6 sm:p-8">
         <div className="flex items-center gap-3 text-sm font-medium text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
           <span>Verifying your Paystack payment...</span>
         </div>
-        <div className="space-y-3 border-t pt-4">
+        <div className="space-y-3 border-t border-border pt-4">
           <Skeleton className="h-5 w-48" />
           <Skeleton className="h-4 w-full max-w-md" />
-          <div className="grid gap-3 pt-2 sm:grid-cols-2">
-            <Skeleton className="h-16 w-full rounded-lg" />
-            <Skeleton className="h-16 w-full rounded-lg" />
-          </div>
         </div>
       </div>
     );
@@ -282,43 +271,50 @@ export function CheckoutForm({
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="grid gap-8 lg:grid-cols-[1fr_380px]"
+      className="grid items-start gap-8 lg:grid-cols-[1fr_380px]"
     >
       <WhatsAppPageContext message={createCheckoutHelpMessage()} />
+
       <div className="space-y-6">
-        <CheckoutCustomerSection register={register} errors={errors} />
+        {/* Unified Architectural Porcelain Ledger for Checkout Chapters */}
+        <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+          <CheckoutCustomerSection register={register} errors={errors} />
 
-        <CheckoutDeliverySection
-          register={register}
-          watch={watch}
-          setValue={setValue}
-          clearErrors={clearErrors}
-          errors={errors}
-        />
-
-        <CheckoutPaymentSection
-          register={register}
-          watch={watch}
-          setValue={setValue}
-          clearErrors={clearErrors}
-          errors={errors}
-          gatewayAvailability={gatewayAvailability}
-        />
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium">
-            Additional notes (optional)
-          </label>
-
-          <textarea
-            className="min-h-[120px] w-full rounded-md border border-input bg-card p-3 text-base shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:text-sm"
-            placeholder="Add any extra information about your order"
-            {...register("customerNotes")}
+          <CheckoutDeliverySection
+            register={register}
+            watch={watch}
+            setValue={setValue}
+            clearErrors={clearErrors}
+            errors={errors}
           />
+
+          <CheckoutPaymentSection
+            register={register}
+            watch={watch}
+            setValue={setValue}
+            clearErrors={clearErrors}
+            errors={errors}
+            gatewayAvailability={gatewayAvailability}
+          />
+
+          <div className="space-y-2 p-5 sm:p-7">
+            <label
+              htmlFor="checkout-additional-notes"
+              className="text-xs font-medium text-foreground"
+            >
+              Order notes <span className="text-muted-foreground">(optional)</span>
+            </label>
+            <textarea
+              id="checkout-additional-notes"
+              className="min-h-[96px] w-full rounded-md border border-input bg-background p-3 text-base transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:text-sm"
+              placeholder="Anything else our team should know when preparing your items"
+              {...register("customerNotes")}
+            />
+          </div>
         </div>
 
         {generalError ? (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3.5 text-sm text-destructive">
             {generalError}
           </div>
         ) : null}
@@ -328,7 +324,7 @@ export function CheckoutForm({
           disabled={
             isSubmitting || cartItems.length === 0 || mpesaBlockedWithoutDaraja
           }
-          className="min-h-12 w-full rounded-md bg-primary px-4 py-3 text-base font-medium text-primary-foreground shadow-sm transition-all duration-150 hover:bg-primary/92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+          className="min-h-12 w-full rounded-md bg-primary px-5 py-3 text-base font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary/92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
         >
           {mpesaBlockedWithoutDaraja
             ? "Select Cash on Pickup (M-Pesa awaiting activation)"
@@ -337,8 +333,8 @@ export function CheckoutForm({
                 ? "Opening M-Pesa payment..."
                 : "Submitting order..."
               : selectedPaymentMethod === "MPESA_BUY_GOODS"
-                ? "Pay with M-Pesa & Place Order"
-                : "Place order"}
+                ? "Pay with M-Pesa & Complete Order"
+                : "Complete Order"}
         </button>
       </div>
 

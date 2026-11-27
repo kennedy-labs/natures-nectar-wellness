@@ -55,21 +55,29 @@ export default async function HomePage() {
     (product) => !popularIds.has(product.id)
   );
 
+  // Consolidate into one cohesive 3-column showcase grid when overlap leaves sparse rows (max 6)
+  const showcaseProducts =
+    popularProducts.length > 0
+      ? distinctFeatured.length >= 3
+        ? popularProducts.slice(0, 6)
+        : [...popularProducts, ...distinctFeatured].slice(0, 6)
+      : featuredProducts.slice(0, 6);
+
   return (
     <section className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-8 sm:gap-14 sm:px-6 sm:py-12 md:gap-16 md:py-14">
+      {/* Band 1: 55/45 Asymmetric Hero Split */}
       <div className="grid items-stretch gap-8 lg:grid-cols-12 lg:gap-12">
         <div className="flex flex-col justify-center space-y-6 lg:col-span-6">
           <div className="space-y-4">
-            <p className="text-sm font-medium tracking-wide text-primary">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
               Kenyan Botanical Apothecary
             </p>
-            <h1 className="font-display text-[clamp(2.1rem,4vw,3.3rem)] font-medium leading-[1.12] tracking-tight text-foreground text-balance">
-              Herbal products for everyday balance and wellbeing
+            <h1 className="font-display text-[clamp(2.15rem,4.1vw,3.35rem)] font-medium leading-[1.1] tracking-tight text-foreground text-balance">
+              Herbal formulations shaped for everyday balance and trust
             </h1>
-            <p className="max-w-[52ch] text-base leading-relaxed text-muted-foreground sm:text-[17px]">
-              Browse teas, raw forest honey, mineral resins, and natural
-              supplements. Order online with direct M-Pesa or Cash on Pickup and
-              personal delivery coordination across Kenya.
+            <p className="max-w-[50ch] text-base leading-relaxed text-muted-foreground sm:text-[17px]">
+              Small-batch teas, raw forest honey, mineral resins, and natural
+              supplements delivered across Kenya with transparent pricing.
             </p>
           </div>
 
@@ -90,7 +98,7 @@ export default async function HomePage() {
               asChild
               size="lg"
               variant="outline"
-              className="min-h-11 w-full sm:w-auto"
+              className="min-h-11 w-full bg-card sm:w-auto"
             >
               <Link href="/categories">Explore categories</Link>
             </Button>
@@ -101,96 +109,82 @@ export default async function HomePage() {
             <span aria-hidden="true">·</span>
             <span>M-Pesa &amp; Cash on Pickup</span>
             <span aria-hidden="true">·</span>
-            <span>Countrywide delivery</span>
+            <span>Countrywide dispatch</span>
           </div>
         </div>
 
         <div className="min-w-0 lg:col-span-6">
-          <HeroProductCarousel products={allProducts} />
+          <HeroProductCarousel
+            products={
+              allProducts.length > 0 ? allProducts : showcaseProducts
+            }
+          />
         </div>
       </div>
 
-      <div className="grid gap-6 border-y border-border/80 py-8 md:grid-cols-3 md:gap-8">
-        <div className="space-y-1.5">
-          <h2 className="font-display text-base font-medium text-foreground">
-            01. Trusted sourcing
+      {/* Band 2: 3-Pillar Hairline Proof Strip */}
+      <div className="grid divide-y divide-border border-y border-border md:grid-cols-3 md:divide-x md:divide-y-0">
+        <div className="space-y-1.5 py-6 md:py-8 md:pr-8">
+          <p className="font-mono text-xs text-primary">01</p>
+          <h2 className="font-display text-lg font-medium text-foreground">
+            Verified purity
           </h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Botanical harvests selected for purity, clarity, and everyday
+            Botanical harvests selected for clarity, honest labeling, and daily
             wellness support.
           </p>
         </div>
-        <div className="space-y-1.5">
-          <h2 className="font-display text-base font-medium text-foreground">
-            02. Direct M-Pesa &amp; WhatsApp care
+        <div className="space-y-1.5 py-6 md:px-8 md:py-8">
+          <p className="font-mono text-xs text-primary">02</p>
+          <h2 className="font-display text-lg font-medium text-foreground">
+            Direct M-Pesa &amp; WhatsApp care
           </h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Checkout seamlessly online with instant M-Pesa prompt or personal
-            WhatsApp coordination.
+            Seamless online M-Pesa prompt or Cash on Pickup backed by responsive
+            human care.
           </p>
         </div>
-        <div className="space-y-1.5">
-          <h2 className="font-display text-base font-medium text-foreground">
-            03. Delivery across Kenya
+        <div className="space-y-1.5 py-6 md:py-8 md:pl-8">
+          <p className="font-mono text-xs text-primary">03</p>
+          <h2 className="font-display text-lg font-medium text-foreground">
+            Predictable Kenya-wide dispatch
           </h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Free pickup and Nairobi delivery alongside flexible countrywide
-            courier dispatch.
+            Free Nairobi pickup and local drop-off alongside quoted countrywide
+            courier delivery.
           </p>
         </div>
       </div>
 
-      {popularProducts.length > 0 ? (
-        <div className="space-y-6">
+      {/* Band 3: Curated 3-Column Collection Grid */}
+      {showcaseProducts.length > 0 ? (
+        <div className="space-y-7">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="space-y-1.5">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+                Apothecary Selection
+              </p>
               <h2 className="font-display text-2xl font-medium tracking-tight text-foreground sm:text-3xl">
-                {distinctFeatured.length > 0
-                  ? "Popular in Kenya"
-                  : "Popular & Featured Formulations"}
+                Popular &amp; Essential Formulations
               </h2>
               <p className="text-sm text-muted-foreground sm:text-base">
-                Most-ordered botanical favorites and trusted daily essentials
-                from our apothecary.
+                Most-ordered botanical favorites and trusted daily essentials.
               </p>
             </div>
             <Link
               href="/products"
               className="inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 transition-colors hover:underline"
             >
-              View all products
+              <span>View all products</span>
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
 
-          <ProductGrid products={popularProducts} />
+          <ProductGrid products={showcaseProducts} />
         </div>
       ) : null}
 
-      {distinctFeatured.length > 0 ? (
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="space-y-1.5">
-              <h2 className="font-display text-2xl font-medium tracking-tight text-foreground sm:text-3xl">
-                Featured Formulations
-              </h2>
-              <p className="text-sm text-muted-foreground sm:text-base">
-                Handpicked herbal essentials highlighted from our apothecary.
-              </p>
-            </div>
-            <Link
-              href="/products"
-              className="inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 transition-colors hover:underline"
-            >
-              Browse full catalog
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-
-          <ProductGrid products={distinctFeatured} />
-        </div>
-      ) : null}
-
+      {/* Band 4: Quiet WhatsApp Concierge Strip */}
       <StorefrontWhatsAppInvitation />
     </section>
   );

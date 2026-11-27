@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { X } from "lucide-react";
 
+import { InlineBotanicalSearch } from "@/components/layout/InlineBotanicalSearch";
 import { Button } from "@/components/ui/button";
 import { DEFAULT_OG_IMAGE, getAbsoluteUrl } from "@/config/site";
 import { ProductGrid } from "@/features/products/components/ProductGrid";
@@ -107,30 +108,51 @@ export default async function ProductsPage(props: ProductsPageProps) {
           __html: JSON.stringify(collectionSchema),
         }}
       />
-      <div className="mb-8 space-y-5 border-b border-border/80 pb-6 sm:mb-10">
-        <div className="max-w-2xl space-y-2">
-          <p className="text-sm font-medium text-primary">Botanical Catalog</p>
-          <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
-            {activeCategory ? activeCategory.name : "Products"}
-          </h1>
-          <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
-            Explore our small-batch herbal catalog. Live availability is shown
-            on each product.
-          </p>
+
+      {/* Unified Catalog Command Header */}
+      <header className="mb-8 space-y-6 border-b border-border pb-6 sm:mb-10">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+              Botanical Catalog
+            </p>
+            <div className="flex flex-wrap items-baseline gap-3">
+              <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
+                {activeCategory ? activeCategory.name : "All Formulations"}
+              </h1>
+              <span className="text-sm text-muted-foreground tabular-nums">
+                {products.length}{" "}
+                {products.length === 1 ? "item" : "items"}
+              </span>
+            </div>
+            <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
+              Small-batch herbal teas, raw honey, resins, and natural
+              formulations with live stock clarity.
+            </p>
+          </div>
+
+          <InlineBotanicalSearch
+            key={activeQuery}
+            variant="subbar"
+            initialQuery={activeQuery}
+            placeholder="Filter by herb, benefit, ingredient..."
+            className="w-full lg:max-w-sm"
+          />
         </div>
 
+        {/* Single-line Horizontal Segmented Category Bar */}
         {categories.length > 0 ? (
           <nav
             aria-label="Filter products by category"
-            className="flex flex-wrap items-center gap-2"
+            className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             <Link
               href={buildFilterHref(undefined)}
               className={cn(
-                "inline-flex min-h-9 items-center rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                "inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-md border px-3 text-xs font-medium transition-colors",
                 !activeCategorySlug
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border/80 bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
               )}
             >
               All
@@ -140,14 +162,16 @@ export default async function ProductsPage(props: ProductsPageProps) {
                 key={cat.id}
                 href={buildFilterHref(cat.slug)}
                 className={cn(
-                  "inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                  "inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-xs font-medium transition-colors",
                   activeCategorySlug === cat.slug
                     ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border/80 bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                    : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
                 )}
               >
                 <span>{cat.name}</span>
-                <span className="opacity-75">({cat.productCount})</span>
+                <span className="opacity-75 tabular-nums">
+                  ({cat.productCount})
+                </span>
               </Link>
             ))}
           </nav>
@@ -156,7 +180,10 @@ export default async function ProductsPage(props: ProductsPageProps) {
         {activeQuery || activeCategory ? (
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground sm:text-sm">
             <p>
-              Showing <strong className="font-medium text-foreground">{products.length}</strong>{" "}
+              Showing{" "}
+              <strong className="font-semibold tabular-nums text-foreground">
+                {products.length}
+              </strong>{" "}
               {products.length === 1 ? "formulation" : "formulations"}
               {activeCategory ? ` in ${activeCategory.name}` : ""}
               {activeQuery ? ` matching "${activeQuery}"` : ""}.
@@ -170,22 +197,22 @@ export default async function ProductsPage(props: ProductsPageProps) {
             </Link>
           </div>
         ) : null}
-      </div>
+      </header>
 
       {products.length > 0 ? (
         <ProductGrid products={products} />
       ) : (
-        <div className="rounded-xl border border-border/80 bg-card p-8 text-center shadow-[0_1px_2px_rgba(24,42,32,0.04)]">
+        <div className="rounded-xl border border-border bg-card p-8 text-center">
           <h2 className="font-display text-xl font-medium text-foreground">
             No matching formulations found
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            We couldn&apos;t find active products matching your filter. Try a
-            broader botanical keyword or view the entire catalog.
+            No active products match your current filter. Reset your filters or
+            explore categories above.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-3">
             <Button asChild size="sm">
-              <Link href="/products">View all formulations</Link>
+              <Link href="/products">Reset filters</Link>
             </Button>
             <Button asChild size="sm" variant="outline">
               <Link href="/categories">Explore categories</Link>

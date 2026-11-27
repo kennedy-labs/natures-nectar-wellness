@@ -57,7 +57,6 @@ export async function getOrdersForAdmin() {
       },
     },
     include: {
-      customer: true,
       items: true,
       payments: true,
     },

@@ -1,17 +1,12 @@
-import { formatKes } from "@/lib/format";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Leaf } from "lucide-react";
+
 import { SkeletonImage } from "@/components/ui/skeleton-image";
 import {
   getInventoryStatus,
   getInventoryStatusLabel,
 } from "@/features/inventory/utils/inventory.utils";
 import { AddToCartButton } from "@/features/products/components/AddToCartButton";
+import { formatKes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type ProductCardProps = {
@@ -43,13 +38,16 @@ export function ProductCard({
   const statusLabel = getInventoryStatusLabel(inventoryStatus);
   const trimmedBenefits = benefits?.trim() || "";
   const trimmedDescription = description.trim();
-  const hasDistinctBenefits =
-    Boolean(trimmedBenefits) &&
-    trimmedBenefits.toLowerCase() !== trimmedDescription.toLowerCase();
+  const summaryText =
+    trimmedBenefits &&
+    trimmedBenefits.toLowerCase() !== trimmedDescription.toLowerCase()
+      ? trimmedBenefits
+      : trimmedDescription;
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden rounded-xl border-border/80 bg-card shadow-[0_1px_2px_rgba(24,42,32,0.04)] transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/35 group-hover:shadow-[0_14px_30px_-14px_rgba(24,42,32,0.16)]">
-      <div className="relative aspect-[4/3] overflow-hidden bg-muted/50">
+    <article className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground transition-[transform,border-color,box-shadow] duration-200 ease-out group-hover:-translate-y-0.5 group-hover:border-primary/40 group-hover:shadow-[0_14px_28px_-16px_rgba(20,34,27,0.14)]">
+      {/* Visual Surface (4:3 locked ratio) */}
+      <div className="relative aspect-[4/3] overflow-hidden border-b border-border/60 bg-muted/45">
         {image ? (
           <SkeletonImage
             src={image}
@@ -57,30 +55,36 @@ export function ProductCard({
             priority={priority}
             useNextImage={!image.startsWith("data:")}
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+            className="transition-transform duration-300 ease-out group-hover:scale-[1.02]"
           />
         ) : (
-          <div className="flex h-full items-center justify-center px-6 text-center font-display text-sm font-medium text-muted-foreground">
-            Nature&apos;s Nectar
+          <div className="flex h-full flex-col items-center justify-center gap-2 bg-[radial-gradient(circle_at_top,rgba(31,78,55,0.08),transparent_70%)] px-6 text-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card text-primary/75">
+              <Leaf className="h-4 w-4" />
+            </div>
+            <span className="font-display text-xs font-medium tracking-wide text-muted-foreground">
+              Nature&apos;s Nectar
+            </span>
           </div>
         )}
       </div>
 
-      <CardHeader className="space-y-2 p-5 pb-2">
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs">
+      {/* Uniform Text Slot Cadence */}
+      <div className="flex flex-1 flex-col p-5">
+        <div className="flex items-center gap-1.5 text-xs">
           {categoryName ? (
             <>
               <span className="truncate font-medium text-muted-foreground">
                 {categoryName}
               </span>
-              <span aria-hidden="true" className="text-muted-foreground/70">
+              <span aria-hidden="true" className="text-muted-foreground/60">
                 ·
               </span>
             </>
           ) : null}
           <span
             className={cn(
-              "font-medium",
+              "shrink-0 font-medium",
               inventoryStatus === "OUT_OF_STOCK"
                 ? "text-destructive"
                 : inventoryStatus === "LOW_STOCK"
@@ -92,30 +96,16 @@ export function ProductCard({
           </span>
         </div>
 
-        <CardTitle className="font-display text-xl font-medium leading-snug tracking-tight text-foreground text-balance">
+        <h3 className="mt-2 line-clamp-2 font-display text-[19px] font-medium leading-[1.28] tracking-tight text-foreground transition-colors group-hover:text-primary">
           {name}
-        </CardTitle>
+        </h3>
 
-        {hasDistinctBenefits ? (
-          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-            {trimmedBenefits}
-          </p>
-        ) : null}
-      </CardHeader>
-
-      <CardContent className="px-5 pb-4 pt-1">
-        <p
-          className={cn(
-            "text-sm leading-relaxed text-muted-foreground/90",
-            hasDistinctBenefits ? "line-clamp-2" : "line-clamp-3"
-          )}
-        >
-          {description}
+        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+          {summaryText}
         </p>
-      </CardContent>
 
-      <CardFooter className="mt-auto border-t border-border/60 px-5 py-3.5">
-        <div className="flex w-full flex-wrap items-center justify-between gap-2">
+        {/* Hairline Price + CTA Footer aligned horizontally across grid */}
+        <div className="mt-auto flex items-center justify-between gap-3 border-t border-border/75 pt-4 mt-5">
           <p className="text-base font-semibold tabular-nums text-foreground">
             {formatKes(price)}
           </p>
@@ -131,7 +121,7 @@ export function ProductCard({
             }}
           />
         </div>
-      </CardFooter>
-    </Card>
+      </div>
+    </article>
   );
 }

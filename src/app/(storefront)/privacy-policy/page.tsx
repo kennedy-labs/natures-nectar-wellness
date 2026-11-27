@@ -27,8 +27,21 @@ export default function PrivacyPolicyPage() {
       summary="We respect your privacy and only collect the information needed to fulfill your orders, process M-Pesa payments, and coordinate delivery."
       lastUpdated="November 2026"
       whatsappMessage={createTopicInquiryMessage("your Privacy Policy")}
+      callout={{
+        title: "Kenya Data Protection Act",
+        body: "You can request access, correction, or deletion of your order contact details anytime via our WhatsApp care desk.",
+      }}
+      sections={[
+        { id: "information-we-collect", title: "1. Information we collect" },
+        { id: "how-we-use-data", title: "2. How we use your information" },
+        { id: "sharing-payment-security", title: "3. Sharing and payment security" },
+        { id: "your-rights", title: "4. Your rights under Kenyan law" },
+      ]}
     >
-      <section className="space-y-2">
+      <section
+        id="information-we-collect"
+        className="scroll-mt-24 space-y-2.5 border-b border-border/70 pb-7"
+      >
         <h2 className="font-display text-xl font-medium text-foreground">
           1. Information we collect
         </h2>
@@ -46,7 +59,10 @@ export default function PrivacyPolicyPage() {
         </p>
       </section>
 
-      <section className="space-y-2">
+      <section
+        id="how-we-use-data"
+        className="scroll-mt-24 space-y-2.5 border-b border-border/70 pb-7"
+      >
         <h2 className="font-display text-xl font-medium text-foreground">
           2. How we use your information
         </h2>
@@ -64,7 +80,10 @@ export default function PrivacyPolicyPage() {
         </ul>
       </section>
 
-      <section className="space-y-2">
+      <section
+        id="sharing-payment-security"
+        className="scroll-mt-24 space-y-2.5 border-b border-border/70 pb-7"
+      >
         <h2 className="font-display text-xl font-medium text-foreground">
           3. Sharing and payment security
         </h2>
@@ -76,7 +95,7 @@ export default function PrivacyPolicyPage() {
         </p>
       </section>
 
-      <section className="space-y-2">
+      <section id="your-rights" className="scroll-mt-24 space-y-2.5">
         <h2 className="font-display text-xl font-medium text-foreground">
           4. Your rights under Kenyan law
         </h2>

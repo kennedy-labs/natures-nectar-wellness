@@ -1,5 +1,5 @@
-import { DashboardPage } from "@/features/admin-v2/components/Dashboard/DashboardPage";
+import { permanentRedirect } from "next/navigation";
 
 export default function Admin2Page() {
-  return <DashboardPage />;
+  permanentRedirect("/admin");
 }

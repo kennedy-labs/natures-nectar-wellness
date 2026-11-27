@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Check, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useCartStore } from "@/store/cart.store";
 
 type Props = {
@@ -85,14 +87,15 @@ export function AddToCartButton({ product }: Props) {
       <Button
         type="button"
         size="sm"
-        className="min-h-10 px-4"
+        variant="ghost"
+        className="h-9 px-3 text-xs text-muted-foreground"
         disabled
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
         }}
       >
-        Out of stock
+        Unavailable
       </Button>
     );
   }
@@ -101,16 +104,29 @@ export function AddToCartButton({ product }: Props) {
     <Button
       type="button"
       size="sm"
-      className="min-h-10 px-4"
+      className={cn(
+        "h-9 gap-1.5 px-3.5 text-xs font-medium transition-colors duration-150",
+        feedback === "added"
+          ? "bg-primary text-primary-foreground"
+          : "border-border bg-background text-foreground hover:border-primary hover:bg-primary hover:text-primary-foreground"
+      )}
       disabled={isMaxed}
       variant={feedback === "added" ? "default" : "outline"}
       onClick={handleClick}
     >
-      {feedback === "added"
-        ? "✓ Added!"
-        : isMaxed
-          ? "Max in cart"
-          : "Add to cart"}
+      {feedback === "added" ? (
+        <>
+          <Check className="h-3.5 w-3.5" />
+          <span>Added</span>
+        </>
+      ) : isMaxed ? (
+        <span>Max in bag</span>
+      ) : (
+        <>
+          <Plus className="h-3.5 w-3.5" />
+          <span>Add</span>
+        </>
+      )}
     </Button>
   );
 }

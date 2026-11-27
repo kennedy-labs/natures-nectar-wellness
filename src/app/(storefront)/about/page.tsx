@@ -35,6 +35,27 @@ export const metadata: Metadata = {
   },
 };
 
+const CRAFT_PILLARS = [
+  {
+    number: "01",
+    eyebrow: "Ingredient Clarity",
+    title: "Pure botanical focus",
+    body: "Every product page clearly lists ingredients, preparation guidance, and practical everyday uses without inflated claims or cluttered marketing jargon.",
+  },
+  {
+    number: "02",
+    eyebrow: "Personal Guidance",
+    title: "Direct WhatsApp care",
+    body: "Whether you are comparing herbal teas, asking how to prepare resin, or checking stock before ordering, our team responds directly on WhatsApp.",
+  },
+  {
+    number: "03",
+    eyebrow: "Kenya-Wide Reach",
+    title: "Seamless M-Pesa & delivery",
+    body: "Pay easily via instant M-Pesa STK Push or Cash on Pickup, enjoy free Nairobi delivery and pickup, or coordinate transparent countrywide courier dispatch.",
+  },
+] as const;
+
 export default function AboutPage() {
   const whatsappUrl = getWhatsAppUrl(DEFAULT_STOREFRONT_WHATSAPP_MESSAGE);
 
@@ -67,7 +88,7 @@ export default function AboutPage() {
   };
 
   return (
-    <article className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
+    <article className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -89,9 +110,11 @@ export default function AboutPage() {
         <span className="font-medium text-foreground">About Us</span>
       </nav>
 
-      <header className="space-y-4 border-b border-border/80 pb-8">
-        <p className="text-sm font-medium text-primary">Our Story &amp; Craft</p>
-        <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl md:text-[2.6rem] md:leading-[1.15] text-balance">
+      <header className="space-y-4 pb-10">
+        <p className="text-xs font-medium tracking-[0.04em] text-primary uppercase">
+          Our Story &amp; Craft
+        </p>
+        <h1 className="max-w-3xl font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl md:text-[2.75rem] md:leading-[1.12] text-balance">
           Botanical simplicity crafted for everyday Kenyan wellness
         </h1>
         <p className="max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-[17px]">
@@ -101,109 +124,115 @@ export default function AboutPage() {
         </p>
       </header>
 
-      <div className="mt-8 grid gap-6 md:grid-cols-3">
-        <section className="space-y-2 rounded-xl border border-border/80 bg-card p-6 shadow-[0_1px_2px_rgba(24,42,32,0.04)]">
-          <p className="text-xs font-medium text-primary">01. Ingredient Clarity</p>
-          <h2 className="font-display text-xl font-medium text-foreground">
-            Pure botanical focus
-          </h2>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Every product page clearly lists ingredients, preparation guidance,
-            and practical everyday uses without inflated claims or cluttered
-            marketing jargon.
-          </p>
-        </section>
-
-        <section className="space-y-2 rounded-xl border border-border/80 bg-card p-6 shadow-[0_1px_2px_rgba(24,42,32,0.04)]">
-          <p className="text-xs font-medium text-primary">02. Personal Guidance</p>
-          <h2 className="font-display text-xl font-medium text-foreground">
-            Direct WhatsApp care
-          </h2>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Whether you are comparing herbal teas, asking how to prepare resin,
-            or checking stock before ordering, our team responds directly on
-            WhatsApp.
-          </p>
-        </section>
-
-        <section className="space-y-2 rounded-xl border border-border/80 bg-card p-6 shadow-[0_1px_2px_rgba(24,42,32,0.04)]">
-          <p className="text-xs font-medium text-primary">03. Kenya-Wide Reach</p>
-          <h2 className="font-display text-xl font-medium text-foreground">
-            Seamless M-Pesa &amp; delivery
-          </h2>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Pay easily via instant M-Pesa STK Push or Cash on Pickup, enjoy free
-            Nairobi delivery and pickup, or coordinate transparent countrywide
-            courier dispatch.
-          </p>
-        </section>
-      </div>
-
-      <section className="mt-10 space-y-4 rounded-xl border border-border/80 bg-card p-6 shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-8">
-        <h2 className="font-display text-2xl font-medium text-foreground">
-          How we approach quality and transparency
-        </h2>
-        <div className="space-y-3 text-sm leading-relaxed text-muted-foreground sm:text-[15px]">
-          <p>
-            Wellness routines work best when you know exactly what is in your
-            cup or jar. Rather than burying details in fine print, we highlight
-            straightforward botanical sourcing, traditional uses, and clear
-            stock availability across every item in our store.
-          </p>
-          <p>
-            Our herbal teas, raw honey, mineral resins, and supplements are
-            offered as natural everyday foods and botanical wellness products
-            and are not intended to diagnose, treat, cure, or replace licensed
-            medical care.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-3 pt-3 sm:flex-row sm:flex-wrap">
-          <Button asChild className="min-h-11 w-full sm:w-auto">
-            <Link href="/products">
-              Browse formulations
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="min-h-11 w-full sm:w-auto">
-            <Link href="/faq">Read customer FAQ</Link>
-          </Button>
-          {whatsappUrl ? (
-            <Button asChild variant="outline" className="min-h-11 w-full sm:w-auto">
-              <a href={whatsappUrl} rel="noopener noreferrer" target="_blank">
-                <MessageCircle className="h-4 w-4 text-primary" />
-                Chat on WhatsApp
-              </a>
-            </Button>
-          ) : null}
+      {/* Hairline-Divided 3-Pillar Craft Matrix */}
+      <section aria-label="Our craft pillars" className="border-y border-border">
+        <div className="grid divide-y divide-border md:grid-cols-3 md:divide-x md:divide-y-0">
+          {CRAFT_PILLARS.map((pillar) => (
+            <div
+              key={pillar.number}
+              className="space-y-2.5 py-6 md:px-6 md:first:pl-0 md:last:pr-0"
+            >
+              <p className="text-xs font-medium tracking-[0.04em] text-primary tabular-nums">
+                {pillar.number} · {pillar.eyebrow}
+              </p>
+              <h2 className="font-display text-xl font-medium text-foreground">
+                {pillar.title}
+              </h2>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {pillar.body}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 
+      {/* Editorial Transparency Section (Open Prose, 65ch measure) */}
+      <section className="grid gap-8 border-b border-border py-10 lg:grid-cols-12 lg:gap-12">
+        <div className="lg:col-span-4">
+          <p className="text-xs font-medium tracking-[0.04em] text-primary uppercase">
+            Quality Standards
+          </p>
+          <h2 className="mt-2 font-display text-2xl font-medium tracking-tight text-foreground">
+            How we approach quality and transparency
+          </h2>
+        </div>
+
+        <div className="space-y-5 lg:col-span-8">
+          <div className="max-w-[65ch] space-y-3.5 text-sm leading-relaxed text-muted-foreground sm:text-[15px]">
+            <p>
+              Wellness routines work best when you know exactly what is in your
+              cup or jar. Rather than burying details in fine print, we
+              highlight straightforward botanical sourcing, traditional uses, and
+              clear stock availability across every item in our store.
+            </p>
+            <p>
+              Our herbal teas, raw honey, mineral resins, and supplements are
+              offered as natural everyday foods and botanical wellness products
+              and are not intended to diagnose, treat, cure, or replace licensed
+              medical care.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2.5 pt-2 sm:flex-row sm:flex-wrap">
+            <Button asChild className="min-h-11 w-full sm:w-auto">
+              <Link href="/products">
+                Browse formulations
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              className="min-h-11 w-full bg-card sm:w-auto"
+            >
+              <Link href="/faq">Read customer FAQ</Link>
+            </Button>
+            {whatsappUrl ? (
+              <Button
+                asChild
+                variant="outline"
+                className="min-h-11 w-full bg-card sm:w-auto"
+              >
+                <a href={whatsappUrl} rel="noopener noreferrer" target="_blank">
+                  <MessageCircle className="h-4 w-4 text-primary" />
+                  Chat on WhatsApp
+                </a>
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      {/* Nairobi Flagship & Pickup Frame */}
       <section
         id="visit-us"
-        className="mt-10 grid gap-6 rounded-xl border border-border/80 bg-card p-6 shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-8 lg:grid-cols-12 lg:items-center"
+        className="mt-10 grid gap-6 overflow-hidden rounded-xl border border-border bg-card p-6 sm:p-8 lg:grid-cols-12 lg:items-center"
       >
         <div className="space-y-4 lg:col-span-5">
-          <p className="text-xs font-medium text-primary">Visit Our Nairobi Shop</p>
-          <h2 className="font-display text-2xl font-medium text-foreground">
+          <p className="text-xs font-medium tracking-[0.04em] text-primary uppercase">
+            Visit Our Nairobi Shop
+          </p>
+          <h2 className="font-display text-2xl font-medium tracking-tight text-foreground">
             Pickup &amp; in-person assistance
           </h2>
-          <div className="space-y-2.5 text-sm text-muted-foreground">
-            <p className="flex items-start gap-2">
+          <div className="space-y-3 border-t border-border/70 pt-4 text-sm text-muted-foreground">
+            <p className="flex items-start gap-2.5">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <span className="text-foreground">{BUSINESS_LOCATION.fullAddress}</span>
+              <span className="leading-relaxed text-foreground">
+                {BUSINESS_LOCATION.fullAddress}
+              </span>
             </p>
-            <p className="flex items-center gap-2">
+            <p className="flex items-center gap-2.5">
               <Phone className="h-4 w-4 shrink-0 text-primary" />
               <a
                 href={BUSINESS_LOCATION.phoneHref}
-                className="font-medium text-foreground underline-offset-4 hover:underline"
+                className="font-medium tabular-nums text-foreground underline-offset-4 hover:underline"
               >
                 {BUSINESS_LOCATION.phoneDisplay}
               </a>
             </p>
           </div>
-          <div className="flex flex-col gap-2.5 pt-1 sm:flex-row sm:flex-wrap">
+          <div className="pt-2">
             <Button asChild className="min-h-11 w-full sm:w-auto">
               <a
                 href={BUSINESS_LOCATION.googleMapsUrl}
@@ -217,7 +246,7 @@ export default function AboutPage() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-border/80 bg-muted/40 lg:col-span-7">
+        <div className="overflow-hidden rounded-lg border border-border bg-muted/40 lg:col-span-7">
           <iframe
             title="Nature's Nectar Wellness location at Kooni Mall, Tsavo Street, Nairobi"
             src={BUSINESS_LOCATION.googleMapsEmbedUrl}

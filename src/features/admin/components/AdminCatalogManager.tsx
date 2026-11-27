@@ -39,7 +39,11 @@ import { ApiClientError } from "@/lib/api-client";
 type AdminCatalogManagerProps = {
   initialCategories: Category[];
   initialProducts: Product[];
+  onCategoriesChange?: (categories: Category[]) => void;
+  onProductsChange?: (products: Product[]) => void;
 };
+
+const ADMIN_PRODUCTS_PAGE_SIZE = 24;
 
 type CatalogSection = "products" | "categories";
 type ProductFilter = "all" | "active" | "missing_photo" | "low_stock" | "inactive";
@@ -244,6 +248,8 @@ function validateCategoryForm(form: CategoryFormState): FieldErrors {
 export function AdminCatalogManager({
   initialCategories,
   initialProducts,
+  onCategoriesChange,
+  onProductsChange,
 }: AdminCatalogManagerProps) {
   const [section, setSection] = useState<CatalogSection>("products");
   const [categories, setCategories] = useState(initialCategories);
@@ -251,6 +257,23 @@ export function AdminCatalogManager({
 
   const [searchQuery, setSearchQuery] = useState("");
   const [productFilter, setProductFilter] = useState<ProductFilter>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  function updateProductsState(updater: (prev: Product[]) => Product[]) {
+    setProducts((prev) => {
+      const next = updater(prev);
+      onProductsChange?.(next);
+      return next;
+    });
+  }
+
+  function updateCategoriesState(updater: (prev: Category[]) => Category[]) {
+    setCategories((prev) => {
+      const next = updater(prev);
+      onCategoriesChange?.(next);
+      return next;
+    });
+  }
 
   const [isProductEditorOpen, setIsProductEditorOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
@@ -357,6 +380,16 @@ export function AdminCatalogManager({
     });
   }, [products, productFilter, searchQuery, categoryById]);
 
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredProducts.length / ADMIN_PRODUCTS_PAGE_SIZE)
+  );
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedProducts = useMemo(() => {
+    const start = (safeCurrentPage - 1) * ADMIN_PRODUCTS_PAGE_SIZE;
+    return filteredProducts.slice(start, start + ADMIN_PRODUCTS_PAGE_SIZE);
+  }, [filteredProducts, safeCurrentPage]);
+
   function clearProductFieldError(field: string) {
     setProductFieldErrors((prev) => {
       if (!prev[field]) return prev;
@@ -456,17 +489,24 @@ export function AdminCatalogManager({
 
     try {
       const wasEdit = Boolean(editingProductId);
+      const originalImage = editingProductId
+        ? (products.find((item) => item.id === editingProductId)?.image ?? "").trim()
+        : "";
+      const imageChanged = trimmedImage !== originalImage;
+
       const savedProduct = editingProductId
         ? await updateProductFromClient(editingProductId, {
             ...basePayload,
-            image: trimmedImage ? trimmedImage : null,
+            ...(imageChanged
+              ? { image: trimmedImage ? trimmedImage : null }
+              : {}),
           })
         : await createProductFromClient({
             ...basePayload,
             image: trimmedImage ? trimmedImage : undefined,
           });
 
-      setProducts((prev) =>
+      updateProductsState((prev) =>
         wasEdit
           ? prev.map((item) =>
               item.id === savedProduct.id ? savedProduct : item
@@ -501,7 +541,7 @@ export function AdminCatalogManager({
   async function handleArchiveProduct(product: Product) {
     setFeedback(null);
     const updated = await deleteProductFromClient(product.id);
-    setProducts((prev) =>
+    updateProductsState((prev) =>
       prev.map((item) => (item.id === updated.id ? updated : item))
     );
     setFeedback({
@@ -518,7 +558,7 @@ export function AdminCatalogManager({
       const updated = await updateProductFromClient(product.id, {
         isActive: true,
       });
-      setProducts((prev) =>
+      updateProductsState((prev) =>
         prev.map((item) => (item.id === updated.id ? updated : item))
       );
       setFeedback({
@@ -542,7 +582,7 @@ export function AdminCatalogManager({
   async function handlePermanentDeleteProduct(product: Product) {
     setFeedback(null);
     await permanentlyDeleteProductFromClient(product.id);
-    setProducts((prev) => prev.filter((item) => item.id !== product.id));
+    updateProductsState((prev) => prev.filter((item) => item.id !== product.id));
     if (editingProductId === product.id) {
       closeProductEditor();
     }
@@ -645,11 +685,18 @@ export function AdminCatalogManager({
 
     try {
       const wasEdit = Boolean(editingCategoryId);
+      const originalImage = editingCategoryId
+        ? (categories.find((item) => item.id === editingCategoryId)?.image ?? "").trim()
+        : "";
+      const imageChanged = trimmedImage !== originalImage;
+
       const savedCategory = editingCategoryId
         ? await updateCategoryFromClient(editingCategoryId, {
             name: categoryForm.name.trim(),
             description: normalizeOptional(categoryForm.description),
-            image: trimmedImage ? trimmedImage : null,
+            ...(imageChanged
+              ? { image: trimmedImage ? trimmedImage : null }
+              : {}),
           })
         : await createCategoryFromClient({
             name: categoryForm.name.trim(),
@@ -657,7 +704,7 @@ export function AdminCatalogManager({
             image: trimmedImage ? trimmedImage : undefined,
           });
 
-      setCategories((prev) => {
+      updateCategoriesState((prev) => {
         const next = wasEdit
           ? prev.map((item) =>
               item.id === savedCategory.id ? savedCategory : item
@@ -690,7 +737,9 @@ export function AdminCatalogManager({
 
     try {
       await deleteCategoryFromClient(category.id);
-      setCategories((prev) => prev.filter((item) => item.id !== category.id));
+      updateCategoriesState((prev) =>
+        prev.filter((item) => item.id !== category.id)
+      );
       setFeedback({
         type: "success",
         text: `${category.name} deleted.`,
@@ -712,14 +761,14 @@ export function AdminCatalogManager({
     <div className="space-y-5">
       {/* Sub-section Switcher */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-grid grid-cols-2 rounded-lg border border-border/80 bg-white p-1 sm:w-auto">
+        <div className="inline-grid grid-cols-2 rounded-lg border border-border bg-white p-1 sm:w-auto">
           <button
             type="button"
             onClick={() => {
               setSection("products");
               setFeedback(null);
             }}
-            className={`min-h-10 rounded-md px-4 text-sm font-medium transition-colors whitespace-nowrap ${
+            className={`min-h-10 rounded-md px-4 text-sm font-medium tabular-nums transition-colors whitespace-nowrap ${
               section === "products"
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -733,7 +782,7 @@ export function AdminCatalogManager({
               setSection("categories");
               setFeedback(null);
             }}
-            className={`min-h-10 rounded-md px-4 text-sm font-medium transition-colors whitespace-nowrap ${
+            className={`min-h-10 rounded-md px-4 text-sm font-medium tabular-nums transition-colors whitespace-nowrap ${
               section === "categories"
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -806,10 +855,11 @@ export function AdminCatalogManager({
               categories={categories}
               existingProducts={products}
               onProductCreated={(created) => {
-                setProducts((prev) => [created, ...prev]);
+                updateProductsState((prev) => [created, ...prev]);
               }}
               onComplete={({ savedCount, failedCount }) => {
                 setProductFilter("inactive");
+                setCurrentPage(1);
                 if (failedCount === 0) {
                   setIsBulkUploadOpen(false);
                   setFeedback({
@@ -828,10 +878,10 @@ export function AdminCatalogManager({
           ) : null}
 
           {isProductEditorOpen ? (
-            <div className="rounded-xl border border-border/80 bg-white p-5 sm:p-6">
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-4">
+            <div className="rounded-xl border border-border bg-white p-5 sm:p-6">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
                 <div>
-                  <h2 className="text-lg font-semibold">
+                  <h2 className="font-display text-xl font-medium text-foreground">
                     {editingProductId ? "Edit product" : "Create new product"}
                   </h2>
                   <p className="text-xs text-muted-foreground">
@@ -1212,20 +1262,23 @@ export function AdminCatalogManager({
           ) : null}
 
           {/* Search & Filters */}
-          <div className="space-y-3 rounded-xl border border-border/80 bg-white p-4">
+          <div className="space-y-3 rounded-xl border border-border bg-white p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="relative flex-1 sm:max-w-xs">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   type="search"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   placeholder="Search products..."
-                  className="h-10 pl-9"
+                  className="h-10 bg-white pl-9"
                 />
               </div>
 
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {(
                   [
                     { key: "all", label: "All" },
@@ -1238,11 +1291,14 @@ export function AdminCatalogManager({
                   <button
                     key={tab.key}
                     type="button"
-                    onClick={() => setProductFilter(tab.key)}
-                    className={`min-h-9 rounded-md px-3 text-xs font-medium tabular-nums transition-colors whitespace-nowrap ${
+                    onClick={() => {
+                      setProductFilter(tab.key);
+                      setCurrentPage(1);
+                    }}
+                    className={`min-h-9 shrink-0 rounded-md px-3 text-xs font-medium tabular-nums transition-colors whitespace-nowrap ${
                       productFilter === tab.key
-                        ? "bg-foreground text-background"
-                        : "bg-muted/60 text-muted-foreground hover:text-foreground"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-[#F6F7F5] hover:text-foreground"
                     }`}
                   >
                     {tab.label} ({filterCounts[tab.key]})
@@ -1251,7 +1307,7 @@ export function AdminCatalogManager({
               </div>
             </div>
 
-            <p className="text-xs text-muted-foreground">
+            <p className="border-t border-border/70 pt-2.5 text-xs text-muted-foreground">
               Press and hold any product row (or right-click) to archive,
               unarchive, or delete permanently.
             </p>
@@ -1279,48 +1335,51 @@ export function AdminCatalogManager({
               No products match the current search or filter.
             </div>
           ) : (
-            <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/80 bg-white">
-              {filteredProducts.map((product) => {
-                const status = getInventoryStatus(product.stockQuantity);
-                const category = categoryById.get(product.categoryId);
-                const isPressing = pressingProductId === product.id;
+            <div className="space-y-4">
+              <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-white">
+                {paginatedProducts.map((product) => {
+                  const status = getInventoryStatus(product.stockQuantity);
+                  const category = categoryById.get(product.categoryId);
+                  const isPressing = pressingProductId === product.id;
 
-                return (
-                  <div
-                    key={product.id}
-                    onPointerDown={(e) => startLongPress(e, product)}
-                    onPointerMove={checkLongPressMove}
-                    onPointerUp={clearLongPressTimer}
-                    onPointerCancel={clearLongPressTimer}
-                    onPointerLeave={clearLongPressTimer}
-                    onContextMenu={(e) => {
-                      const target = e.target as HTMLElement | null;
-                      if (target?.closest("button, a, input, select, textarea")) {
-                        return;
-                      }
-                      e.preventDefault();
-                      clearLongPressTimer();
-                      setActionProduct(product);
-                    }}
-                    className={`flex select-none touch-pan-y flex-col gap-4 p-4 transition-colors sm:flex-row sm:items-center sm:justify-between ${
-                      isPressing ? "bg-muted/50" : "hover:bg-muted/20"
-                    }`}
-                  >
-                    <div className="flex min-w-0 items-start gap-3.5 sm:items-center">
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/30">
-                        {product.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={product.image}
-                            alt={product.name}
-                            draggable={false}
-                            referrerPolicy="no-referrer"
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <ImageOff className="h-5 w-5 text-muted-foreground/60" />
-                        )}
-                      </div>
+                  return (
+                    <div
+                      key={product.id}
+                      onPointerDown={(e) => startLongPress(e, product)}
+                      onPointerMove={checkLongPressMove}
+                      onPointerUp={clearLongPressTimer}
+                      onPointerCancel={clearLongPressTimer}
+                      onPointerLeave={clearLongPressTimer}
+                      onContextMenu={(e) => {
+                        const target = e.target as HTMLElement | null;
+                        if (target?.closest("button, a, input, select, textarea")) {
+                          return;
+                        }
+                        e.preventDefault();
+                        clearLongPressTimer();
+                        setActionProduct(product);
+                      }}
+                      className={`flex select-none touch-pan-y flex-col gap-4 p-4 transition-colors sm:flex-row sm:items-center sm:justify-between ${
+                        isPressing ? "bg-muted/50" : "hover:bg-[#F6F7F5]/60"
+                      }`}
+                    >
+                      <div className="flex min-w-0 items-start gap-3.5 sm:items-center">
+                        <div className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-[#F7F5F0]">
+                          {product.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={product.image}
+                              alt={product.name}
+                              loading="lazy"
+                              decoding="async"
+                              draggable={false}
+                              referrerPolicy="no-referrer"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <ImageOff className="h-4 w-4 text-muted-foreground/60" />
+                          )}
+                        </div>
 
                       <div className="min-w-0 space-y-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -1398,6 +1457,52 @@ export function AdminCatalogManager({
                   </div>
                 );
               })}
+              </div>
+
+              {totalPages > 1 ? (
+                <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs text-muted-foreground tabular-nums">
+                    Showing{" "}
+                    {(safeCurrentPage - 1) * ADMIN_PRODUCTS_PAGE_SIZE + 1}–
+                    {Math.min(
+                      safeCurrentPage * ADMIN_PRODUCTS_PAGE_SIZE,
+                      filteredProducts.length
+                    )}{" "}
+                    of {filteredProducts.length} products
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={safeCurrentPage <= 1}
+                      onClick={() => {
+                        setCurrentPage((p) => Math.max(1, p - 1));
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="min-h-9"
+                    >
+                      Previous
+                    </Button>
+                    <span className="px-2 text-xs font-medium tabular-nums text-muted-foreground">
+                      Page {safeCurrentPage} of {totalPages}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => {
+                        setCurrentPage((p) => Math.min(totalPages, p + 1));
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="min-h-9"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -1417,10 +1522,10 @@ export function AdminCatalogManager({
       ) : (
         <div className="space-y-5">
           {isCategoryEditorOpen ? (
-            <div className="rounded-xl border border-border/80 bg-white p-5 sm:p-6">
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-4">
+            <div className="rounded-xl border border-border bg-white p-5 sm:p-6">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
                 <div>
-                  <h2 className="text-lg font-semibold">
+                  <h2 className="font-display text-xl font-medium text-foreground">
                     {editingCategoryId
                       ? "Edit category"
                       : "Create new category"}
@@ -1552,7 +1657,7 @@ export function AdminCatalogManager({
               No categories yet. Add your first category above.
             </div>
           ) : (
-            <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/80 bg-white">
+            <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-white">
               {categories.map((category) => {
                 const count = productCountByCategory.get(category.id) ?? 0;
 
@@ -1562,12 +1667,14 @@ export function AdminCatalogManager({
                     className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="flex min-w-0 items-center gap-3.5">
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/30">
+                      <div className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-[#F7F5F0]">
                         {category.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={category.image}
                             alt={category.name}
+                            loading="lazy"
+                            decoding="async"
                             referrerPolicy="no-referrer"
                             className="h-full w-full object-cover"
                           />

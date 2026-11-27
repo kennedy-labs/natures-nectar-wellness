@@ -27,8 +27,22 @@ export default function TermsPage() {
       summary="Clear terms covering product pricing, order confirmation, payments, and responsible use of our natural wellness formulations."
       lastUpdated="November 2026"
       whatsappMessage={createTopicInquiryMessage("your Terms & Conditions")}
+      highlights={[
+        { label: "Currency", value: "Kenyan Shillings (KES)" },
+        { label: "Payment Hold", value: "Auto-expires if unpaid" },
+        { label: "Governing Law", value: "Republic of Kenya" },
+      ]}
+      sections={[
+        { id: "pricing-availability", title: "1. Pricing and availability" },
+        { id: "order-acceptance", title: "2. Order acceptance and payments" },
+        { id: "wellness-disclaimer", title: "3. Herbal wellness disclaimer" },
+        { id: "governing-law", title: "4. Governing law" },
+      ]}
     >
-      <section className="space-y-2">
+      <section
+        id="pricing-availability"
+        className="scroll-mt-24 space-y-2.5 border-b border-border/70 pb-7"
+      >
         <h2 className="font-display text-xl font-medium text-foreground">
           1. Pricing and availability
         </h2>
@@ -40,7 +54,10 @@ export default function TermsPage() {
         </p>
       </section>
 
-      <section className="space-y-2">
+      <section
+        id="order-acceptance"
+        className="scroll-mt-24 space-y-2.5 border-b border-border/70 pb-7"
+      >
         <h2 className="font-display text-xl font-medium text-foreground">
           2. Order acceptance and payments
         </h2>
@@ -53,7 +70,10 @@ export default function TermsPage() {
         </p>
       </section>
 
-      <section className="space-y-2">
+      <section
+        id="wellness-disclaimer"
+        className="scroll-mt-24 space-y-2.5 border-b border-border/70 pb-7"
+      >
         <h2 className="font-display text-xl font-medium text-foreground">
           3. Herbal wellness disclaimer
         </h2>
@@ -67,7 +87,7 @@ export default function TermsPage() {
         </p>
       </section>
 
-      <section className="space-y-2">
+      <section id="governing-law" className="scroll-mt-24 space-y-2.5">
         <h2 className="font-display text-xl font-medium text-foreground">
           4. Governing law
         </h2>

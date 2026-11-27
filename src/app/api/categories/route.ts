@@ -11,7 +11,11 @@ export async function GET() {
   try {
     const categories = await getStorefrontCategories();
 
-    return apiOk(categories);
+    return apiOk(categories, {
+      headers: {
+        "Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
+      },
+    });
   } catch (error) {
     return apiFail(error);
   }

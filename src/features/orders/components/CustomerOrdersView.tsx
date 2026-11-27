@@ -232,7 +232,7 @@ export function CustomerOrdersView({
     setSelectedOrderId(orderId);
     setNotice(null);
     const stageEl = document.getElementById("featured-order-stage");
-    if (stageEl) {
+    if (stageEl && window.innerWidth < 1024) {
       const rect = stageEl.getBoundingClientRect();
       if (rect.top < 0 || rect.top > window.innerHeight * 0.45) {
         stageEl.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -297,7 +297,7 @@ export function CustomerOrdersView({
     return (
       <form
         onSubmit={handleLookupSubmit}
-        className="rounded-2xl border border-border/80 bg-card p-5 text-left shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-6"
+        className="rounded-xl border border-border bg-card p-5 text-left sm:p-6"
       >
         <div className="space-y-1">
           <h2
@@ -309,8 +309,8 @@ export function CustomerOrdersView({
             Find an order from another device
           </h2>
           <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
-            Enter your order number and checkout phone number to view live
-            delivery progress and receipt details.
+            Enter your order number and checkout phone number to inspect live
+            fulfillment and receipt details.
           </p>
         </div>
 
@@ -329,7 +329,7 @@ export function CustomerOrdersView({
               onChange={(e) => setLookupOrderNumber(e.target.value)}
               placeholder="e.g. NNW-MI4K9-AB12"
               autoComplete="off"
-              className="h-11 w-full rounded-md border border-input bg-background px-3 font-mono text-base uppercase shadow-xs transition-colors placeholder:font-sans placeholder:normal-case placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-10 md:text-sm"
+              className="h-11 w-full rounded-md border border-input bg-background px-3 font-mono text-base uppercase transition-colors placeholder:font-sans placeholder:normal-case placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-10 md:text-sm"
             />
           </div>
 
@@ -348,7 +348,7 @@ export function CustomerOrdersView({
               value={lookupPhone}
               onChange={(e) => setLookupPhone(e.target.value)}
               placeholder="e.g. 0712 345 678"
-              className="h-11 w-full rounded-md border border-input bg-background px-3 text-base shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-10 md:text-sm"
+              className="h-11 w-full rounded-md border border-input bg-background px-3 text-base tabular-nums transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-10 md:text-sm"
             />
           </div>
         </div>
@@ -363,7 +363,7 @@ export function CustomerOrdersView({
           <Button
             type="submit"
             disabled={lookupLoading}
-            className="min-h-11 w-full gap-1.5 sm:w-auto"
+            className="min-h-10 w-full gap-1.5 sm:w-auto"
           >
             <Search className="h-4 w-4" />
             {lookupLoading ? "Checking order..." : "Find order"}
@@ -376,7 +376,7 @@ export function CustomerOrdersView({
                 setLookupOpen(false);
                 setLookupError(null);
               }}
-              className="min-h-11 w-full sm:w-auto"
+              className="min-h-10 w-full sm:w-auto"
             >
               Cancel
             </Button>
@@ -392,29 +392,29 @@ export function CustomerOrdersView({
 
   if (savedRefs.length === 0) {
     return (
-      <div className="space-y-5">
+      <div className="mx-auto max-w-2xl space-y-5">
         {notice ? (
-          <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/90 p-4 text-sm text-emerald-950">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
             {notice}
           </div>
         ) : null}
 
         {renderLookupCard(false)}
 
-        <div className="rounded-2xl border border-border/80 bg-card p-6 text-center shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-8">
-          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <div className="rounded-xl border border-border bg-card p-6 text-center sm:p-8">
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-background text-primary">
             <ShoppingBag className="h-5 w-5" />
           </div>
           <h3 className="mt-3 font-display text-lg font-medium text-foreground">
             New to Nature&apos;s Nectar?
           </h3>
           <p className="mx-auto mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
-            Orders placed on this browser also appear here automatically.
+            Orders placed on this device appear here automatically.
           </p>
           <Button
             asChild
             variant="outline"
-            className="mt-5 min-h-11 w-full sm:w-auto"
+            className="mt-5 min-h-10 w-full sm:w-auto"
           >
             <Link href="/products">Browse products</Link>
           </Button>
@@ -429,23 +429,23 @@ export function CustomerOrdersView({
 
   if (orders.length === 0) {
     return (
-      <div className="space-y-5">
+      <div className="mx-auto max-w-2xl space-y-5">
         {notice ? (
-          <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/90 p-4 text-sm text-emerald-950">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
             {notice}
           </div>
         ) : null}
 
         {renderLookupCard(false)}
 
-        <div className="rounded-2xl border border-border/80 bg-card p-6 text-center shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-8">
+        <div className="rounded-xl border border-border bg-card p-6 text-center sm:p-8">
           <p className="text-sm leading-relaxed text-muted-foreground">
             No confirmed orders were found for this browser yet.
           </p>
           <Button
             asChild
             variant="outline"
-            className="mt-4 min-h-11 w-full sm:w-auto"
+            className="mt-4 min-h-10 w-full sm:w-auto"
           >
             <Link href="/products">Browse products</Link>
           </Button>
@@ -454,13 +454,15 @@ export function CustomerOrdersView({
     );
   }
 
+  const hasMultipleOrders = orders.length > 1;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground tabular-nums">
           {orders.length === 1
-            ? "Showing your most recent order below."
-            : `Showing ${featuredOrder?.orderNumber ?? "latest order"} · ${orders.length} saved on this browser`}
+            ? "Showing your latest order below."
+            : `Viewing ${featuredOrder?.orderNumber ?? "latest order"} · ${orders.length} saved on this device`}
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -472,7 +474,7 @@ export function CustomerOrdersView({
               setLookupOpen((open) => !open);
               setLookupError(null);
             }}
-            className="min-h-10 shrink-0 gap-1.5"
+            className="min-h-9 shrink-0 gap-1.5 bg-card"
           >
             <Search className="h-3.5 w-3.5" />
             Find another order
@@ -483,7 +485,7 @@ export function CustomerOrdersView({
             size="sm"
             disabled={refreshing}
             onClick={handleRefresh}
-            className="min-h-10 shrink-0 gap-1.5"
+            className="min-h-9 shrink-0 gap-1.5 bg-card"
           >
             <RefreshCw
               className={cn("h-3.5 w-3.5", refreshing && "animate-spin")}
@@ -496,31 +498,44 @@ export function CustomerOrdersView({
       {lookupOpen ? renderLookupCard(true) : null}
 
       {notice ? (
-        <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/90 p-4 text-sm text-emerald-950">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
           {notice}
         </div>
       ) : null}
 
       {error ? (
-        <div className="rounded-xl border border-destructive/30 bg-rose-50/90 p-4 text-sm text-destructive">
+        <div className="rounded-lg border border-destructive/30 bg-rose-50 p-4 text-sm text-destructive">
           {error}
         </div>
       ) : null}
 
-      {featuredOrder ? (
+      {hasMultipleOrders ? (
+        <div className="grid items-start gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-4 lg:sticky lg:top-24">
+            <OrderHistoryList
+              orders={orders}
+              selectedOrderId={featuredOrder?.id ?? null}
+              onSelectOrder={handleSelectHistoryOrder}
+              onClearClosedOrders={handleClearClosedOrders}
+            />
+          </div>
+          <div className="lg:col-span-8">
+            {featuredOrder ? (
+              <FeaturedOrderStage
+                order={featuredOrder}
+                onRequestCancel={(target) => setCancelTargetOrder(target)}
+                onRemoveClosedOrder={handleRemoveClosedOrder}
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : featuredOrder ? (
         <FeaturedOrderStage
           order={featuredOrder}
           onRequestCancel={(target) => setCancelTargetOrder(target)}
           onRemoveClosedOrder={handleRemoveClosedOrder}
         />
       ) : null}
-
-      <OrderHistoryList
-        orders={orders}
-        selectedOrderId={featuredOrder?.id ?? null}
-        onSelectOrder={handleSelectHistoryOrder}
-        onClearClosedOrders={handleClearClosedOrders}
-      />
 
       <CancelOrderDialog
         order={cancelTargetOrder}

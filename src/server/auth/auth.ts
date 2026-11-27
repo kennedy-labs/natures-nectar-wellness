@@ -18,7 +18,7 @@ const trustedOrigins = Array.from(
 );
 
 export const auth = betterAuth({
-  baseURL: serverEnv.BETTER_AUTH_URL,
+  baseURL: process.env.APP_URL || getSiteUrl() || serverEnv.BETTER_AUTH_URL,
   trustedOrigins,
   secret: serverEnv.BETTER_AUTH_SECRET,
   database: prismaAdapter(db, {

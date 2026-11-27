@@ -6,7 +6,11 @@ import { WhatsAppPageContext } from "@/components/layout/WhatsAppContext";
 import { DEFAULT_OG_IMAGE, getAbsoluteUrl } from "@/config/site";
 import { ProductGrid } from "@/features/products/components/ProductGrid";
 import { createCategoryInquiryMessage } from "@/features/whatsapp/utils/whatsapp.utils";
-import { getCategoryBySlug } from "@/server/services/category.service";
+import { cn } from "@/lib/utils";
+import {
+  getCategoryBySlug,
+  getStorefrontCategories,
+} from "@/server/services/category.service";
 import { getProductsByCategorySlug } from "@/server/services/product.service";
 
 export const revalidate = 60;
@@ -63,13 +67,19 @@ export async function generateMetadata(
 
 export default async function CategoryPage(props: CategoryPageProps) {
   const params = await props.params;
-  const category = await getCategoryBySlug(params.slug);
+  const [category, allCategories] = await Promise.all([
+    getCategoryBySlug(params.slug),
+    getStorefrontCategories(),
+  ]);
 
   if (!category) {
     notFound();
   }
 
   const products = await getProductsByCategorySlug(category.slug);
+  const siblingCategories = allCategories.filter(
+    (item) => item.slug !== category.slug
+  );
 
   const categorySchema = {
     "@context": "https://schema.org",
@@ -91,30 +101,69 @@ export default async function CategoryPage(props: CategoryPageProps) {
           __html: JSON.stringify(categorySchema),
         }}
       />
-      <div className="mb-8 max-w-2xl space-y-2 border-b border-border/80 pb-6 sm:mb-10">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Link href="/categories" className="hover:text-foreground hover:underline underline-offset-4">
-            Categories
-          </Link>
-          <span aria-hidden="true">/</span>
-          <span className="text-primary font-medium">{category.name}</span>
+
+      <header className="mb-8 space-y-5 border-b border-border pb-6 sm:mb-10">
+        <div className="max-w-2xl space-y-2">
+          <nav
+            aria-label="Breadcrumb"
+            className="flex items-center gap-2 text-xs text-muted-foreground"
+          >
+            <Link
+              href="/categories"
+              className="underline-offset-4 hover:text-foreground hover:underline"
+            >
+              Categories
+            </Link>
+            <span aria-hidden="true">/</span>
+            <span className="font-medium text-primary">{category.name}</span>
+          </nav>
+
+          <div className="flex flex-wrap items-baseline gap-3">
+            <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
+              {category.name}
+            </h1>
+            <span className="text-sm text-muted-foreground tabular-nums">
+              {products.length}{" "}
+              {products.length === 1 ? "formulation" : "formulations"}
+            </span>
+          </div>
+
+          {category.description ? (
+            <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
+              {category.description}
+            </p>
+          ) : null}
         </div>
-        <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
-          {category.name}
-        </h1>
-        {category.description ? (
-          <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
-            {category.description}
-          </p>
+
+        {/* Sibling Collections Switcher */}
+        {siblingCategories.length > 0 ? (
+          <div className="flex items-center gap-2 overflow-x-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <span className="shrink-0 text-xs font-medium text-muted-foreground">
+              Other collections:
+            </span>
+            {siblingCategories.map((sibling) => (
+              <Link
+                key={sibling.id}
+                href={`/categories/${sibling.slug}`}
+                className={cn(
+                  "inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-md border border-border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                )}
+              >
+                {sibling.name}
+              </Link>
+            ))}
+          </div>
         ) : null}
-      </div>
+      </header>
 
       {products.length > 0 ? (
         <ProductGrid products={products} />
       ) : (
-        <p className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">
-          No products in this category yet.
-        </p>
+        <div className="rounded-xl border border-border bg-card p-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            No products in this collection yet.
+          </p>
+        </div>
       )}
     </section>
   );

@@ -143,7 +143,7 @@ export function FeaturedOrderStage({
     <section
       id="featured-order-stage"
       aria-label={`Order ${order.orderNumber} details`}
-      className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_1px_3px_rgba(24,42,32,0.05)] transition-opacity duration-200"
+      className="overflow-hidden rounded-xl border border-border bg-card transition-opacity duration-200"
     >
       {/* Semantic Status Header Band */}
       <div

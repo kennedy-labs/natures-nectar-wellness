@@ -21,6 +21,8 @@ type NominatimResponse = {
   address?: NominatimAddress;
 };
 
+const locationCache = new Map<string, { label: string | null; timestamp: number }>();
+
 function formatReadableLocation(data: NominatimResponse): string | null {
   const addr = data.address;
   if (addr) {
@@ -78,7 +80,18 @@ export async function GET(req: Request) {
 
     const formattedLat = lat.toFixed(6);
     const formattedLng = lng.toFixed(6);
+    const cacheKey = `${lat.toFixed(4)}_${lng.toFixed(4)}`;
     const mapUrl = `https://maps.google.com/?q=${formattedLat},${formattedLng}`;
+
+    const cached = locationCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 3600_000) {
+      return apiOk({
+        label: cached.label,
+        mapUrl,
+        latitude: Number(formattedLat),
+        longitude: Number(formattedLng),
+      });
+    }
 
     let label: string | null = null;
 
@@ -102,6 +115,7 @@ export async function GET(req: Request) {
       if (upstreamRes.ok) {
         const json = (await upstreamRes.json()) as NominatimResponse;
         label = formatReadableLocation(json);
+        locationCache.set(cacheKey, { label, timestamp: Date.now() });
       }
     } catch {
       // Graceful fallback: return mapUrl even if reverse geocoder times out

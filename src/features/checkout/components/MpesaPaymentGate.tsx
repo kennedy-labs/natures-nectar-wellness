@@ -192,7 +192,6 @@ export function MpesaPaymentGate({
     setStkError(null);
 
     try {
-      // Final status check in case customer actually just completed PIN entry
       const status = await pollMpesaPaymentStatus({ orderId, orderNumber });
       if (status.paymentStatus === "VERIFIED") {
         onVerified({
@@ -212,7 +211,7 @@ export function MpesaPaymentGate({
   }
 
   return (
-    <div className="mx-auto max-w-lg rounded-2xl border border-border/80 bg-card p-5 shadow-[0_1px_2px_rgba(24,42,32,0.04)] sm:p-8">
+    <div className="mx-auto max-w-lg rounded-xl border border-border bg-card p-6 sm:p-8">
       <WhatsAppPageContext
         message={createMpesaPendingMessage({ orderNumber, customerName })}
       />
@@ -220,31 +219,30 @@ export function MpesaPaymentGate({
         <div className="space-y-2 text-center">
           <div className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
             <ShieldCheck className="h-3.5 w-3.5" />
-            <span>Payment required to complete order</span>
+            <span>Awaiting M-Pesa PIN confirmation</span>
           </div>
 
           <h2 className="font-display text-2xl font-medium tracking-tight text-foreground sm:text-3xl">
             {stkSending
               ? "Opening M-Pesa..."
               : stkPolling
-                ? "Enter M-Pesa PIN on your phone"
+                ? "Check your handset for M-Pesa"
                 : "Complete M-Pesa payment"}
           </h2>
 
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Your order is <strong>not confirmed yet</strong> and your cart stays
-            saved until Safaricom confirms your M-Pesa payment.
+            Your bag stays reserved until Safaricom confirms your payment.
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 rounded-xl border border-border/80 bg-muted/45 p-3.5 text-center sm:gap-4 sm:p-4">
-          <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">Checkout reference</p>
+        <div className="grid grid-cols-2 divide-x divide-border rounded-lg border border-border bg-background text-center">
+          <div className="min-w-0 p-3.5">
+            <p className="text-xs text-muted-foreground">Reference</p>
             <p className="mt-1 break-all font-mono text-sm font-semibold text-foreground">
               {orderNumber}
             </p>
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 p-3.5">
             <p className="text-xs text-muted-foreground">Amount due</p>
             <p className="mt-1 text-base font-semibold tabular-nums text-foreground">
               {formatKes(amount)}
@@ -252,9 +250,9 @@ export function MpesaPaymentGate({
           </div>
         </div>
 
-        <div className="space-y-4 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:p-5">
+        <div className="space-y-4 rounded-lg border border-primary/25 bg-primary/[0.04] p-4 sm:p-5">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 font-medium text-foreground">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <Smartphone className="h-4 w-4 text-primary" />
               <span>Safaricom M-Pesa Prompt</span>
             </div>
@@ -264,25 +262,25 @@ export function MpesaPaymentGate({
           </div>
 
           {stkSending ? (
-            <div className="flex items-center gap-3 rounded-lg bg-background p-3.5 text-sm">
+            <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3.5 text-sm">
               <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
               <span>
-                Sending M-Pesa PIN menu to <strong>{phone}</strong>...
+                Sending M-Pesa PIN menu to <strong className="tabular-nums">{phone}</strong>...
               </span>
             </div>
           ) : null}
 
           {stkPolling ? (
-            <div className="space-y-3 rounded-lg bg-background p-4 text-sm">
+            <div className="space-y-3 rounded-md border border-border bg-card p-4 text-sm">
               <div className="flex items-start gap-3">
                 <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary" />
                 <div className="space-y-1">
                   <p className="font-medium text-foreground">
-                    M-Pesa menu sent to {phone}
+                    M-Pesa menu sent to <span className="tabular-nums">{phone}</span>
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs leading-relaxed text-muted-foreground">
                     {stkInfo ||
-                      `Approve ${formatKes(amount)} by entering your M-Pesa PIN. Your order submits automatically as soon as Safaricom confirms.`}
+                      `Approve ${formatKes(amount)} by entering your M-Pesa PIN. Your receipt opens automatically once confirmed.`}
                   </p>
                 </div>
               </div>
@@ -291,7 +289,7 @@ export function MpesaPaymentGate({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="min-h-10 w-full"
+                className="min-h-10 w-full bg-background"
                 onClick={handleCheckStatus}
               >
                 <RefreshCw className="mr-2 h-3.5 w-3.5" />
@@ -303,7 +301,7 @@ export function MpesaPaymentGate({
           {!stkSending && !stkPolling ? (
             <div className="space-y-3">
               {stkInfo ? (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-background p-2.5 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-card p-2.5 text-xs">
                   <span>{stkInfo}</span>
                   <button
                     type="button"
@@ -323,15 +321,15 @@ export function MpesaPaymentGate({
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="0712 345 678"
-                  className="bg-background"
+                  className="bg-card tabular-nums"
                 />
                 <Button
                   type="button"
                   onClick={handleRetryStk}
                   disabled={!phone.trim() || cancelling}
-                  className="min-h-11 shrink-0"
+                  className="min-h-10 shrink-0"
                 >
-                  Retry M-Pesa ({formatKes(amount)})
+                  Retry ({formatKes(amount)})
                 </Button>
               </div>
             </div>
@@ -345,7 +343,7 @@ export function MpesaPaymentGate({
         <Button
           type="button"
           variant="outline"
-          className="h-auto min-h-11 w-full whitespace-normal py-2.5 text-center leading-snug"
+          className="h-auto min-h-11 w-full whitespace-normal bg-background py-2.5 text-center text-xs leading-snug"
           disabled={cancelling || stkSending}
           onClick={handleBackToCheckout}
         >
@@ -357,7 +355,7 @@ export function MpesaPaymentGate({
           ) : (
             <>
               <ArrowLeft className="mr-2 h-4 w-4 shrink-0" />
-              Cancel & return to checkout (switch to Cash on Pickup)
+              Cancel &amp; return to checkout (switch to Cash on Pickup)
             </>
           )}
         </Button>

@@ -4,7 +4,7 @@ export function AdminOverviewSkeleton() {
   return (
     <div
       aria-label="Loading admin dashboard"
-      className="min-h-screen bg-[#F7F8F6] text-foreground"
+      className="min-h-screen bg-[#F6F7F5] text-foreground"
     >
       {/* Desktop Sidebar Skeleton */}
       <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-60 lg:flex-col lg:border-r lg:border-border/80 lg:bg-white">
@@ -173,24 +173,34 @@ export function AdminLoginSkeleton() {
   return (
     <main
       aria-label="Loading sign in"
-      className="flex min-h-screen items-center justify-center bg-[#F7F8F6] px-4 py-10"
+      className="flex min-h-screen items-center justify-center bg-[#F6F7F5] px-4 py-10 sm:px-6"
     >
-      <div className="w-full max-w-md space-y-6 rounded-xl border border-border/80 bg-white p-6 sm:p-8">
-        <div className="space-y-2">
-          <Skeleton className="h-10 w-10 rounded-lg" />
-          <Skeleton className="h-7 w-40" />
-          <Skeleton className="h-4 w-full" />
+      <div className="grid w-full max-w-4xl overflow-hidden rounded-xl border border-border bg-white lg:grid-cols-12">
+        <div className="space-y-6 bg-[#1F4E37] p-7 sm:p-10 lg:col-span-5">
+          <Skeleton className="h-9 w-9 rounded-md bg-white/15" />
+          <div className="space-y-2.5">
+            <Skeleton className="h-7 w-48 bg-white/15" />
+            <Skeleton className="h-4 w-full bg-white/10" />
+            <Skeleton className="h-4 w-4/5 bg-white/10" />
+          </div>
         </div>
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Skeleton className="h-4 w-24" />
+        <div className="space-y-6 p-6 sm:p-10 lg:col-span-7">
+          <div className="space-y-2">
+            <Skeleton className="h-3.5 w-24" />
+            <Skeleton className="h-7 w-40" />
+            <Skeleton className="h-4 w-64 max-w-full" />
+          </div>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-11 w-full rounded-md" />
+            </div>
+            <div className="space-y-1.5">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-11 w-full rounded-md" />
+            </div>
             <Skeleton className="h-11 w-full rounded-md" />
           </div>
-          <div className="space-y-1.5">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-11 w-full rounded-md" />
-          </div>
-          <Skeleton className="h-11 w-full rounded-md" />
         </div>
       </div>
     </main>

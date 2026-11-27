@@ -6,6 +6,7 @@ import {
   updateCategorySchema,
 } from "@/features/categories/validations/category.validation";
 import { createCategorySlug } from "@/features/categories/utils/category.utils";
+import { ApiError } from "@/server/http/api-error";
 import {
   createCategory as createCategoryRecord,
   deleteCategory as deleteCategoryRecord,
@@ -42,6 +43,14 @@ export const getCategoryBySlug = cache(async (slug: string) =>
 export async function createCategory(input: unknown) {
   const data = createCategorySchema.parse(input);
 
+  if (data.image?.startsWith("/api/media/")) {
+    throw new ApiError(
+      400,
+      "INVALID_IMAGE",
+      "Upload a new photo or provide a direct image URL."
+    );
+  }
+
   return createCategoryRecord({
     name: data.name,
     slug: createCategorySlug(data.name),
@@ -52,12 +61,15 @@ export async function createCategory(input: unknown) {
 
 export async function updateCategory(id: string, input: unknown) {
   const data = updateCategorySchema.parse(input);
+  const safeImage = data.image?.startsWith("/api/media/")
+    ? undefined
+    : data.image;
 
   return updateCategoryRecord(id, {
     name: data.name,
     slug: data.name ? createCategorySlug(data.name) : undefined,
     description: data.description,
-    image: data.image,
+    image: safeImage,
   });
 }
 

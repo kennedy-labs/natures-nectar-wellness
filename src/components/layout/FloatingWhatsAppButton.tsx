@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowUpRight, MessageCircle, X } from "lucide-react";
 
 import { useWhatsAppContext } from "@/components/layout/WhatsAppContext";
@@ -38,6 +39,7 @@ export function FloatingWhatsAppButton() {
   const trimmedContext = contextMessage?.trim() || "";
   const activeMessage = trimmedContext || DEFAULT_STOREFRONT_WHATSAPP_MESSAGE;
   const directWhatsappUrl = getWhatsAppUrl(activeMessage);
+  const prefersReducedMotion = useReducedMotion();
 
   const [isOpen, setIsOpen] = useState(false);
   const [whisperVisible, setWhisperVisible] = useState(false);
@@ -114,7 +116,7 @@ export function FloatingWhatsAppButton() {
     try {
       sessionStorage.setItem(WHISPER_DISMISSED_KEY, "1");
     } catch {
-      // Ignore storage access errors in private browsing modes
+      // Ignore storage access errors
     }
   }
 
@@ -140,115 +142,124 @@ export function FloatingWhatsAppButton() {
       ref={containerRef}
       className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-40 flex flex-col items-end gap-2 sm:bottom-6 sm:right-6"
     >
-      {isOpen ? (
-        <div
-          id="whatsapp-concierge-card"
-          role="dialog"
-          aria-label="Chat on WhatsApp"
-          className="w-[calc(100vw-2rem)] max-w-[20rem] rounded-xl border border-border bg-card p-4 text-card-foreground shadow-[0_12px_32px_-12px_rgba(24,42,32,0.22)] transition-all duration-150 ease-out"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-0.5">
-              <p className="font-display text-base font-medium text-foreground">
-                Nature&apos;s Nectar Wellness
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Ask anything directly on WhatsApp
-              </p>
+      <AnimatePresence>
+        {isOpen ? (
+          <motion.div
+            id="whatsapp-concierge-card"
+            role="dialog"
+            aria-label="Chat on WhatsApp"
+            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.98 }}
+            transition={{ duration: 0.16, ease: "easeOut" }}
+            className="w-[calc(100vw-2rem)] max-w-[20rem] rounded-xl border border-border bg-card p-4 text-card-foreground shadow-[0_14px_34px_-12px_rgba(20,34,27,0.22)]"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-0.5">
+                <p className="font-display text-base font-medium text-foreground">
+                  Nature&apos;s Nectar Concierge
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Direct botanical help on WhatsApp
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleClose}
+                aria-label="Close WhatsApp card"
+                className="-mr-1 -mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
+
+            <div className="mt-3 space-y-1.5">
+              <label htmlFor="whatsapp-draft-message" className="sr-only">
+                Your WhatsApp message
+              </label>
+              <Textarea
+                ref={textareaRef}
+                id="whatsapp-draft-message"
+                rows={3}
+                value={draftMessage}
+                onChange={(event) =>
+                  setDraftState({ base: activeMessage, text: event.target.value })
+                }
+                placeholder={activeMessage}
+                className="min-h-[4.75rem] resize-none bg-background text-base leading-relaxed md:text-sm"
+              />
+            </div>
+
+            <a
+              href={submitWhatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleClose}
+              className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <MessageCircle className="h-4 w-4 shrink-0" />
+              <span>Continue to WhatsApp</span>
+              <ArrowUpRight className="h-4 w-4 shrink-0" />
+            </a>
+
+            <div className="mt-3.5 border-t border-border pt-3">
+              <p className="text-[11px] font-medium text-muted-foreground">
+                Quick topics
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+                {OPTIONAL_TOPICS.map((topic) => {
+                  const isSelected = draftMessage.trim() === topic.message;
+
+                  return (
+                    <button
+                      key={topic.id}
+                      type="button"
+                      onClick={() => handleSelectTopic(topic.message)}
+                      className={cn(
+                        "inline-flex min-h-7 items-center text-left text-xs underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        isSelected
+                          ? "font-medium text-foreground underline"
+                          : "text-primary"
+                      )}
+                    >
+                      {topic.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {!isOpen && whisperVisible ? (
+          <motion.div
+            role="status"
+            initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16, ease: "easeOut" }}
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-card py-1.5 pl-3 pr-1.5 text-card-foreground shadow-[0_8px_22px_-8px_rgba(20,34,27,0.16)]"
+          >
             <button
               type="button"
-              onClick={handleClose}
-              aria-label="Close WhatsApp card"
-              className="-mr-1 -mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={handleToggleOpen}
+              className="text-left text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <X className="h-4 w-4" />
+              Questions? Ask us on WhatsApp
             </button>
-          </div>
-
-          <div className="mt-3 space-y-1.5">
-            <label
-              htmlFor="whatsapp-draft-message"
-              className="sr-only"
+            <button
+              type="button"
+              onClick={markWhisperSeen}
+              aria-label="Dismiss message"
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Your WhatsApp message
-            </label>
-            <Textarea
-              ref={textareaRef}
-              id="whatsapp-draft-message"
-              rows={3}
-              value={draftMessage}
-              onChange={(event) =>
-                setDraftState({ base: activeMessage, text: event.target.value })
-              }
-              placeholder={activeMessage}
-              className="min-h-[4.75rem] resize-none bg-background/80 text-base leading-relaxed md:text-sm"
-            />
-          </div>
-
-          <a
-            href={submitWhatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handleClose}
-            className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            <MessageCircle className="h-4 w-4 shrink-0" />
-            <span>Continue to WhatsApp</span>
-            <ArrowUpRight className="h-4 w-4 shrink-0" />
-          </a>
-
-          <div className="mt-3.5 border-t border-border/70 pt-3">
-            <p className="text-[11px] font-medium text-muted-foreground">
-              Optional quick topics
-            </p>
-            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-              {OPTIONAL_TOPICS.map((topic) => {
-                const isSelected = draftMessage.trim() === topic.message;
-
-                return (
-                  <button
-                    key={topic.id}
-                    type="button"
-                    onClick={() => handleSelectTopic(topic.message)}
-                    className={cn(
-                      "inline-flex min-h-7 items-center text-left text-xs underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      isSelected
-                        ? "font-medium text-foreground underline"
-                        : "text-primary"
-                    )}
-                  >
-                    {topic.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {!isOpen && whisperVisible ? (
-        <div
-          role="status"
-          className="flex items-center gap-1.5 rounded-lg border border-border bg-card py-1.5 pl-3 pr-1.5 text-card-foreground shadow-[0_8px_22px_-8px_rgba(24,42,32,0.16)] transition-all duration-150 ease-out"
-        >
-          <button
-            type="button"
-            onClick={handleToggleOpen}
-            className="text-left text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Questions? Ask us on WhatsApp
-          </button>
-          <button
-            type="button"
-            onClick={markWhisperSeen}
-            aria-label="Dismiss message"
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      ) : null}
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <button
         ref={triggerRef}
@@ -257,7 +268,7 @@ export function FloatingWhatsAppButton() {
         aria-expanded={isOpen}
         aria-controls="whatsapp-concierge-card"
         aria-label={isOpen ? "Close WhatsApp" : "Chat on WhatsApp"}
-        className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground shadow-[0_8px_24px_-6px_rgba(24,42,32,0.34)] transition-transform duration-150 ease-out hover:scale-[1.02] hover:bg-primary/95 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-primary/20 bg-primary px-4 text-sm font-medium text-primary-foreground shadow-[0_10px_24px_-6px_rgba(20,34,27,0.32)] transition-transform duration-150 ease-out hover:-translate-y-0.5 hover:bg-primary/95 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         {isOpen ? (
           <X className="h-4 w-4 shrink-0" />

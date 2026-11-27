@@ -97,6 +97,14 @@ export const getProductBySlug = cache(async (slug: string) =>
 export async function createProduct(input: unknown) {
   const data = createProductSchema.parse(input);
 
+  if (data.image?.startsWith("/api/media/")) {
+    throw new ApiError(
+      400,
+      "INVALID_IMAGE",
+      "Upload a new photo or provide a direct image URL."
+    );
+  }
+
   return createProductRecord({
     name: data.name,
     description: data.description,
@@ -115,6 +123,9 @@ export async function createProduct(input: unknown) {
 
 export async function updateProduct(id: string, input: unknown) {
   const data = updateProductSchema.parse(input);
+  const safeImage = data.image?.startsWith("/api/media/")
+    ? undefined
+    : data.image;
 
   return updateProductRecord(id, {
     name: data.name,
@@ -124,7 +135,7 @@ export async function updateProduct(id: string, input: unknown) {
     ingredients: data.ingredients,
     price: data.price,
     stockQuantity: data.stockQuantity,
-    image: data.image,
+    image: safeImage,
     isFeatured: data.isFeatured,
     isActive: data.isActive,
     categoryId: data.categoryId,

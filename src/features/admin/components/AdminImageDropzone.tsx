@@ -78,6 +78,7 @@ export function AdminImageDropzone({
 
   const trimmedValue = value.trim();
   const isDataUri = trimmedValue.startsWith("data:image/");
+  const isStoredMedia = trimmedValue.startsWith("/api/media/");
   const displayedError = uploadError ?? error;
 
   return (
@@ -123,12 +124,18 @@ export function AdminImageDropzone({
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-foreground">
-                {isDataUri ? "Uploaded photo ready" : "Image linked"}
+                {isDataUri
+                  ? "Uploaded photo ready"
+                  : isStoredMedia
+                    ? "Stored photo ready"
+                    : "Image linked"}
               </p>
               <p className="truncate text-xs text-muted-foreground">
                 {isDataUri
                   ? `Optimized (~${estimateDataUrlKb(trimmedValue)} KB) · Click save to store`
-                  : trimmedValue}
+                  : isStoredMedia
+                    ? "Current saved photo · Upload a new file to replace"
+                    : trimmedValue}
               </p>
             </div>
           </div>
@@ -202,7 +209,7 @@ export function AdminImageDropzone({
       {showUrlInput ? (
         <Input
           type="text"
-          value={isDataUri ? "" : value}
+          value={isDataUri || isStoredMedia ? "" : value}
           onChange={(e) => {
             setUploadError(null);
             onChange(e.target.value);

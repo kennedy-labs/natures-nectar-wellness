@@ -23,14 +23,14 @@ export function OrdersNavLink() {
       asChild
       size="sm"
       variant="ghost"
-      className="h-10 shrink-0 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm"
+      className="h-9 shrink-0 px-2 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
     >
-      <Link href="/orders" className="gap-1 sm:gap-1.5">
+      <Link href="/orders" className="gap-1.5">
         <Package className="h-4 w-4 shrink-0" />
-        <span>Orders</span>
+        <span className="hidden sm:inline">Orders</span>
         {count > 0 ? (
-          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-foreground tabular-nums">
-            {count}
+          <span className="font-semibold text-primary tabular-nums">
+            ({count})
           </span>
         ) : null}
       </Link>

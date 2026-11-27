@@ -34,7 +34,7 @@ const NAV_ITEMS = [
   { href: "/categories", label: "Categories", icon: Grid2x2 },
   { href: "/about", label: "About Us", icon: Info },
   { href: "/faq", label: "FAQ", icon: HelpCircle },
-  { href: "/orders", label: "Orders", icon: Package },
+  { href: "/orders", label: "Orders & Tracking", icon: Package },
 ] as const;
 
 export function MobileNavDrawer({ whatsappUrl }: MobileNavDrawerProps) {
@@ -47,7 +47,7 @@ export function MobileNavDrawer({ whatsappUrl }: MobileNavDrawerProps) {
           type="button"
           size="icon"
           variant="ghost"
-          className="h-10 w-10 shrink-0 md:hidden"
+          className="h-9 w-9 shrink-0 md:hidden"
           aria-label="Open navigation menu"
         >
           <Menu className="h-5 w-5" />
@@ -56,25 +56,28 @@ export function MobileNavDrawer({ whatsappUrl }: MobileNavDrawerProps) {
 
       <SheetContent
         side="left"
-        className="flex w-[85vw] max-w-xs flex-col px-4 py-5"
+        className="flex w-[85vw] max-w-xs flex-col border-border bg-background px-5 py-6"
       >
-        <SheetHeader className="text-left">
-          <SheetTitle className="flex items-center gap-2 text-base">
+        <SheetHeader className="border-b border-border pb-4 text-left">
+          <SheetTitle className="flex items-center gap-2 font-display text-lg font-medium">
             <Leaf className="h-4 w-4 text-primary" />
             <span>Nature&apos;s Nectar</span>
           </SheetTitle>
-          <SheetDescription>
-            Natural herbal wellness storefront
+          <SheetDescription className="text-xs text-muted-foreground">
+            Kenyan Botanical Apothecary
           </SheetDescription>
         </SheetHeader>
 
-        <nav aria-label="Mobile navigation" className="mt-6 flex flex-1 flex-col gap-1">
+        <nav
+          aria-label="Mobile navigation"
+          className="mt-4 flex flex-1 flex-col divide-y divide-border/60"
+        >
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setOpen(false)}
-              className="flex min-h-12 items-center gap-3 rounded-lg px-3 text-base font-medium text-foreground transition-colors hover:bg-muted"
+              className="flex min-h-12 items-center gap-3 px-1 text-[15px] font-medium text-foreground transition-colors hover:text-primary"
             >
               <item.icon className="h-4 w-4 text-primary" />
               <span>{item.label}</span>
@@ -83,7 +86,7 @@ export function MobileNavDrawer({ whatsappUrl }: MobileNavDrawerProps) {
         </nav>
 
         {whatsappUrl ? (
-          <div className="border-t pt-4 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+          <div className="border-t border-border pt-4 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
             <Button asChild variant="outline" className="min-h-11 w-full">
               <a
                 href={whatsappUrl}
