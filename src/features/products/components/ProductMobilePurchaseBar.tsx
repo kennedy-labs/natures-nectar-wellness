@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
+import { useWhatsAppContext } from "@/components/layout/WhatsAppContext";
 import { AddToCartButton } from "@/features/cart/components/AddToCartButton";
 import { formatKes } from "@/lib/format";
 
@@ -24,6 +25,7 @@ export function ProductMobilePurchaseBar({
 }: ProductMobilePurchaseBarProps) {
   const [visible, setVisible] = useState(false);
   const prefersReducedMotion = useReducedMotion();
+  const { setMobileBottomBarVisible } = useWhatsAppContext();
 
   useEffect(() => {
     const el = document.getElementById(targetElementId);
@@ -41,6 +43,13 @@ export function ProductMobilePurchaseBar({
     observer.observe(el);
     return () => observer.disconnect();
   }, [targetElementId]);
+
+  useEffect(() => {
+    setMobileBottomBarVisible(visible);
+    return () => {
+      setMobileBottomBarVisible(false);
+    };
+  }, [visible, setMobileBottomBarVisible]);
 
   return (
     <AnimatePresence>

@@ -383,6 +383,65 @@ export async function cancelOrder(orderId: string) {
   });
 }
 
+export async function deleteOrder(orderId: string) {
+  const normalizedId = orderId.trim();
+  if (!normalizedId) {
+    throw new ApiError(400, "INVALID_ORDER_ID", "Missing order ID.");
+  }
+
+  const order = await db.order.findUnique({
+    where: { id: normalizedId },
+    include: {
+      items: true,
+    },
+  });
+
+  if (!order) {
+    throw new ApiError(404, "ORDER_NOT_FOUND", "Order not found.");
+  }
+
+  const shouldRestoreStock = !["DELIVERED", "CANCELLED"].includes(order.status);
+
+  return db.$transaction(async (tx) => {
+    if (shouldRestoreStock) {
+      for (const item of order.items) {
+        await tx.product.updateMany({
+          where: { id: item.productId },
+          data: {
+            stockQuantity: {
+              increment: item.quantity,
+            },
+          },
+        });
+      }
+    }
+
+    await tx.orderStatusHistory.deleteMany({
+      where: { orderId: normalizedId },
+    });
+
+    await tx.order.delete({
+      where: { id: normalizedId },
+    });
+
+    const remainingCustomerOrders = await tx.order.count({
+      where: { customerId: order.customerId },
+    });
+
+    if (remainingCustomerOrders === 0) {
+      await tx.customer.deleteMany({
+        where: { id: order.customerId },
+      });
+    }
+
+    return {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      restoredStock: shouldRestoreStock,
+    };
+  });
+}
+
 const releaseMpesaHoldSchema = z.object({
   orderId: z.string().min(1),
   orderNumber: z.string().min(1),

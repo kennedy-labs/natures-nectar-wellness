@@ -14,6 +14,10 @@ import {
   AdminShell,
   type AdminTab,
 } from "@/features/admin/components/AdminShell";
+import {
+  getAdminOrderStatusMeta,
+  getAdminOrderTotal,
+} from "@/features/admin/utils/order-display.utils";
 import type { Category } from "@/features/categories/types/category.types";
 import type { Product } from "@/features/products/types/product.types";
 import { formatKes } from "@/lib/format";
@@ -46,11 +50,15 @@ export function AdminDashboardTabs({
   const [categories, setCategories] = useState(initialCategories);
   const [products, setProducts] = useState(initialProducts);
   const [orders, setOrders] = useState(initialOrders);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     function handlePopState() {
       const next = parseTabFromLocation();
       setActiveTab(next);
+      if (next !== "orders") {
+        setSelectedOrderId(null);
+      }
       if (next === "catalog") {
         setHasOpenedCatalog(true);
       }
@@ -60,8 +68,15 @@ export function AdminDashboardTabs({
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  function switchTab(nextTab: AdminTab) {
+  function switchTab(nextTab: AdminTab, orderIdToOpen?: string) {
     setActiveTab(nextTab);
+    if (nextTab === "orders") {
+      if (orderIdToOpen !== undefined) {
+        setSelectedOrderId(orderIdToOpen);
+      }
+    } else {
+      setSelectedOrderId(null);
+    }
     if (nextTab === "catalog") {
       setHasOpenedCatalog(true);
     }
@@ -228,14 +243,13 @@ export function AdminDashboardTabs({
               ) : (
                 <div className="divide-y divide-border/70">
                   {orders.slice(0, 5).map((order) => {
-                    const orderTotal =
-                      order.totalAmount ??
-                      order.subtotalAmount + (order.deliveryFee ?? 0);
+                    const orderTotal = getAdminOrderTotal(order);
+                    const statusMeta = getAdminOrderStatusMeta(order);
                     return (
                       <button
                         key={order.id}
                         type="button"
-                        onClick={() => switchTab("orders")}
+                        onClick={() => switchTab("orders", order.id)}
                         className="flex w-full items-center justify-between gap-3 py-3 text-left text-sm transition-colors hover:bg-[#F6F7F5]/70 first:pt-1 last:pb-1"
                       >
                         <div className="min-w-0">
@@ -244,7 +258,7 @@ export function AdminDashboardTabs({
                           </p>
                           <p className="truncate text-xs text-muted-foreground">
                             <span className="font-mono">{order.orderNumber}</span>{" "}
-                            · {order.status.replace(/_/g, " ")}
+                            · {statusMeta.label}
                           </p>
                         </div>
                         <span className="shrink-0 font-medium tabular-nums text-foreground">
@@ -333,6 +347,8 @@ export function AdminDashboardTabs({
           <AdminOrdersPanel
             initialOrders={orders}
             onOrdersChange={setOrders}
+            selectedOrderId={selectedOrderId}
+            onSelectedOrderIdChange={setSelectedOrderId}
           />
         </div>
       ) : null}

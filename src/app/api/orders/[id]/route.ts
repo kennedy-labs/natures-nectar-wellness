@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requireAdminRequest } from "@/server/auth/admin-auth";
 import {
   confirmDeliveryQuote,
+  deleteOrder,
   updateOrderStatus,
 } from "@/server/services/order.service";
 import { ApiError, getApiErrorResponse } from "@/server/http/api-error";
+import { apiFail, apiOk } from "@/server/http/api-response";
 
 export async function PATCH(
   req: Request,
@@ -48,5 +51,28 @@ export async function PATCH(
       },
       { status: response.status }
     );
+  }
+}
+
+export async function DELETE(
+  req: Request,
+  context: RouteContext<"/api/orders/[id]">
+) {
+  try {
+    await requireAdminRequest(req);
+
+    const { id: orderId } = await context.params;
+    const result = await deleteOrder(orderId);
+
+    if (result.restoredStock) {
+      revalidateTag("products", { expire: 0 });
+      revalidatePath("/");
+      revalidatePath("/products");
+      revalidatePath("/categories");
+    }
+
+    return apiOk(result);
+  } catch (error) {
+    return apiFail(error);
   }
 }

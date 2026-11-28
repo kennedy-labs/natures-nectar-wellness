@@ -35,7 +35,7 @@ const OPTIONAL_TOPICS = [
 ] as const;
 
 export function FloatingWhatsAppButton() {
-  const { contextMessage } = useWhatsAppContext();
+  const { contextMessage, mobileBottomBarVisible } = useWhatsAppContext();
   const trimmedContext = contextMessage?.trim() || "";
   const activeMessage = trimmedContext || DEFAULT_STOREFRONT_WHATSAPP_MESSAGE;
   const directWhatsappUrl = getWhatsAppUrl(activeMessage);
@@ -140,7 +140,12 @@ export function FloatingWhatsAppButton() {
   return (
     <div
       ref={containerRef}
-      className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-40 flex flex-col items-end gap-2 sm:bottom-6 sm:right-6"
+      className={cn(
+        "fixed right-4 z-40 flex flex-col items-end gap-2 transition-[bottom] duration-200 ease-out sm:right-6 md:bottom-6",
+        mobileBottomBarVisible
+          ? "bottom-[calc(4.75rem+env(safe-area-inset-bottom))]"
+          : "bottom-[max(1rem,env(safe-area-inset-bottom))] sm:bottom-6"
+      )}
     >
       <AnimatePresence>
         {isOpen ? (

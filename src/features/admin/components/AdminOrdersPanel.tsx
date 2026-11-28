@@ -1,81 +1,45 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
+  ChevronRight,
   Clock,
-  ExternalLink,
-  MapPin,
-  MessageCircle,
   Package,
-  Phone,
   RefreshCw,
   Search,
+  ShoppingBag,
+  Trash2,
   Truck,
+  X,
   XCircle,
 } from "lucide-react";
 
 import { AdminOrdersListSkeleton } from "@/components/skeletons/AdminSkeletons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AdminDeleteOrderDialog } from "@/features/admin/components/AdminDeleteOrderDialog";
+import { AdminOrderDetailSheet } from "@/features/admin/components/AdminOrderDetailSheet";
 import {
-  getDeliveryFeeSummary,
-  getDeliveryMethodLabel,
-  parseDeliveryNotesPin,
-} from "@/features/orders/utils/order.utils";
+  type AdminOrder,
+  type AdminOrderPayment,
+  formatAdminOrderDate,
+  getAdminDeliveryLabel,
+  getAdminOrderStatusMeta,
+  getAdminOrderTotal,
+  getAdminPaymentMethodLabel,
+  getToneClasses,
+} from "@/features/admin/utils/order-display.utils";
 import { formatKes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-type Payment = {
-  id: string;
-  method:
-    | "MPESA_BUY_GOODS"
-    | "BANK_TRANSFER"
-    | "CASH_ON_PICKUP"
-    | "CASH_ON_DELIVERY";
-  status:
-    | "PENDING"
-    | "AWAITING_VERIFICATION"
-    | "VERIFIED"
-    | "FAILED"
-    | "REFUNDED";
-  amount?: number | null;
-  transactionRef?: string | null;
-  verifiedAt?: Date | string | null;
-};
-
-type OrderItem = {
-  id: string;
-  productName: string;
-  quantity: number;
-  priceAtPurchase: number;
-  lineTotal: number;
-};
-
-export type AdminOrder = {
-  id: string;
-  orderNumber: string;
-  status: string;
-  customerName: string;
-  customerPhone: string;
-  customerEmail?: string | null;
-  deliveryMethod: string;
-  deliveryLocation?: string | null;
-  deliveryNotes?: string | null;
-  deliveryFee?: number | null;
-  deliveryQuoteNotes?: string | null;
-  subtotalAmount: number;
-  totalAmount?: number | null;
-  preferredPaymentMethod?: string | null;
-  customerNotes?: string | null;
-  createdAt: Date | string;
-  items?: OrderItem[];
-  payments?: Payment[];
-};
+export type { AdminOrder };
 
 type AdminOrdersPanelProps = {
   initialOrders?: AdminOrder[];
   onOrdersChange?: (orders: AdminOrder[]) => void;
+  selectedOrderId?: string | null;
+  onSelectedOrderIdChange?: (orderId: string | null) => void;
 };
 
 type OrderFilter =
@@ -85,56 +49,74 @@ type OrderFilter =
   | "delivered"
   | "cancelled";
 
-function toWhatsAppPhone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("0") && digits.length === 10) {
-    return `254${digits.slice(1)}`;
+function StatusGlyph({ status }: { status: string }) {
+  if (status === "CANCELLED") {
+    return <XCircle className="h-3.5 w-3.5 shrink-0" />;
   }
-  if ((digits.startsWith("7") || digits.startsWith("1")) && digits.length === 9) {
-    return `254${digits}`;
+  if (status === "DELIVERED" || status === "PAID") {
+    return <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />;
   }
-  return digits;
+  if (status === "OUT_FOR_DELIVERY") {
+    return <Truck className="h-3.5 w-3.5 shrink-0" />;
+  }
+  if (status === "PROCESSING") {
+    return <Package className="h-3.5 w-3.5 shrink-0" />;
+  }
+  return <Clock className="h-3.5 w-3.5 shrink-0" />;
 }
 
-function getStatusTextClass(status: string): string {
-  if (status === "PAID" || status === "DELIVERED") {
-    return "text-primary";
+function summarizeItems(order: AdminOrder): string {
+  const items = order.items ?? [];
+  if (items.length === 0) return "No items";
+  const totalUnits = items.reduce((sum, item) => sum + item.quantity, 0);
+  const firstName = items[0]?.productName ?? "";
+  if (items.length === 1) {
+    return `${totalUnits}× ${firstName}`;
   }
-  if (status === "CANCELLED") {
-    return "text-destructive";
-  }
-  if (status === "AWAITING_PAYMENT" || status === "PENDING") {
-    return "text-amber-700";
-  }
-  return "text-foreground";
+  return `${totalUnits} items · ${firstName} +${items.length - 1}`;
 }
 
 export function AdminOrdersPanel({
   initialOrders,
   onOrdersChange,
+  selectedOrderId: controlledOrderId,
+  onSelectedOrderIdChange,
 }: AdminOrdersPanelProps = {}) {
   const [orders, setOrders] = useState<AdminOrder[]>(initialOrders ?? []);
   const [loading, setLoading] = useState(initialOrders === undefined);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<OrderFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [panelMessage, setPanelMessage] = useState<string | null>(null);
-  const [busyOrderId, setBusyOrderId] = useState<string | null>(null);
+  const [panelNotice, setPanelNotice] = useState<{
+    tone: "info" | "error";
+    text: string;
+  } | null>(null);
   const [expiring, setExpiring] = useState(false);
-  const [cancelConfirmOrderId, setCancelConfirmOrderId] = useState<
+
+  const [internalSelectedOrderId, setInternalSelectedOrderId] = useState<
     string | null
   >(null);
-  const [errorByOrderId, setErrorByOrderId] = useState<Record<string, string>>(
-    {}
-  );
-  const [quotesByOrderId, setQuotesByOrderId] = useState<
-    Record<string, { fee: string; notes: string }>
-  >({});
-  const [verifyByOrderId, setVerifyByOrderId] = useState<
-    Record<string, { transactionRef: string; amount: string }>
-  >({});
+  const [orderToDelete, setOrderToDelete] = useState<AdminOrder | null>(null);
 
-  async function load() {
+  const activeOrderId =
+    controlledOrderId !== undefined
+      ? controlledOrderId
+      : internalSelectedOrderId;
+
+  function setActiveOrderId(nextId: string | null) {
+    if (onSelectedOrderIdChange) {
+      onSelectedOrderIdChange(nextId);
+    } else {
+      setInternalSelectedOrderId(nextId);
+    }
+  }
+
+  const activeOrder = useMemo(
+    () => orders.find((order) => order.id === activeOrderId) ?? null,
+    [orders, activeOrderId]
+  );
+
+  const load = useCallback(async () => {
     setRefreshing(true);
     try {
       const res = await fetch("/api/orders");
@@ -146,187 +128,213 @@ export function AdminOrdersPanel({
       setLoading(false);
       setRefreshing(false);
     }
-  }
+  }, [onOrdersChange]);
 
-  function setOrderError(orderId: string, message: string | null) {
-    setErrorByOrderId((prev) => {
-      if (!message) {
-        const next = { ...prev };
-        delete next[orderId];
-        return next;
-      }
-      return { ...prev, [orderId]: message };
-    });
-  }
+  useEffect(() => {
+    if (initialOrders !== undefined) return;
+    let cancelled = false;
 
-  async function confirmDelivery(orderId: string) {
-    const quote = quotesByOrderId[orderId] ?? { fee: "", notes: "" };
-    const fee = Number(quote.fee);
-    if (!Number.isFinite(fee) || fee < 0) {
-      setOrderError(orderId, "Enter a valid delivery fee (0 or higher).");
-      return;
-    }
-
-    setBusyOrderId(orderId);
-    setOrderError(orderId, null);
-
-    try {
-      const res = await fetch(`/api/orders/${orderId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fee, notes: quote.notes }),
+    void fetch("/api/orders")
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        const nextOrders: AdminOrder[] = data?.data ?? data ?? [];
+        setOrders(nextOrders);
+        onOrdersChange?.(nextOrders);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
       });
 
-      const payload = await res.json().catch(() => null);
-      if (!res.ok) {
-        setOrderError(
-          orderId,
-          payload?.error?.message ??
-            payload?.message ??
-            "Failed to confirm delivery quote."
-        );
-        return;
-      }
+    return () => {
+      cancelled = true;
+    };
+  }, [initialOrders, onOrdersChange]);
 
-      await load();
-    } finally {
-      setBusyOrderId(null);
+  async function confirmDeliveryQuote(
+    orderId: string,
+    fee: number,
+    notes: string
+  ) {
+    const res = await fetch(`/api/orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fee, notes }),
+    });
+
+    const payload = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(
+        payload?.error?.message ??
+          payload?.message ??
+          "Failed to confirm delivery quote."
+      );
     }
+
+    setPanelNotice({
+      tone: "info",
+      text: `Delivery quote saved (${formatKes(fee)}).`,
+    });
+    await load();
   }
 
   async function updateStatus(orderId: string, status: string) {
-    setBusyOrderId(orderId);
-    setOrderError(orderId, null);
+    const res = await fetch(`/api/orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
 
-    try {
-      const res = await fetch(`/api/orders/${orderId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-
-      const payload = await res.json().catch(() => null);
-      if (!res.ok) {
-        setOrderError(
-          orderId,
-          payload?.error?.message ??
-            payload?.message ??
-            "Failed to update order status."
-        );
-        return;
-      }
-
-      await load();
-    } finally {
-      setBusyOrderId(null);
+    const payload = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(
+        payload?.error?.message ??
+          payload?.message ??
+          "Failed to update order status."
+      );
     }
+
+    setPanelNotice({
+      tone: "info",
+      text: "Order progress updated.",
+    });
+    await load();
   }
 
-  async function verifyPayment(payment: Payment, order: AdminOrder) {
-    const expectedTotal =
-      order.totalAmount ?? order.subtotalAmount + (order.deliveryFee ?? 0);
-    const input = verifyByOrderId[order.id] ?? {
-      transactionRef: "",
-      amount: String(expectedTotal),
-    };
+  async function verifyPayment(
+    payment: AdminOrderPayment,
+    order: AdminOrder,
+    transactionRef: string,
+    amount: number
+  ) {
+    const res = await fetch(`/api/payments/${payment.id}/verify`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transactionRef,
+        amount,
+      }),
+    });
 
-    const amount = Number(input.amount || expectedTotal);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setOrderError(order.id, "Enter a valid positive payment amount.");
-      return;
+    const payload = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(
+        payload?.error?.message ??
+          payload?.message ??
+          "Payment verification failed."
+      );
     }
 
-    setBusyOrderId(order.id);
-    setOrderError(order.id, null);
-
-    try {
-      const res = await fetch(`/api/payments/${payment.id}/verify`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transactionRef: input.transactionRef.trim(),
-          amount,
-        }),
-      });
-
-      const payload = await res.json().catch(() => null);
-      if (!res.ok) {
-        setOrderError(
-          order.id,
-          payload?.error?.message ??
-            payload?.message ??
-            "Payment verification failed."
-        );
-        return;
-      }
-
-      await load();
-    } finally {
-      setBusyOrderId(null);
-    }
+    setPanelNotice({
+      tone: "info",
+      text: `Payment confirmed for ${order.orderNumber}.`,
+    });
+    await load();
   }
 
-  async function cancelAndRestoreStock(orderId: string) {
-    setBusyOrderId(orderId);
-    setOrderError(orderId, null);
+  async function cancelOrder(orderId: string) {
+    const res = await fetch(`/api/orders/${orderId}/cancel`, {
+      method: "POST",
+    });
 
-    try {
-      const res = await fetch(`/api/orders/${orderId}/cancel`, {
-        method: "POST",
-      });
-
-      const payload = await res.json().catch(() => null);
-      if (!res.ok) {
-        setOrderError(
-          orderId,
-          payload?.error?.message ??
-            payload?.message ??
-            "Failed to cancel order."
-        );
-        return;
-      }
-
-      setCancelConfirmOrderId(null);
-      setPanelMessage("Order cancelled and item stock restored.");
-      await load();
-    } finally {
-      setBusyOrderId(null);
+    const payload = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(
+        payload?.error?.message ?? payload?.message ?? "Failed to cancel order."
+      );
     }
+
+    setPanelNotice({
+      tone: "info",
+      text: "Order cancelled and item stock restored.",
+    });
+    await load();
+  }
+
+  async function deleteOrder(order: AdminOrder) {
+    const res = await fetch(`/api/orders/${order.id}`, {
+      method: "DELETE",
+    });
+
+    const payload = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(
+        payload?.error?.message ??
+          payload?.message ??
+          "Failed to delete order."
+      );
+    }
+
+    if (activeOrderId === order.id) {
+      setActiveOrderId(null);
+    }
+
+    const restored = Boolean(payload?.data?.restoredStock);
+    setPanelNotice({
+      tone: "info",
+      text: restored
+        ? `Order ${order.orderNumber} deleted and reserved stock restored.`
+        : `Order ${order.orderNumber} permanently deleted.`,
+    });
+    await load();
   }
 
   async function expireOldUnpaidOrders() {
     setExpiring(true);
-    setPanelMessage(null);
+    setPanelNotice(null);
 
     try {
       const res = await fetch("/api/orders/expire", { method: "POST" });
       const payload = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setPanelMessage(
-          payload?.error?.message ?? "Could not expire unpaid orders."
-        );
+        setPanelNotice({
+          tone: "error",
+          text:
+            payload?.error?.message ?? "Could not expire unpaid orders right now.",
+        });
         return;
       }
 
       const count = payload?.data?.cancelledCount ?? 0;
-      setPanelMessage(
-        count > 0
-          ? `Expired ${count} unpaid order(s) older than 24h and restored their stock.`
-          : "No unpaid orders older than 24 hours found."
-      );
+      setPanelNotice({
+        tone: "info",
+        text:
+          count > 0
+            ? `Expired ${count} unpaid order(s) older than 24h and restored their stock.`
+            : "No unpaid orders older than 24 hours were found.",
+      });
       await load();
     } finally {
       setExpiring(false);
     }
   }
 
-  useEffect(() => {
-    if (initialOrders === undefined) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      void load();
-    }
-  }, [initialOrders]);
+  const summary = useMemo(() => {
+    const needsAction = orders.filter((o) =>
+      ["PENDING", "REVIEWING_DELIVERY", "AWAITING_PAYMENT"].includes(o.status)
+    );
+    const fulfillment = orders.filter((o) =>
+      ["PAID", "PROCESSING", "OUT_FOR_DELIVERY"].includes(o.status)
+    );
+    const delivered = orders.filter((o) => o.status === "DELIVERED");
+    const cancelled = orders.filter((o) => o.status === "CANCELLED");
+
+    const completedRevenue = delivered.reduce(
+      (sum, o) => sum + getAdminOrderTotal(o),
+      0
+    );
+
+    return {
+      needsActionCount: needsAction.length,
+      fulfillmentCount: fulfillment.length,
+      deliveredCount: delivered.length,
+      cancelledCount: cancelled.length,
+      completedRevenue,
+    };
+  }, [orders]);
 
   const filteredOrders = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -349,10 +357,17 @@ export function AdminOrdersPanel({
       if (filter === "cancelled" && order.status !== "CANCELLED") return false;
 
       if (!query) return true;
+      const itemMatch =
+        order.items?.some((item) =>
+          item.productName.toLowerCase().includes(query)
+        ) ?? false;
+
       return (
         order.orderNumber.toLowerCase().includes(query) ||
         order.customerName.toLowerCase().includes(query) ||
-        order.customerPhone.toLowerCase().includes(query)
+        order.customerPhone.toLowerCase().includes(query) ||
+        (order.customerEmail?.toLowerCase().includes(query) ?? false) ||
+        itemMatch
       );
     });
   }, [orders, filter, searchQuery]);
@@ -363,18 +378,117 @@ export function AdminOrdersPanel({
 
   return (
     <div className="space-y-5">
-      {/* Unified Filter & Action Toolbar */}
-      <div className="rounded-xl border border-border bg-white p-4">
+      {/* Interactive 4-Segment Queue Strip */}
+      <section
+        aria-label="Order queue summary"
+        className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-4"
+      >
+        <button
+          type="button"
+          onClick={() => setFilter("needs_action")}
+          className={cn(
+            "flex flex-col justify-between bg-[#FCFBF8] p-4 text-left transition-colors hover:bg-[#F7F5F0]",
+            filter === "needs_action" && "bg-[#F7F5F0]"
+          )}
+        >
+          <span className="text-xs font-medium text-muted-foreground">
+            Needs attention
+          </span>
+          <span
+            className={cn(
+              "mt-1.5 font-display text-2xl font-medium tabular-nums",
+              summary.needsActionCount > 0
+                ? "text-amber-800"
+                : "text-foreground"
+            )}
+          >
+            {summary.needsActionCount}
+          </span>
+          <span className="mt-1 text-[11px] text-muted-foreground">
+            Quote or payment check
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilter("fulfillment")}
+          className={cn(
+            "flex flex-col justify-between bg-[#FCFBF8] p-4 text-left transition-colors hover:bg-[#F7F5F0]",
+            filter === "fulfillment" && "bg-[#F7F5F0]"
+          )}
+        >
+          <span className="text-xs font-medium text-muted-foreground">
+            Ready &amp; in transit
+          </span>
+          <span className="mt-1.5 font-display text-2xl font-medium tabular-nums text-[#1F4E37]">
+            {summary.fulfillmentCount}
+          </span>
+          <span className="mt-1 text-[11px] text-muted-foreground">
+            Paid, packing, or delivering
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilter("delivered")}
+          className={cn(
+            "flex flex-col justify-between bg-[#FCFBF8] p-4 text-left transition-colors hover:bg-[#F7F5F0]",
+            filter === "delivered" && "bg-[#F7F5F0]"
+          )}
+        >
+          <span className="text-xs font-medium text-muted-foreground">
+            Completed
+          </span>
+          <span className="mt-1.5 font-display text-2xl font-medium tabular-nums text-foreground">
+            {summary.deliveredCount}
+          </span>
+          <span className="mt-1 text-[11px] text-muted-foreground tabular-nums">
+            {formatKes(summary.completedRevenue)} delivered
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilter("all")}
+          className={cn(
+            "flex flex-col justify-between bg-[#FCFBF8] p-4 text-left transition-colors hover:bg-[#F7F5F0]",
+            filter === "all" && "bg-[#F7F5F0]"
+          )}
+        >
+          <span className="text-xs font-medium text-muted-foreground">
+            All orders
+          </span>
+          <span className="mt-1.5 font-display text-2xl font-medium tabular-nums text-foreground">
+            {orders.length}
+          </span>
+          <span className="mt-1 text-[11px] text-muted-foreground tabular-nums">
+            {summary.cancelledCount} cancelled
+          </span>
+        </button>
+      </section>
+
+      {/* Search, Status Filter Tabs & Maintenance Tools */}
+      <div className="rounded-xl border border-border bg-[#FCFBF8] p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1 sm:max-w-xs">
+          <div className="relative flex-1 sm:max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search order #, name, phone..."
-              className="h-10 bg-white pl-9"
+              placeholder="Search customer, phone, order #, or item..."
+              className="h-10 bg-white pl-9 pr-9"
             />
+            {searchQuery ? (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
+                className="absolute right-2.5 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -387,7 +501,7 @@ export function AdminOrdersPanel({
               className="min-h-10 flex-1 bg-white sm:flex-initial"
             >
               <RefreshCw
-                className={`mr-1.5 h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+                className={cn("mr-1.5 h-4 w-4", refreshing && "animate-spin")}
               />
               {refreshing ? "Refreshing..." : "Refresh"}
             </Button>
@@ -406,14 +520,26 @@ export function AdminOrdersPanel({
           </div>
         </div>
 
-        <div className="mt-3 flex gap-1 overflow-x-auto border-t border-border pt-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mt-3 flex gap-1 overflow-x-auto border-t border-border/80 pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {(
             [
               { key: "all", label: `All (${orders.length})` },
-              { key: "needs_action", label: "Needs action" },
-              { key: "fulfillment", label: "Paid / Delivering" },
-              { key: "delivered", label: "Delivered" },
-              { key: "cancelled", label: "Cancelled" },
+              {
+                key: "needs_action",
+                label: `Needs action (${summary.needsActionCount})`,
+              },
+              {
+                key: "fulfillment",
+                label: `In progress (${summary.fulfillmentCount})`,
+              },
+              {
+                key: "delivered",
+                label: `Completed (${summary.deliveredCount})`,
+              },
+              {
+                key: "cancelled",
+                label: `Cancelled (${summary.cancelledCount})`,
+              },
             ] as const
           ).map((item) => {
             const active = filter === item.key;
@@ -425,8 +551,8 @@ export function AdminOrdersPanel({
                 className={cn(
                   "min-h-9 shrink-0 rounded-md px-3 text-xs font-medium tabular-nums transition-colors whitespace-nowrap",
                   active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-[#F6F7F5] hover:text-foreground"
+                    ? "bg-[#1F4E37] text-white"
+                    : "text-muted-foreground hover:bg-[#F7F5F0] hover:text-foreground"
                 )}
               >
                 {item.label}
@@ -436,375 +562,286 @@ export function AdminOrdersPanel({
         </div>
       </div>
 
-      {panelMessage ? (
-        <div className="rounded-xl border border-border bg-white px-4 py-3 text-sm text-foreground">
-          {panelMessage}
-        </div>
-      ) : null}
-
-      {filteredOrders.length === 0 ? (
-        <div className="rounded-xl border border-border bg-white p-8 text-center text-sm text-muted-foreground">
-          No orders match your current filter.
-        </div>
-      ) : null}
-
-      {filteredOrders.map((order) => {
-        const payment = order.payments?.[0];
-        const paymentStatus = payment?.status;
-        const isPaid =
-          order.payments?.some((p) => p.status === "VERIFIED") ?? false;
-        const isCashOrder =
-          order.preferredPaymentMethod === "CASH_ON_PICKUP" ||
-          order.preferredPaymentMethod === "CASH_ON_DELIVERY";
-        const canFulfill = isPaid || isCashOrder;
-        const isClosed =
-          order.status === "DELIVERED" || order.status === "CANCELLED";
-        const total =
-          order.totalAmount ??
-          order.subtotalAmount + (order.deliveryFee ?? 0);
-        const isBusy = busyOrderId === order.id;
-
-        const quote = quotesByOrderId[order.id] ?? { fee: "", notes: "" };
-        const verifyInput = verifyByOrderId[order.id] ?? {
-          transactionRef: "",
-          amount: String(total),
-        };
-
-        const waMessage = `Hello ${order.customerName}, regarding your Nature's Nectar order ${order.orderNumber} (Total: ${formatKes(total)}).`;
-        const waHref = `https://wa.me/${toWhatsAppPhone(order.customerPhone)}?text=${encodeURIComponent(waMessage)}`;
-        const { cleanNotes: cleanDeliveryNotes, mapUrl } =
-          parseDeliveryNotesPin(order.deliveryNotes);
-
-        return (
-          <div
-            key={order.id}
-            className="overflow-hidden rounded-xl border border-border bg-white"
+      {/* Feedback Banner */}
+      {panelNotice ? (
+        <div
+          role={panelNotice.tone === "error" ? "alert" : "status"}
+          className={cn(
+            "flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-xs font-medium",
+            panelNotice.tone === "error"
+              ? "border-destructive/30 bg-destructive/10 text-destructive"
+              : "border-[#1F4E37]/25 bg-[#1F4E37]/[0.07] text-[#1F4E37]"
+          )}
+        >
+          <span>{panelNotice.text}</span>
+          <button
+            type="button"
+            onClick={() => setPanelNotice(null)}
+            aria-label="Dismiss message"
+            className="inline-flex h-6 w-6 items-center justify-center rounded opacity-70 hover:opacity-100"
           >
-            {/* Header Ledger Band */}
-            <div className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <p className="font-mono text-sm font-semibold text-foreground">
-                    {order.orderNumber}
-                  </p>
-                  <span
-                    className={`text-xs font-semibold ${getStatusTextClass(order.status)}`}
-                  >
-                    · {order.status.replace(/_/g, " ")}
-                  </span>
-                  {paymentStatus ? (
-                    <span
-                      className={`text-xs font-medium ${
-                        paymentStatus === "VERIFIED"
-                          ? "text-primary"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      · Payment: {paymentStatus.replace(/_/g, " ")}
-                    </span>
-                  ) : null}
-                </div>
-                <p className="text-xs text-muted-foreground tabular-nums">
-                  {new Date(order.createdAt).toLocaleString()}
-                  {order.preferredPaymentMethod
-                    ? ` · ${order.preferredPaymentMethod.replace(/_/g, " ")}`
-                    : ""}
-                  {payment?.transactionRef
-                    ? ` · Ref: ${payment.transactionRef}`
-                    : ""}
-                </p>
-              </div>
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : null}
 
-              <div className="sm:text-right">
-                <p className="font-display text-xl font-medium tracking-tight tabular-nums text-foreground">
-                  {formatKes(total)}
-                </p>
-                <p className="text-xs text-muted-foreground tabular-nums">
-                  Subtotal {formatKes(order.subtotalAmount)}
-                  {` · Delivery: ${getDeliveryFeeSummary(
-                    order.deliveryMethod,
-                    order.deliveryFee
-                  )}`}
-                </p>
-              </div>
-            </div>
-
-            {/* Single-Elevation Hairline Customer & Delivery Ledger */}
-            <div className="grid divide-y divide-border border-t border-border text-sm md:grid-cols-2 md:divide-x md:divide-y-0">
-              <div className="space-y-2.5 px-5 py-4">
-                <p className="font-medium text-foreground">
-                  {order.customerName}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <a
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border bg-white px-2.5 text-xs font-medium tabular-nums text-foreground transition-colors hover:bg-[#F6F7F5]"
-                    href={`tel:${order.customerPhone}`}
-                  >
-                    <Phone className="h-3.5 w-3.5" />
-                    {order.customerPhone}
-                  </a>
-                  <a
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 text-xs font-medium text-primary transition-colors hover:bg-primary/15"
-                    href={waHref}
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    WhatsApp
-                  </a>
-                </div>
-                {order.customerEmail ? (
-                  <p className="truncate text-xs text-muted-foreground">
-                    {order.customerEmail}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="space-y-1.5 px-5 py-4 text-xs text-muted-foreground">
-                <p className="font-medium text-foreground">
-                  {getDeliveryMethodLabel(order.deliveryMethod)}
-                </p>
-                {order.deliveryLocation ? (
-                  <p>Location: {order.deliveryLocation}</p>
-                ) : null}
-                {mapUrl ? (
-                  <div className="pt-0.5">
-                    <a
-                      href={mapUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-2.5 text-xs font-medium text-primary hover:bg-primary/10"
-                    >
-                      <MapPin className="h-3.5 w-3.5" />
-                      Open Map Pin
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                ) : null}
-                {cleanDeliveryNotes ? (
-                  <p>Delivery note: {cleanDeliveryNotes}</p>
-                ) : null}
-                {order.customerNotes ? (
-                  <p>Customer note: {order.customerNotes}</p>
-                ) : null}
-              </div>
-            </div>
-
-            {/* Items Ledger */}
-            {order.items && order.items.length > 0 ? (
-              <div className="space-y-1.5 border-t border-border bg-[#F6F7F5]/40 px-5 py-3.5">
-                {order.items.map((item) => (
-                  <div
-                    className="flex justify-between gap-2 text-xs tabular-nums"
-                    key={item.id}
-                  >
-                    <span className="text-muted-foreground">
-                      <strong className="font-medium text-foreground">
-                        {item.quantity}×
-                      </strong>{" "}
-                      {item.productName}
-                    </span>
-                    <span className="font-medium text-foreground">
-                      {formatKes(item.lineTotal)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            {errorByOrderId[order.id] ? (
-              <div className="border-t border-destructive/30 bg-destructive/10 px-5 py-2.5 text-xs font-medium text-destructive">
-                {errorByOrderId[order.id]}
-              </div>
-            ) : null}
-
-            {/* Step 1: Delivery Quote */}
-            {(order.status === "PENDING" ||
-              order.status === "REVIEWING_DELIVERY") && (
-              <div className="grid gap-2 border-t border-border px-5 py-4 sm:grid-cols-[150px_1fr_auto]">
-                <Input
-                  className="h-10 bg-white tabular-nums"
-                  min="0"
-                  placeholder="Delivery fee (KES)"
-                  step="1"
-                  type="number"
-                  value={quote.fee}
-                  onChange={(e) =>
-                    setQuotesByOrderId((prev) => ({
-                      ...prev,
-                      [order.id]: { ...quote, fee: e.target.value },
-                    }))
-                  }
-                />
-                <Input
-                  className="h-10 bg-white"
-                  placeholder="Delivery notes (optional)"
-                  type="text"
-                  value={quote.notes}
-                  onChange={(e) =>
-                    setQuotesByOrderId((prev) => ({
-                      ...prev,
-                      [order.id]: { ...quote, notes: e.target.value },
-                    }))
-                  }
-                />
-                <Button
-                  disabled={isBusy}
-                  onClick={() => confirmDelivery(order.id)}
-                  className="min-h-10"
-                  type="button"
-                >
-                  Confirm quote
-                </Button>
-              </div>
-            )}
-
-            {/* Step 2: Payment Verification */}
-            {payment &&
-              (paymentStatus === "PENDING" ||
-                paymentStatus === "AWAITING_VERIFICATION") &&
-              !isClosed && (
-                <div className="grid gap-2 border-t border-border px-5 py-4 sm:grid-cols-[1fr_140px_auto]">
-                  <Input
-                    className="h-10 bg-white"
-                    placeholder={
-                      payment.method === "MPESA_BUY_GOODS" ||
-                      payment.method === "BANK_TRANSFER"
-                        ? "M-Pesa / Bank Ref (e.g. SJK8912P4)"
-                        : "Receipt / Reference (optional)"
-                    }
-                    type="text"
-                    value={verifyInput.transactionRef}
-                    onChange={(e) =>
-                      setVerifyByOrderId((prev) => ({
-                        ...prev,
-                        [order.id]: {
-                          ...verifyInput,
-                          transactionRef: e.target.value,
-                        },
-                      }))
-                    }
-                  />
-                  <Input
-                    className="h-10 bg-white tabular-nums"
-                    min="1"
-                    placeholder="Amount (KES)"
-                    step="0.01"
-                    type="number"
-                    value={verifyInput.amount}
-                    onChange={(e) =>
-                      setVerifyByOrderId((prev) => ({
-                        ...prev,
-                        [order.id]: { ...verifyInput, amount: e.target.value },
-                      }))
-                    }
-                  />
-                  <Button
-                    disabled={isBusy}
-                    onClick={() => verifyPayment(payment, order)}
-                    className="min-h-10"
-                    type="button"
-                  >
-                    <CheckCircle2 className="mr-1.5 h-4 w-4" />
-                    Verify & mark paid
-                  </Button>
-                </div>
-              )}
-
-            {/* Step 3: Fulfillment & Cancel */}
-            {!isClosed ? (
-              <div className="flex flex-col gap-3 border-t border-border px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap gap-2">
-                  {canFulfill &&
-                    order.status !== "PROCESSING" &&
-                    order.status !== "OUT_FOR_DELIVERY" && (
-                      <Button
-                        disabled={isBusy}
-                        onClick={() => updateStatus(order.id, "PROCESSING")}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                        className="min-h-10 bg-white"
-                      >
-                        <Package className="mr-1.5 h-4 w-4" />
-                        Start processing
-                      </Button>
-                    )}
-
-                  {canFulfill && order.status !== "OUT_FOR_DELIVERY" && (
-                    <Button
-                      disabled={isBusy}
-                      onClick={() =>
-                        updateStatus(order.id, "OUT_FOR_DELIVERY")
-                      }
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                      className="min-h-10 bg-white"
-                    >
-                      <Truck className="mr-1.5 h-4 w-4" />
-                      Out for delivery
-                    </Button>
-                  )}
-
-                  {canFulfill && (
-                    <Button
-                      disabled={isBusy}
-                      onClick={() => updateStatus(order.id, "DELIVERED")}
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                      className="min-h-10 bg-white"
-                    >
-                      <CheckCircle2 className="mr-1.5 h-4 w-4" />
-                      Mark delivered
-                    </Button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {cancelConfirmOrderId === order.id ? (
-                    <>
-                      <Button
-                        disabled={isBusy}
-                        onClick={() => cancelAndRestoreStock(order.id)}
-                        size="sm"
-                        type="button"
-                        variant="destructive"
-                        className="min-h-10"
-                      >
-                        Confirm cancel & restore stock
-                      </Button>
-                      <Button
-                        disabled={isBusy}
-                        onClick={() => setCancelConfirmOrderId(null)}
-                        size="sm"
-                        type="button"
-                        variant="ghost"
-                        className="min-h-10"
-                      >
-                        Keep
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      disabled={isBusy}
-                      onClick={() => setCancelConfirmOrderId(order.id)}
-                      size="sm"
-                      type="button"
-                      variant="ghost"
-                      className="min-h-10 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <XCircle className="mr-1.5 h-4 w-4" />
-                      Cancel order
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ) : null}
+      {/* Empty State */}
+      {filteredOrders.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-[#FCFBF8] px-6 py-12 text-center">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-white text-muted-foreground">
+            <ShoppingBag className="h-5 w-5" />
           </div>
-        );
-      })}
+          <p className="mt-3 font-display text-lg font-medium text-foreground">
+            {orders.length === 0
+              ? "No customer orders yet"
+              : "No orders match this view"}
+          </p>
+          <p className="mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
+            {orders.length === 0
+              ? "When customers complete checkout on the storefront, their orders will appear here for confirmation and dispatch."
+              : "Try clearing your search or switching to another status tab."}
+          </p>
+          {filter !== "all" || searchQuery ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setFilter("all");
+                setSearchQuery("");
+              }}
+              className="mt-4 min-h-9 bg-white"
+            >
+              Show all orders
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border bg-[#FCFBF8]">
+          {/* Desktop Clean Ledger Table (md+) */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-border bg-[#F7F5F0]/80 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                  <th className="py-3 pl-5 pr-3">Order</th>
+                  <th className="px-3 py-3">Customer &amp; items</th>
+                  <th className="px-3 py-3">Channel</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3 text-right">Total</th>
+                  <th className="py-3 pl-3 pr-5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/80">
+                {filteredOrders.map((order) => {
+                  const total = getAdminOrderTotal(order);
+                  const statusMeta = getAdminOrderStatusMeta(order);
+                  const tone = getToneClasses(statusMeta.tone);
+                  const isQuotePending =
+                    order.deliveryMethod === "COUNTRYWIDE_DELIVERY" &&
+                    order.deliveryFee == null &&
+                    !["DELIVERED", "CANCELLED"].includes(order.status);
+
+                  return (
+                    <tr
+                      key={order.id}
+                      onClick={() => setActiveOrderId(order.id)}
+                      className="group cursor-pointer transition-colors hover:bg-[#F7F5F0]/75"
+                    >
+                      <td className="py-3.5 pl-5 pr-3 align-middle">
+                        <p className="font-mono text-xs font-semibold text-foreground">
+                          {order.orderNumber}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
+                          {formatAdminOrderDate(order.createdAt)}
+                        </p>
+                      </td>
+
+                      <td className="max-w-[260px] px-3 py-3.5 align-middle">
+                        <p className="truncate font-medium text-foreground">
+                          {order.customerName}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {summarizeItems(order)}
+                        </p>
+                      </td>
+
+                      <td className="px-3 py-3.5 align-middle text-xs">
+                        <p className="font-medium text-foreground">
+                          {getAdminDeliveryLabel(order.deliveryMethod)}
+                        </p>
+                        <p className="mt-0.5 text-muted-foreground">
+                          {getAdminPaymentMethodLabel(
+                            order.preferredPaymentMethod
+                          )}
+                        </p>
+                      </td>
+
+                      <td className="px-3 py-3.5 align-middle">
+                        <div
+                          className={cn(
+                            "inline-flex items-center gap-1.5 text-xs font-semibold",
+                            tone.text
+                          )}
+                        >
+                          <StatusGlyph status={order.status} />
+                          <span>{statusMeta.label}</span>
+                        </div>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {statusMeta.nextActionHint}
+                        </p>
+                      </td>
+
+                      <td className="px-3 py-3.5 text-right align-middle tabular-nums">
+                        <p className="font-semibold text-foreground">
+                          {formatKes(total)}
+                        </p>
+                        {isQuotePending ? (
+                          <p className="mt-0.5 text-[11px] text-amber-800">
+                            Quote needed
+                          </p>
+                        ) : null}
+                      </td>
+
+                      <td
+                        className="py-3.5 pl-3 pr-5 text-right align-middle"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setActiveOrderId(order.id)}
+                            className="h-9 gap-1 bg-white px-3 text-xs font-medium hover:border-[#1F4E37]/40 hover:text-[#1F4E37]"
+                          >
+                            <span>View details</span>
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Delete order ${order.orderNumber}`}
+                            onClick={() => setOrderToDelete(order)}
+                            className="h-9 w-9 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Compact List Rows (< md) */}
+          <div className="divide-y divide-border md:hidden">
+            {filteredOrders.map((order) => {
+              const total = getAdminOrderTotal(order);
+              const statusMeta = getAdminOrderStatusMeta(order);
+              const tone = getToneClasses(statusMeta.tone);
+
+              return (
+                <div
+                  key={order.id}
+                  className="space-y-3 p-4 transition-colors hover:bg-[#F7F5F0]/60"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span className="font-mono text-xs font-semibold text-foreground">
+                          {order.orderNumber}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground tabular-nums">
+                          · {formatAdminOrderDate(order.createdAt)}
+                        </span>
+                      </div>
+                      <p className="mt-1 truncate font-medium text-foreground">
+                        {order.customerName}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {summarizeItems(order)}
+                      </p>
+                    </div>
+
+                    <div className="shrink-0 text-right tabular-nums">
+                      <p className="font-semibold text-foreground">
+                        {formatKes(total)}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {getAdminPaymentMethodLabel(
+                          order.preferredPaymentMethod
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <div className="min-w-0">
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1.5 text-xs font-semibold",
+                          tone.text
+                        )}
+                      >
+                        <StatusGlyph status={order.status} />
+                        <span>{statusMeta.label}</span>
+                      </span>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {getAdminDeliveryLabel(order.deliveryMethod)} ·{" "}
+                        {statusMeta.nextActionHint}
+                      </p>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setActiveOrderId(order.id)}
+                        className="min-h-10 gap-1 bg-white px-3 text-xs"
+                      >
+                        <span>View details</span>
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        aria-label={`Delete order ${order.orderNumber}`}
+                        onClick={() => setOrderToDelete(order)}
+                        className="h-10 w-10 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Slide-Over Order Details Drawer */}
+      <AdminOrderDetailSheet
+        order={activeOrder}
+        onClose={() => setActiveOrderId(null)}
+        onConfirmDeliveryQuote={confirmDeliveryQuote}
+        onUpdateStatus={updateStatus}
+        onVerifyPayment={verifyPayment}
+        onCancelOrder={cancelOrder}
+        onDeleteOrder={deleteOrder}
+      />
+
+      {/* Row Delete Confirmation Modal */}
+      <AdminDeleteOrderDialog
+        order={orderToDelete}
+        onClose={() => setOrderToDelete(null)}
+        onConfirmDelete={deleteOrder}
+      />
     </div>
   );
 }

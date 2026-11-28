@@ -159,18 +159,21 @@ export default async function HomePage() {
       {/* Band 3: Curated 3-Column Collection Grid */}
       {showcaseProducts.length > 0 ? (
         <div className="space-y-7">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
-                Apothecary Selection
-              </p>
-              <h2 className="font-display text-2xl font-medium tracking-tight text-foreground sm:text-3xl">
-                Popular &amp; Essential Formulations
-              </h2>
-              <p className="text-sm text-muted-foreground sm:text-base">
-                Most-ordered botanical favorites and trusted daily essentials.
-              </p>
-            </div>
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+              Apothecary Selection
+            </p>
+            <h2 className="font-display text-2xl font-medium tracking-tight text-foreground sm:text-3xl">
+              Popular &amp; Essential Formulations
+            </h2>
+            <p className="text-sm text-muted-foreground sm:text-base">
+              Most-ordered botanical favorites and trusted daily essentials.
+            </p>
+          </div>
+
+          <ProductGrid products={showcaseProducts} />
+
+          <div className="flex justify-center pt-1">
             <Link
               href="/products"
               className="inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 transition-colors hover:underline"
@@ -179,8 +182,6 @@ export default async function HomePage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-
-          <ProductGrid products={showcaseProducts} />
         </div>
       ) : null}
 

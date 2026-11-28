@@ -98,54 +98,62 @@ export function AdminOverviewSkeleton() {
 
 export function AdminOrdersListSkeleton() {
   return (
-    <div aria-label="Loading admin orders" className="space-y-4">
-      <div className="space-y-3 rounded-xl border border-border/80 bg-white p-4">
+    <div aria-label="Loading admin orders" className="space-y-5">
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-4">
+        {[1, 2, 3, 4].map((cell) => (
+          <div key={cell} className="space-y-2 bg-[#FCFBF8] p-4">
+            <Skeleton className="h-3.5 w-24" />
+            <Skeleton className="h-7 w-12" />
+            <Skeleton className="h-3 w-28" />
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-3 rounded-xl border border-border bg-[#FCFBF8] p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Skeleton className="h-10 w-full sm:max-w-xs" />
-          <Skeleton className="h-10 w-full sm:w-44" />
+          <Skeleton className="h-10 w-full sm:max-w-sm" />
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-24 rounded-md" />
+            <Skeleton className="h-10 w-36 rounded-md" />
+          </div>
         </div>
-        <div className="flex flex-wrap gap-1.5 border-t border-border/60 pt-3">
-          {[1, 2, 3, 4, 5].map((pill) => (
-            <Skeleton key={pill} className="h-9 w-24 rounded-md" />
+        <div className="flex gap-2 overflow-hidden border-t border-border/80 pt-3">
+          {[1, 2, 3, 4, 5].map((tab) => (
+            <Skeleton key={tab} className="h-9 w-24 shrink-0 rounded-md" />
           ))}
         </div>
       </div>
 
-      <div className="space-y-3">
-        {[1, 2, 3].map((card) => (
-          <div
-            key={card}
-            className="space-y-4 rounded-xl border border-border/80 bg-white p-4 sm:p-5"
-          >
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Skeleton className="h-5 w-28" />
-                  <Skeleton className="h-4 w-24" />
+      <div className="overflow-hidden rounded-xl border border-border bg-[#FCFBF8]">
+        <div className="divide-y divide-border/80">
+          {[1, 2, 3, 4, 5].map((row) => (
+            <div
+              key={row}
+              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="flex items-center gap-6">
+                <div className="space-y-1.5">
+                  <Skeleton className="h-3.5 w-24" />
+                  <Skeleton className="h-3 w-20" />
                 </div>
-                <Skeleton className="h-3.5 w-48" />
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-40" />
+                </div>
               </div>
-              <div className="space-y-1.5 sm:text-right">
-                <Skeleton className="h-6 w-24 sm:ml-auto" />
-                <Skeleton className="h-3.5 w-36 sm:ml-auto" />
-              </div>
-            </div>
-
-            <div className="grid gap-4 rounded-lg bg-muted/35 p-3.5 md:grid-cols-2">
-              <div className="space-y-2.5">
-                <Skeleton className="h-4 w-32" />
-                <div className="flex gap-2">
-                  <Skeleton className="h-9 w-32 rounded-md" />
+              <div className="flex items-center justify-between gap-4 sm:justify-end">
+                <div className="space-y-1.5 sm:text-right">
+                  <Skeleton className="h-4 w-24 sm:ml-auto" />
+                  <Skeleton className="h-3 w-20 sm:ml-auto" />
+                </div>
+                <div className="flex items-center gap-1.5">
                   <Skeleton className="h-9 w-28 rounded-md" />
+                  <Skeleton className="h-9 w-9 rounded-md" />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-4 w-44" />
-              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
