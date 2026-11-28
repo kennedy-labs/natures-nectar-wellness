@@ -10,7 +10,11 @@ export type CreateOrderRequestData = SubmitOrderInput & {
   orderNumber: string;
   subtotalAmount: number;
   whatsappMessage: string;
-  initialStatus?: "PENDING" | "AWAITING_PAYMENT";
+  initialStatus?:
+    | "PENDING"
+    | "REVIEWING_DELIVERY"
+    | "AWAITING_PAYMENT"
+    | "PROCESSING";
   items: Array<{
     productId: string;
     productName: string;
@@ -22,7 +26,7 @@ export type CreateOrderRequestData = SubmitOrderInput & {
 };
 
 export async function createOrderRequest(data: CreateOrderRequestData) {
-  const initialStatus = data.initialStatus ?? "PENDING";
+  const initialStatus = data.initialStatus ?? "PROCESSING";
 
   return db.$transaction(async (transaction) => {
     for (const item of data.items) {

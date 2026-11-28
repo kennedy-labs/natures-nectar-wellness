@@ -1,4 +1,9 @@
 import type { PaymentMethod } from "@/features/checkout/types/checkout.types";
+import {
+  isCashPaymentMethod,
+  isUpfrontDigitalPaymentMethod,
+  normalizeOrderStage,
+} from "@/features/orders/utils/order-workflow.utils";
 import { formatWhatsappPaymentStatus } from "@/features/whatsapp/utils/whatsapp.utils";
 
 export type OrderSemanticTone = "delivered" | "active" | "amber" | "alert";
@@ -47,13 +52,13 @@ export function getTrackingStepsForMethod(
 export function getProgressIndex(status: string): number {
   if (status === "DELIVERED") return 3;
   if (status === "OUT_FOR_DELIVERY") return 2;
-  if (status === "PROCESSING") return 1;
+  if (status === "PROCESSING" || status === "PAID") return 1;
   return 0;
 }
 
 export function getFriendlyStatusLabel(
   status: string,
-  isPaid: boolean,
+  _isPaid: boolean,
   deliveryMethod?: string
 ): string {
   if (status === "CANCELLED") return "Cancelled";
@@ -63,8 +68,9 @@ export function getFriendlyStatusLabel(
   if (status === "OUT_FOR_DELIVERY") {
     return deliveryMethod === "PICKUP" ? "Ready for Pickup" : "Out for Delivery";
   }
-  if (status === "PROCESSING") return "Preparing";
-  if (status === "PAID" || isPaid) return "Confirmed";
+  if (status === "PROCESSING" || status === "PAID") return "Preparing";
+  if (status === "REVIEWING_DELIVERY") return "Quote Needed";
+  if (status === "AWAITING_PAYMENT") return "Awaiting Payment";
   return "Order Placed";
 }
 
@@ -90,23 +96,27 @@ export function getOrderVisualProfile(input: {
   paymentStatus?: string | null;
 }): OrderVisualProfile {
   const isPaid = input.paymentStatus === "VERIFIED";
-  const isCancelled = input.status === "CANCELLED";
-  const isDelivered = input.status === "DELIVERED";
+  const stage = normalizeOrderStage({
+    status: input.status,
+    deliveryMethod: input.deliveryMethod,
+    deliveryFee: input.deliveryFee,
+    preferredPaymentMethod: input.preferredPaymentMethod,
+    payments: input.paymentStatus ? [{ status: input.paymentStatus }] : null,
+  });
+
+  const isCancelled = stage === "CANCELLED";
+  const isDelivered = stage === "DELIVERED";
   const isPaymentFailed = input.paymentStatus === "FAILED";
-  const isAwaitingMpesa =
+  const isCashPending =
+    !isPaid && !isCancelled && isCashPaymentMethod(input.preferredPaymentMethod);
+  const isAwaitingQuote = stage === "REVIEWING_DELIVERY";
+  const isAwaitingPayment =
+    stage === "AWAITING_PAYMENT" &&
     !isPaid &&
-    !isCancelled &&
-    (input.preferredPaymentMethod === "MPESA_BUY_GOODS" ||
-      input.preferredPaymentMethod === "BANK_TRANSFER");
-  const isCashOnPickupPending =
-    !isPaid && !isCancelled && input.preferredPaymentMethod === "CASH_ON_PICKUP";
-  const isAwaitingDeliveryQuote =
-    !isCancelled &&
-    input.deliveryMethod === "COUNTRYWIDE_DELIVERY" &&
-    input.deliveryFee === null;
+    isUpfrontDigitalPaymentMethod(input.preferredPaymentMethod);
 
   const statusLabel = getFriendlyStatusLabel(
-    input.status,
+    stage,
     isPaid,
     input.deliveryMethod
   );
@@ -157,13 +167,13 @@ export function getOrderVisualProfile(input: {
     };
   }
 
-  if (isPaymentFailed || isAwaitingMpesa) {
+  if (isPaymentFailed || isAwaitingPayment) {
     return {
       tone: "amber",
       statusLabel: isPaymentFailed ? "Payment Failed" : statusLabel,
       statusDescription: isPaymentFailed
         ? "M-Pesa confirmation did not complete. Message us on WhatsApp if you need help."
-        : "Waiting for M-Pesa payment confirmation before dispatch.",
+        : "Waiting for M-Pesa or bank payment confirmation before packing.",
       paymentLabel,
       paymentPaid: false,
       paymentNeedsAttention: true,
@@ -177,20 +187,19 @@ export function getOrderVisualProfile(input: {
     };
   }
 
-  let statusDescription = "Your order is confirmed and in our fulfillment queue.";
-  if (input.status === "OUT_FOR_DELIVERY") {
+  let statusDescription = "We are carefully preparing and packing your items.";
+  if (stage === "OUT_FOR_DELIVERY") {
     statusDescription =
       input.deliveryMethod === "PICKUP"
         ? "Your formulation is packed and ready for collection."
         : "Your order is on the way with our delivery rider.";
-  } else if (input.status === "PROCESSING") {
-    statusDescription = "We are carefully preparing and packing your items.";
-  } else if (isAwaitingDeliveryQuote) {
+  } else if (stage === "PROCESSING") {
+    statusDescription = isCashPending
+      ? "We are preparing and packing your order. Pay in cash on handover."
+      : "We are carefully preparing and packing your items.";
+  } else if (isAwaitingQuote) {
     statusDescription =
       "Order saved. Our team will confirm the countrywide delivery fee shortly.";
-  } else if (isCashOnPickupPending) {
-    statusDescription =
-      "Order saved. Pay in cash when collecting your items.";
   }
 
   return {
@@ -199,7 +208,7 @@ export function getOrderVisualProfile(input: {
     statusDescription,
     paymentLabel,
     paymentPaid: isPaid,
-    paymentNeedsAttention: isCashOnPickupPending || isAwaitingDeliveryQuote,
+    paymentNeedsAttention: isCashPending || isAwaitingQuote,
     headerSurfaceClass: "bg-primary/[0.07]",
     headerBorderClass: "border-primary/15",
     headerTitleClass: "text-foreground",

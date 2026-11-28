@@ -41,11 +41,20 @@ import {
   getDeliveryFeeSummary,
   parseDeliveryNotesPin,
 } from "@/features/orders/utils/order.utils";
+import {
+  getNextOrderAction,
+  hasVerifiedPayment,
+  isCashPaymentMethod,
+  normalizeOrderStage,
+} from "@/features/orders/utils/order-workflow.utils";
 import { formatKes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+type FocusSection = "quote" | "payment" | null;
+
 type AdminOrderDetailSheetProps = {
   order: AdminOrder | null;
+  focusSection?: FocusSection;
   onClose: () => void;
   onConfirmDeliveryQuote: (
     orderId: string,
@@ -63,19 +72,17 @@ type AdminOrderDetailSheetProps = {
   onDeleteOrder: (order: AdminOrder) => Promise<void>;
 };
 
-const PROGRESS_STEPS = ["Placed", "Confirmed", "Dispatch", "Completed"] as const;
-
-function StatusIcon({ status }: { status: string }) {
-  if (status === "CANCELLED") {
+function StatusIcon({ stage }: { stage: string }) {
+  if (stage === "CANCELLED") {
     return <XCircle className="h-4 w-4 shrink-0" />;
   }
-  if (status === "DELIVERED" || status === "PAID") {
+  if (stage === "DELIVERED") {
     return <CheckCircle2 className="h-4 w-4 shrink-0" />;
   }
-  if (status === "OUT_FOR_DELIVERY") {
+  if (stage === "OUT_FOR_DELIVERY") {
     return <Truck className="h-4 w-4 shrink-0" />;
   }
-  if (status === "PROCESSING") {
+  if (stage === "PROCESSING") {
     return <Package className="h-4 w-4 shrink-0" />;
   }
   return <Clock className="h-4 w-4 shrink-0" />;
@@ -83,6 +90,7 @@ function StatusIcon({ status }: { status: string }) {
 
 function OrderDetailContent({
   order,
+  focusSection = null,
   onClose,
   onConfirmDeliveryQuote,
   onUpdateStatus,
@@ -91,6 +99,7 @@ function OrderDetailContent({
   onDeleteOrder,
 }: {
   order: AdminOrder;
+  focusSection?: FocusSection;
   onClose: () => void;
   onConfirmDeliveryQuote: AdminOrderDetailSheetProps["onConfirmDeliveryQuote"];
   onUpdateStatus: AdminOrderDetailSheetProps["onUpdateStatus"];
@@ -98,23 +107,14 @@ function OrderDetailContent({
   onCancelOrder: AdminOrderDetailSheetProps["onCancelOrder"];
   onDeleteOrder: AdminOrderDetailSheetProps["onDeleteOrder"];
 }) {
+  const stage = normalizeOrderStage(order);
+  const nextAction = getNextOrderAction(order);
   const total = getAdminOrderTotal(order);
   const payment = order.payments?.[0];
   const paymentStatus = payment?.status;
-  const isPaid = order.payments?.some((p) => p.status === "VERIFIED") ?? false;
-  const isCashOrder =
-    order.preferredPaymentMethod === "CASH_ON_PICKUP" ||
-    order.preferredPaymentMethod === "CASH_ON_DELIVERY";
-  const canFulfill = isPaid || isCashOrder;
-  const isClosed =
-    order.status === "DELIVERED" || order.status === "CANCELLED";
-  const needsQuote =
-    order.status === "PENDING" || order.status === "REVIEWING_DELIVERY";
-  const canVerifyPayment =
-    Boolean(payment) &&
-    (paymentStatus === "PENDING" ||
-      paymentStatus === "AWAITING_VERIFICATION") &&
-    !isClosed;
+  const isPaid = hasVerifiedPayment(order);
+  const isCashOrder = isCashPaymentMethod(order.preferredPaymentMethod);
+  const isClosed = stage === "DELIVERED" || stage === "CANCELLED";
 
   const [feeInput, setFeeInput] = useState(
     order.deliveryFee !== null && order.deliveryFee !== undefined
@@ -125,7 +125,7 @@ function OrderDetailContent({
     order.deliveryQuoteNotes ?? ""
   );
   const [showQuoteEditor, setShowQuoteEditor] = useState(
-    needsQuote && order.deliveryMethod === "COUNTRYWIDE_DELIVERY"
+    stage === "REVIEWING_DELIVERY" || focusSection === "quote"
   );
   const [transactionRefInput, setTransactionRefInput] = useState(
     payment?.transactionRef ?? ""
@@ -140,6 +140,10 @@ function OrderDetailContent({
 
   const statusMeta = getAdminOrderStatusMeta(order);
   const tone = getToneClasses(statusMeta.tone);
+  const progressSteps =
+    order.deliveryMethod === "PICKUP"
+      ? (["Placed", "Preparing", "Ready for Pickup", "Collected"] as const)
+      : (["Placed", "Preparing", "Out for Delivery", "Delivered"] as const);
   const { cleanNotes: cleanDeliveryNotes, mapUrl } = parseDeliveryNotesPin(
     order.deliveryNotes
   );
@@ -212,7 +216,7 @@ function OrderDetailContent({
               tone.badgeClass
             )}
           >
-            <StatusIcon status={order.status} />
+            <StatusIcon stage={stage} />
             <span>{statusMeta.label}</span>
           </span>
         </div>
@@ -221,11 +225,11 @@ function OrderDetailContent({
           Full details and management actions for order {order.orderNumber}
         </SheetDescription>
 
-        {/* Clean 4-Step Progress Bar */}
-        {order.status !== "CANCELLED" ? (
+        {/* Clean 4-Step Progress Bar aligned 1-to-1 with Customer Tracking */}
+        {stage !== "CANCELLED" ? (
           <div className="pt-3">
             <div className="grid grid-cols-4 gap-1.5">
-              {PROGRESS_STEPS.map((stepLabel, idx) => {
+              {progressSteps.map((stepLabel, idx) => {
                 const reached = idx <= statusMeta.stepIndex;
                 return (
                   <div key={stepLabel} className="space-y-1">
@@ -237,7 +241,7 @@ function OrderDetailContent({
                     />
                     <p
                       className={cn(
-                        "text-[11px] font-medium",
+                        "truncate text-[11px] font-medium",
                         reached ? "text-foreground" : "text-muted-foreground/80"
                       )}
                     >
@@ -275,14 +279,14 @@ function OrderDetailContent({
           </div>
         ) : null}
 
-        {/* Guided Action Studio */}
+        {/* State-Driven Single Primary Action */}
         {!isClosed || isPaid ? (
           <section aria-label="Order actions" className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                Order actions
+                Next action
               </h3>
-              {!isClosed && !showQuoteEditor ? (
+              {!isClosed && stage !== "REVIEWING_DELIVERY" && !showQuoteEditor ? (
                 <button
                   type="button"
                   onClick={() => setShowQuoteEditor(true)}
@@ -295,14 +299,25 @@ function OrderDetailContent({
               ) : null}
             </div>
 
-            {/* Delivery Fee Quote Form */}
+            {/* Delivery Quote Editor */}
             {!isClosed && showQuoteEditor ? (
               <div className="space-y-3 rounded-xl border border-border bg-white p-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-foreground">
-                    Delivery quote
-                  </p>
-                  {order.deliveryMethod !== "COUNTRYWIDE_DELIVERY" ? (
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {stage === "REVIEWING_DELIVERY"
+                        ? "Set delivery quote"
+                        : "Adjust delivery fee"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {stage === "REVIEWING_DELIVERY"
+                        ? isCashOrder
+                          ? "Saving moves this order to Preparing."
+                          : "Saving updates the order total so payment can be verified."
+                        : "Updating delivery fee recalculates the order total while preserving progress."}
+                    </p>
+                  </div>
+                  {stage !== "REVIEWING_DELIVERY" ? (
                     <button
                       type="button"
                       onClick={() => setShowQuoteEditor(false)}
@@ -326,6 +341,7 @@ function OrderDetailContent({
                       min="0"
                       step="1"
                       placeholder="e.g. 350"
+                      autoFocus={focusSection === "quote"}
                       value={feeInput}
                       onChange={(e) => setFeeInput(e.target.value)}
                       className="h-10 bg-[#FCFBF8] tabular-nums"
@@ -366,18 +382,16 @@ function OrderDetailContent({
               </div>
             ) : null}
 
-            {/* Payment Verification */}
-            {canVerifyPayment && payment ? (
+            {/* Verify Payment Form (Only when AWAITING_PAYMENT) */}
+            {stage === "AWAITING_PAYMENT" && payment ? (
               <div className="space-y-3 rounded-xl border border-border bg-white p-4">
                 <div>
                   <p className="text-sm font-medium text-foreground">
-                    Confirm {getAdminPaymentMethodLabel(payment.method)} payment
+                    Verify {getAdminPaymentMethodLabel(payment.method)} payment
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {payment.method === "MPESA_BUY_GOODS" ||
-                    payment.method === "BANK_TRANSFER"
-                      ? "Enter the M-Pesa or bank confirmation code once received."
-                      : "Confirm cash receipt once collected from the customer."}
+                    Enter the M-Pesa or bank confirmation code to verify payment
+                    and move this order into Preparing.
                   </p>
                 </div>
 
@@ -387,20 +401,13 @@ function OrderDetailContent({
                       htmlFor={`pay-ref-${order.id}`}
                       className="mb-1 block text-xs text-muted-foreground"
                     >
-                      {payment.method === "MPESA_BUY_GOODS" ||
-                      payment.method === "BANK_TRANSFER"
-                        ? "Transaction code"
-                        : "Receipt note (optional)"}
+                      Transaction code
                     </label>
                     <Input
                       id={`pay-ref-${order.id}`}
                       type="text"
-                      placeholder={
-                        payment.method === "MPESA_BUY_GOODS" ||
-                        payment.method === "BANK_TRANSFER"
-                          ? "e.g. SJK8912P4"
-                          : "Optional receipt reference"
-                      }
+                      placeholder="e.g. SJK8912P4"
+                      autoFocus={focusSection === "payment"}
                       value={transactionRefInput}
                       onChange={(e) => setTransactionRefInput(e.target.value)}
                       className="h-10 bg-[#FCFBF8] font-mono text-xs uppercase"
@@ -439,12 +446,15 @@ function OrderDetailContent({
                   ) : (
                     <>
                       <CheckCircle2 className="h-4 w-4" />
-                      Mark payment received
+                      Verify payment &amp; prepare order
                     </>
                   )}
                 </Button>
               </div>
-            ) : isPaid && payment ? (
+            ) : null}
+
+            {/* Paid Confirmation Strip */}
+            {isPaid && payment ? (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#1F4E37]/20 bg-[#1F4E37]/[0.06] px-4 py-3 text-xs">
                 <span className="inline-flex items-center gap-1.5 font-medium text-[#1F4E37]">
                   <CheckCircle2 className="h-4 w-4" />
@@ -457,79 +467,50 @@ function OrderDetailContent({
               </div>
             ) : null}
 
-            {/* Fulfillment Stage Controls */}
-            {!isClosed && canFulfill ? (
-              <div className="space-y-2.5 rounded-xl border border-border bg-white p-4">
-                <p className="text-sm font-medium text-foreground">
-                  Update fulfillment stage
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {order.status !== "PROCESSING" &&
-                  order.status !== "OUT_FOR_DELIVERY" ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={Boolean(busyAction)}
-                      onClick={() =>
-                        runAction("status-processing", () =>
-                          onUpdateStatus(order.id, "PROCESSING")
-                        )
-                      }
-                      className="min-h-10 gap-1.5 bg-[#FCFBF8]"
-                    >
-                      {busyAction === "status-processing" ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Package className="h-3.5 w-3.5 text-[#1F4E37]" />
-                      )}
-                      Start packing
-                    </Button>
-                  ) : null}
-
-                  {order.status !== "OUT_FOR_DELIVERY" ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={Boolean(busyAction)}
-                      onClick={() =>
-                        runAction("status-dispatch", () =>
-                          onUpdateStatus(order.id, "OUT_FOR_DELIVERY")
-                        )
-                      }
-                      className="min-h-10 gap-1.5 bg-[#FCFBF8]"
-                    >
-                      {busyAction === "status-dispatch" ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Truck className="h-3.5 w-3.5 text-[#1F4E37]" />
-                      )}
-                      {order.deliveryMethod === "PICKUP"
-                        ? "Ready for pickup"
-                        : "Out for delivery"}
-                    </Button>
-                  ) : null}
-
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={Boolean(busyAction)}
-                    onClick={() =>
-                      runAction("status-delivered", () =>
-                        onUpdateStatus(order.id, "DELIVERED")
-                      )
-                    }
-                    className="min-h-10 gap-1.5"
-                  >
-                    {busyAction === "status-delivered" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                    )}
-                    Mark delivered
-                  </Button>
+            {/* Single Valid Next-Step Fulfillment Card */}
+            {!isClosed && nextAction?.kind === "transition" ? (
+              <div className="space-y-3 rounded-xl border border-border bg-white p-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {stage === "PROCESSING"
+                      ? order.deliveryMethod === "PICKUP"
+                        ? "Ready at pickup counter?"
+                        : "Handed over for delivery?"
+                      : order.deliveryMethod === "PICKUP"
+                        ? "Confirm customer pickup"
+                        : "Confirm delivery completion"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {stage === "PROCESSING"
+                      ? order.deliveryMethod === "PICKUP"
+                        ? "Once packed, mark Ready for Pickup to alert your customer."
+                        : "Once handed to the rider or courier, mark Out for Delivery."
+                      : nextAction.autoVerifiesCash
+                        ? `Confirm handover to mark Delivered and verify the ${formatKes(total)} cash payment.`
+                        : "Mark Delivered once the customer has received their items."}
+                  </p>
                 </div>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={Boolean(busyAction)}
+                  onClick={() =>
+                    runAction(`status-${nextAction.targetStatus}`, () =>
+                      onUpdateStatus(order.id, nextAction.targetStatus)
+                    )
+                  }
+                  className="min-h-10 w-full gap-1.5 sm:w-auto"
+                >
+                  {busyAction === `status-${nextAction.targetStatus}` ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : nextAction.targetStatus === "OUT_FOR_DELIVERY" ? (
+                    <Truck className="h-4 w-4" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  {nextAction.label}
+                </Button>
               </div>
             ) : null}
           </section>
@@ -817,6 +798,7 @@ function OrderDetailContent({
 
 export function AdminOrderDetailSheet({
   order,
+  focusSection = null,
   onClose,
   onConfirmDeliveryQuote,
   onUpdateStatus,
@@ -832,8 +814,9 @@ export function AdminOrderDetailSheet({
       >
         {order ? (
           <OrderDetailContent
-            key={order.id}
+            key={`${order.id}-${focusSection ?? "default"}`}
             order={order}
+            focusSection={focusSection}
             onClose={onClose}
             onConfirmDeliveryQuote={onConfirmDeliveryQuote}
             onUpdateStatus={onUpdateStatus}

@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
+  MapPin,
   Package,
   RefreshCw,
   Search,
@@ -33,6 +34,11 @@ import {
   getAdminPaymentMethodLabel,
   getToneClasses,
 } from "@/features/admin/utils/order-display.utils";
+import {
+  normalizeOrderStage,
+  type OrderNextAction,
+  type UnifiedOrderStage,
+} from "@/features/orders/utils/order-workflow.utils";
 import { formatKes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -47,21 +53,24 @@ type AdminOrdersPanelProps = {
 
 type OrderFilter = "all" | AdminOrderCategory;
 
-function StatusGlyph({ status }: { status: string }) {
-  if (status === "CANCELLED") {
+function StatusGlyph({ stage }: { stage: UnifiedOrderStage }) {
+  if (stage === "CANCELLED") {
     return <XCircle className="h-3.5 w-3.5 shrink-0" />;
   }
-  if (status === "DELIVERED") {
+  if (stage === "DELIVERED") {
     return <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />;
   }
-  if (status === "PAID") {
-    return <CreditCard className="h-3.5 w-3.5 shrink-0" />;
-  }
-  if (status === "OUT_FOR_DELIVERY") {
+  if (stage === "OUT_FOR_DELIVERY") {
     return <Truck className="h-3.5 w-3.5 shrink-0" />;
   }
-  if (status === "PROCESSING") {
+  if (stage === "PROCESSING") {
     return <Package className="h-3.5 w-3.5 shrink-0" />;
+  }
+  if (stage === "AWAITING_PAYMENT") {
+    return <CreditCard className="h-3.5 w-3.5 shrink-0" />;
+  }
+  if (stage === "REVIEWING_DELIVERY") {
+    return <MapPin className="h-3.5 w-3.5 shrink-0" />;
   }
   return <Clock className="h-3.5 w-3.5 shrink-0" />;
 }
@@ -97,6 +106,9 @@ export function AdminOrdersPanel({
 
   const [internalSelectedOrderId, setInternalSelectedOrderId] = useState<
     string | null
+  >(null);
+  const [drawerFocusSection, setDrawerFocusSection] = useState<
+    "quote" | "payment" | null
   >(null);
   const [orderToCancel, setOrderToCancel] = useState<AdminOrder | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<AdminOrder | null>(null);
@@ -183,7 +195,11 @@ export function AdminOrdersPanel({
     await load();
   }
 
-  async function updateStatus(orderId: string, status: string) {
+  async function updateStatus(
+    orderId: string,
+    status: string,
+    noticeText?: string
+  ) {
     const res = await fetch(`/api/orders/${orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -204,26 +220,37 @@ export function AdminOrdersPanel({
     setPanelNotice({
       tone: "info",
       text:
-        status === "DELIVERED"
+        noticeText ??
+        (status === "DELIVERED"
           ? "Order marked as delivered."
-          : "Order progress updated.",
+          : "Order progress updated."),
     });
     await load();
   }
 
-  async function handleQuickComplete(order: AdminOrder) {
+  async function handleNextAction(order: AdminOrder, action: OrderNextAction) {
+    if (action.kind === "open_quote" || action.kind === "open_payment") {
+      setDrawerFocusSection(action.focusSection);
+      setActiveOrderId(order.id);
+      return;
+    }
+
     if (busyOrderId) return;
     setBusyOrderId(order.id);
     setPanelNotice(null);
+
+    const noticeText =
+      action.targetStatus === "DELIVERED"
+        ? action.autoVerifiesCash
+          ? `Order ${order.orderNumber} marked Delivered and cash payment verified.`
+          : `Order ${order.orderNumber} marked Delivered.`
+        : `Order ${order.orderNumber} moved to ${action.label}.`;
+
     try {
-      await updateStatus(order.id, "DELIVERED");
-      setPanelNotice({
-        tone: "info",
-        text: `Order ${order.orderNumber} marked as delivered.`,
-      });
+      await updateStatus(order.id, action.targetStatus, noticeText);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Could not complete order.";
+        err instanceof Error ? err.message : "Could not advance order.";
       const code =
         err && typeof err === "object" && "code" in err
           ? String((err as { code?: unknown }).code ?? "")
@@ -232,8 +259,16 @@ export function AdminOrdersPanel({
       if (code === "PAYMENT_REQUIRED") {
         setPanelNotice({
           tone: "error",
-          text: `Verify payment for ${order.orderNumber} before completing it.`,
+          text: `Verify payment for ${order.orderNumber} before continuing.`,
         });
+        setDrawerFocusSection("payment");
+        setActiveOrderId(order.id);
+      } else if (code === "DELIVERY_QUOTE_REQUIRED") {
+        setPanelNotice({
+          tone: "error",
+          text: `Set the delivery quote for ${order.orderNumber} before continuing.`,
+        });
+        setDrawerFocusSection("quote");
         setActiveOrderId(order.id);
       } else {
         setPanelNotice({
@@ -358,21 +393,19 @@ export function AdminOrdersPanel({
 
   const summary = useMemo(() => {
     const counts: Record<AdminOrderCategory, number> = {
-      new_orders: 0,
-      pending_payments: 0,
-      delivery_check: 0,
-      preparing: 0,
-      being_packed: 0,
-      ready_for_pickup: 0,
-      delivered: 0,
-      cancelled: 0,
+      REVIEWING_DELIVERY: 0,
+      AWAITING_PAYMENT: 0,
+      PROCESSING: 0,
+      OUT_FOR_DELIVERY: 0,
+      DELIVERED: 0,
+      CANCELLED: 0,
     };
     let deliveredRevenue = 0;
 
     for (const order of orders) {
       const category = getAdminOrderCategory(order);
       counts[category] += 1;
-      if (category === "delivered") {
+      if (category === "DELIVERED") {
         deliveredRevenue += getAdminOrderTotal(order);
       }
     }
@@ -423,61 +456,44 @@ export function AdminOrdersPanel({
     activeClass: string;
   }> = [
     {
-      key: "new_orders",
-      title: "New Orders",
-      count: summary.new_orders,
-      subtext: "Awaiting review",
-      countClass: summary.new_orders > 0 ? "text-amber-700" : "text-foreground",
+      key: "REVIEWING_DELIVERY",
+      title: "Quote Needed",
+      count: summary.REVIEWING_DELIVERY,
+      subtext: "Courier fee pending",
+      countClass:
+        summary.REVIEWING_DELIVERY > 0 ? "text-amber-700" : "text-foreground",
       activeClass: "bg-amber-50/75 ring-1 ring-inset ring-amber-300/70",
     },
     {
-      key: "pending_payments",
-      title: "Pending Payments",
-      count: summary.pending_payments,
-      subtext: "Awaiting confirmation",
+      key: "AWAITING_PAYMENT",
+      title: "Awaiting Payment",
+      count: summary.AWAITING_PAYMENT,
+      subtext: "Verify M-Pesa / Bank",
       countClass:
-        summary.pending_payments > 0 ? "text-amber-700" : "text-foreground",
+        summary.AWAITING_PAYMENT > 0 ? "text-amber-700" : "text-foreground",
       activeClass: "bg-amber-50/75 ring-1 ring-inset ring-amber-300/70",
     },
     {
-      key: "delivery_check",
-      title: "Need Verification",
-      count: summary.delivery_check,
-      subtext: "Delivery check action",
-      countClass:
-        summary.delivery_check > 0 ? "text-orange-700" : "text-foreground",
-      activeClass: "bg-orange-50/75 ring-1 ring-inset ring-orange-300/70",
-    },
-    {
-      key: "preparing",
-      title: "Preparing Orders",
-      count: summary.preparing,
-      subtext: "Paid & ready",
-      countClass:
-        summary.preparing > 0 ? "text-emerald-700" : "text-foreground",
-      activeClass: "bg-emerald-50/75 ring-1 ring-inset ring-emerald-300/70",
-    },
-    {
-      key: "being_packed",
-      title: "Being Packed",
-      count: summary.being_packed,
-      subtext: "Packing items",
-      countClass: summary.being_packed > 0 ? "text-sky-700" : "text-foreground",
+      key: "PROCESSING",
+      title: "Preparing",
+      count: summary.PROCESSING,
+      subtext: "Ready to pack",
+      countClass: summary.PROCESSING > 0 ? "text-sky-700" : "text-foreground",
       activeClass: "bg-sky-50/75 ring-1 ring-inset ring-sky-300/70",
     },
     {
-      key: "ready_for_pickup",
-      title: "Ready for Pickup",
-      count: summary.ready_for_pickup,
-      subtext: "Pickup & dispatch",
+      key: "OUT_FOR_DELIVERY",
+      title: "Ready / Dispatched",
+      count: summary.OUT_FOR_DELIVERY,
+      subtext: "Pickup & riders",
       countClass:
-        summary.ready_for_pickup > 0 ? "text-indigo-700" : "text-foreground",
+        summary.OUT_FOR_DELIVERY > 0 ? "text-indigo-700" : "text-foreground",
       activeClass: "bg-indigo-50/75 ring-1 ring-inset ring-indigo-300/70",
     },
     {
-      key: "delivered",
+      key: "DELIVERED",
       title: "Delivered",
-      count: summary.delivered,
+      count: summary.DELIVERED,
       subtext:
         summary.deliveredRevenue > 0
           ? formatKes(summary.deliveredRevenue)
@@ -489,10 +505,10 @@ export function AdminOrdersPanel({
 
   return (
     <div className="space-y-4">
-      {/* 7-Stage Order Lifecycle Summary Strip */}
+      {/* 5-Stage Order Lifecycle Summary Strip */}
       <section
         aria-label="Order queue stages"
-        className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4 xl:grid-cols-7"
+        className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3 lg:grid-cols-5"
       >
         {stageCards.map((card) => {
           const active = filter === card.key;
@@ -525,7 +541,7 @@ export function AdminOrdersPanel({
         })}
       </section>
 
-      {/* Unified Compact Toolbar: Quick Tabs + Search + Maintenance */}
+      {/* Unified Compact Toolbar: 1-to-1 State Tabs + Search + Maintenance */}
       <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-white p-3 sm:p-3.5">
         <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -538,51 +554,39 @@ export function AdminOrdersPanel({
                   activeClass: "bg-slate-900 text-white",
                 },
                 {
-                  key: "new_orders",
-                  label: "New Orders",
-                  count: summary.new_orders,
+                  key: "REVIEWING_DELIVERY",
+                  label: "Quote Needed",
+                  count: summary.REVIEWING_DELIVERY,
                   activeClass: "bg-amber-600 text-white",
                 },
                 {
-                  key: "pending_payments",
-                  label: "Pending Payments",
-                  count: summary.pending_payments,
+                  key: "AWAITING_PAYMENT",
+                  label: "Awaiting Payment",
+                  count: summary.AWAITING_PAYMENT,
                   activeClass: "bg-amber-700 text-white",
                 },
                 {
-                  key: "delivery_check",
-                  label: "Need Verification",
-                  count: summary.delivery_check,
-                  activeClass: "bg-orange-600 text-white",
-                },
-                {
-                  key: "preparing",
+                  key: "PROCESSING",
                   label: "Preparing",
-                  count: summary.preparing,
-                  activeClass: "bg-emerald-700 text-white",
-                },
-                {
-                  key: "being_packed",
-                  label: "Being Packed",
-                  count: summary.being_packed,
+                  count: summary.PROCESSING,
                   activeClass: "bg-sky-700 text-white",
                 },
                 {
-                  key: "ready_for_pickup",
-                  label: "Ready for Pickup",
-                  count: summary.ready_for_pickup,
+                  key: "OUT_FOR_DELIVERY",
+                  label: "Ready / Dispatched",
+                  count: summary.OUT_FOR_DELIVERY,
                   activeClass: "bg-indigo-700 text-white",
                 },
                 {
-                  key: "delivered",
+                  key: "DELIVERED",
                   label: "Delivered",
-                  count: summary.delivered,
+                  count: summary.DELIVERED,
                   activeClass: "bg-[#1F4E37] text-white",
                 },
                 {
-                  key: "cancelled",
+                  key: "CANCELLED",
                   label: "Cancelled",
-                  count: summary.cancelled,
+                  count: summary.CANCELLED,
                   activeClass: "bg-rose-700 text-white",
                 },
               ] as const
@@ -741,18 +745,19 @@ export function AdminOrdersPanel({
               </thead>
               <tbody className="divide-y divide-border/80">
                 {filteredOrders.map((order) => {
+                  const stage = normalizeOrderStage(order);
                   const total = getAdminOrderTotal(order);
                   const statusMeta = getAdminOrderStatusMeta(order);
                   const tone = getToneClasses(statusMeta.tone);
-                  const isQuotePending =
-                    order.deliveryMethod === "COUNTRYWIDE_DELIVERY" &&
-                    order.deliveryFee == null &&
-                    !["DELIVERED", "CANCELLED"].includes(order.status);
+                  const isQuotePending = stage === "REVIEWING_DELIVERY";
 
                   return (
                     <tr
                       key={order.id}
-                      onClick={() => setActiveOrderId(order.id)}
+                      onClick={() => {
+                        setDrawerFocusSection(null);
+                        setActiveOrderId(order.id);
+                      }}
                       className="group cursor-pointer transition-colors hover:bg-[#F6F7F5]/80"
                     >
                       <td className="whitespace-nowrap py-2.5 pl-4 pr-3 align-middle">
@@ -792,7 +797,7 @@ export function AdminOrdersPanel({
                               tone.badgeClass
                             )}
                           >
-                            <StatusGlyph status={order.status} />
+                            <StatusGlyph stage={stage} />
                             <span>{statusMeta.label}</span>
                           </span>
                           <span className="text-[11px] text-muted-foreground">
@@ -819,8 +824,13 @@ export function AdminOrdersPanel({
                         <OrderActionsMenu
                           order={order}
                           busy={busyOrderId === order.id}
-                          onViewDetails={(target) => setActiveOrderId(target.id)}
-                          onComplete={(target) => void handleQuickComplete(target)}
+                          onViewDetails={(target) => {
+                            setDrawerFocusSection(null);
+                            setActiveOrderId(target.id);
+                          }}
+                          onNextAction={(target, action) =>
+                            void handleNextAction(target, action)
+                          }
                           onCancel={(target) => setOrderToCancel(target)}
                           onDelete={(target) => setOrderToDelete(target)}
                         />
@@ -835,6 +845,7 @@ export function AdminOrdersPanel({
           {/* Mobile Compact List Rows (< md) */}
           <div className="divide-y divide-border md:hidden">
             {filteredOrders.map((order) => {
+              const stage = normalizeOrderStage(order);
               const total = getAdminOrderTotal(order);
               const statusMeta = getAdminOrderStatusMeta(order);
               const tone = getToneClasses(statusMeta.tone);
@@ -842,7 +853,10 @@ export function AdminOrdersPanel({
               return (
                 <div
                   key={order.id}
-                  onClick={() => setActiveOrderId(order.id)}
+                  onClick={() => {
+                    setDrawerFocusSection(null);
+                    setActiveOrderId(order.id);
+                  }}
                   className="cursor-pointer space-y-2 p-3.5 transition-colors hover:bg-[#F6F7F5]/70"
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -883,7 +897,7 @@ export function AdminOrdersPanel({
                           tone.badgeClass
                         )}
                       >
-                        <StatusGlyph status={order.status} />
+                        <StatusGlyph stage={stage} />
                         <span>{statusMeta.label}</span>
                       </span>
                       <span className="truncate text-[11px] text-muted-foreground">
@@ -898,8 +912,13 @@ export function AdminOrdersPanel({
                       <OrderActionsMenu
                         order={order}
                         busy={busyOrderId === order.id}
-                        onViewDetails={(target) => setActiveOrderId(target.id)}
-                        onComplete={(target) => void handleQuickComplete(target)}
+                        onViewDetails={(target) => {
+                          setDrawerFocusSection(null);
+                          setActiveOrderId(target.id);
+                        }}
+                        onNextAction={(target, action) =>
+                          void handleNextAction(target, action)
+                        }
                         onCancel={(target) => setOrderToCancel(target)}
                         onDelete={(target) => setOrderToDelete(target)}
                       />
@@ -915,7 +934,11 @@ export function AdminOrdersPanel({
       {/* Slide-Over Order Details Drawer */}
       <AdminOrderDetailSheet
         order={activeOrder}
-        onClose={() => setActiveOrderId(null)}
+        focusSection={drawerFocusSection}
+        onClose={() => {
+          setDrawerFocusSection(null);
+          setActiveOrderId(null);
+        }}
         onConfirmDeliveryQuote={confirmDeliveryQuote}
         onUpdateStatus={updateStatus}
         onVerifyPayment={verifyPayment}

@@ -1,3 +1,11 @@
+import {
+  getNextOrderAction,
+  hasVerifiedPayment,
+  isCashPaymentMethod,
+  normalizeOrderStage,
+  type UnifiedOrderStage,
+} from "@/features/orders/utils/order-workflow.utils";
+
 export type AdminOrderPayment = {
   id: string;
   method:
@@ -155,47 +163,21 @@ export function getAdminOrderTotal(order: AdminOrder): number {
   return order.totalAmount ?? order.subtotalAmount + (order.deliveryFee ?? 0);
 }
 
-export type AdminOrderCategory =
-  | "new_orders"
-  | "pending_payments"
-  | "delivery_check"
-  | "preparing"
-  | "being_packed"
-  | "ready_for_pickup"
-  | "delivered"
-  | "cancelled";
+export type AdminOrderCategory = UnifiedOrderStage;
 
 export function getAdminOrderCategory(order: AdminOrder): AdminOrderCategory {
-  if (order.status === "CANCELLED") return "cancelled";
-  if (order.status === "DELIVERED") return "delivered";
-  if (order.status === "OUT_FOR_DELIVERY") return "ready_for_pickup";
-  if (order.status === "PROCESSING") return "being_packed";
-  if (order.status === "PAID") return "preparing";
-
-  const needsDeliveryCheck =
-    order.status === "REVIEWING_DELIVERY" ||
-    (order.status === "PENDING" &&
-      order.deliveryMethod === "COUNTRYWIDE_DELIVERY" &&
-      order.deliveryFee == null);
-
-  if (needsDeliveryCheck) return "delivery_check";
-  if (order.status === "AWAITING_PAYMENT") return "pending_payments";
-  return "new_orders";
+  return normalizeOrderStage(order);
 }
 
 export function getAdminOrderStatusMeta(
   order: AdminOrder
 ): AdminOrderStatusMeta {
-  const isPaid = order.payments?.some((p) => p.status === "VERIFIED") ?? false;
-  const isCash =
-    order.preferredPaymentMethod === "CASH_ON_PICKUP" ||
-    order.preferredPaymentMethod === "CASH_ON_DELIVERY";
-  const needsQuote =
-    (order.status === "PENDING" || order.status === "REVIEWING_DELIVERY") &&
-    order.deliveryMethod === "COUNTRYWIDE_DELIVERY" &&
-    order.deliveryFee == null;
+  const stage = normalizeOrderStage(order);
+  const isPaid = hasVerifiedPayment(order);
+  const isCash = isCashPaymentMethod(order.preferredPaymentMethod);
+  const nextAction = getNextOrderAction(order);
 
-  switch (order.status) {
+  switch (stage) {
     case "CANCELLED":
       return {
         label: "Cancelled",
@@ -220,97 +202,47 @@ export function getAdminOrderStatusMeta(
           order.deliveryMethod === "PICKUP"
             ? "Ready for Pickup"
             : "Out for Delivery",
-        nextActionHint:
-          order.deliveryMethod === "PICKUP"
-            ? "Awaiting customer pickup"
-            : "Mark delivered on handover",
+        nextActionHint: nextAction?.label ?? "Mark Delivered",
         guidance:
           order.deliveryMethod === "PICKUP"
-            ? "Packed and ready at the shop counter for customer collection."
-            : "With the rider or courier. Confirm delivery once the customer receives their items.",
+            ? isCash && !isPaid
+              ? "Packed and waiting at the counter. Collect cash payment and mark delivered on handover."
+              : "Packed and waiting at the shop counter for customer collection."
+            : isCash && !isPaid
+              ? "With the rider or courier. Collecting delivery confirmation also verifies the cash payment."
+              : "With the rider or courier. Mark delivered once the customer receives their items.",
         tone: "dispatch",
         stepIndex: 2,
       };
     case "PROCESSING":
       return {
-        label: "Being Packed",
-        nextActionHint:
-          order.deliveryMethod === "PICKUP"
-            ? "Mark ready for pickup"
-            : "Dispatch order",
+        label: "Preparing",
+        nextActionHint: nextAction?.label ?? "Out for Delivery",
         guidance:
           order.deliveryMethod === "PICKUP"
-            ? "Items are being packed. Move to Ready for Pickup once ready at the counter."
-            : "Items are being packed. Move to Out for Delivery once handed to the rider or courier.",
+            ? "Confirmed and ready to pack. Mark Ready for Pickup once waiting at the counter."
+            : "Confirmed and ready to pack. Mark Out for Delivery once handed to the rider or courier.",
         tone: "packing",
-        stepIndex: 2,
-      };
-    case "PAID":
-      return {
-        label: "Preparing Order",
-        nextActionHint: "Start packing",
-        guidance:
-          "Payment is confirmed. Start packing the items and prepare for pickup or dispatch.",
-        tone: "paid",
         stepIndex: 1,
       };
     case "AWAITING_PAYMENT":
       return {
-        label: "Pending Payment",
-        nextActionHint: "Verify payment",
-        guidance: isCash
-          ? "Ready to pack. Collect cash on handover and verify payment."
-          : "Waiting for the customer's payment. Verify the M-Pesa or bank reference once received.",
-        tone: "attention",
-        stepIndex: 1,
-      };
-    case "REVIEWING_DELIVERY":
-      return {
-        label: "Delivery Check",
-        nextActionHint: "Need verification",
+        label: "Awaiting Payment",
+        nextActionHint: nextAction?.label ?? "Verify Payment",
         guidance:
-          "Countrywide courier selected. Check the delivery location and set the courier fee.",
+          "Waiting for M-Pesa or bank payment confirmation before packing begins.",
         tone: "attention",
         stepIndex: 0,
       };
-    case "PENDING":
-    default:
-      if (needsQuote) {
-        return {
-          label: "Delivery Check",
-          nextActionHint: "Need verification",
-          guidance:
-            "Countrywide courier selected. Check the delivery location and set the courier fee.",
-          tone: "attention",
-          stepIndex: 0,
-        };
-      }
-      if (isCash) {
-        return {
-          label: "New Order",
-          nextActionHint: "Awaiting review",
-          guidance:
-            "Customer will pay cash on pickup or delivery. Review and start packing when ready.",
-          tone: "attention",
-          stepIndex: 0,
-        };
-      }
-      if (!isPaid) {
-        return {
-          label: "New Order",
-          nextActionHint: "Awaiting review",
-          guidance:
-            "Review delivery details or verify the customer's payment reference to move forward.",
-          tone: "attention",
-          stepIndex: 0,
-        };
-      }
+    case "REVIEWING_DELIVERY":
       return {
-        label: "New Order",
-        nextActionHint: "Awaiting review",
-        guidance: "Review the order details and start packing.",
-        tone: "active",
-        stepIndex: 1,
+        label: "Quote Needed",
+        nextActionHint: nextAction?.label ?? "Set Delivery Quote",
+        guidance: isCash
+          ? "Countrywide courier selected. Set the courier fee to move this order to Preparing."
+          : "Countrywide courier selected. Set the courier fee so the customer can complete payment.",
+        tone: "attention",
+        stepIndex: 0,
       };
   }
 }

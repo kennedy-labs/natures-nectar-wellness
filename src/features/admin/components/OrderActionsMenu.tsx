@@ -5,20 +5,28 @@ import { createPortal } from "react-dom";
 import {
   CheckCircle2,
   ChevronDown,
+  CreditCard,
   Eye,
   Loader2,
+  MapPin,
+  PackageCheck,
   Trash2,
+  Truck,
   XCircle,
 } from "lucide-react";
 
 import { type AdminOrder } from "@/features/admin/utils/order-display.utils";
+import {
+  getNextOrderAction,
+  type OrderNextAction,
+} from "@/features/orders/utils/order-workflow.utils";
 import { cn } from "@/lib/utils";
 
 type OrderActionsMenuProps = {
   order: AdminOrder;
   busy?: boolean;
   onViewDetails: (order: AdminOrder) => void;
-  onComplete: (order: AdminOrder) => void;
+  onNextAction: (order: AdminOrder, action: OrderNextAction) => void;
   onCancel: (order: AdminOrder) => void;
   onDelete: (order: AdminOrder) => void;
 };
@@ -29,14 +37,37 @@ type MenuPosition = {
   openUpward: boolean;
 };
 
-const MENU_WIDTH = 208;
+const MENU_WIDTH = 224;
 const ESTIMATED_MENU_HEIGHT = 188;
+
+function NextActionIcon({
+  action,
+  deliveryMethod,
+}: {
+  action: OrderNextAction;
+  deliveryMethod: string;
+}) {
+  if (action.kind === "open_quote") {
+    return <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />;
+  }
+  if (action.kind === "open_payment") {
+    return <CreditCard className="mt-0.5 h-3.5 w-3.5 shrink-0" />;
+  }
+  if (action.targetStatus === "OUT_FOR_DELIVERY") {
+    return deliveryMethod === "PICKUP" ? (
+      <PackageCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+    ) : (
+      <Truck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+    );
+  }
+  return <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />;
+}
 
 export function OrderActionsMenu({
   order,
   busy = false,
   onViewDetails,
-  onComplete,
+  onNextAction,
   onCancel,
   onDelete,
 }: OrderActionsMenuProps) {
@@ -45,13 +76,8 @@ export function OrderActionsMenu({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const isClosed =
-    order.status === "DELIVERED" || order.status === "CANCELLED";
-  const isPaid = order.payments?.some((p) => p.status === "VERIFIED") ?? false;
-  const isCashOrder =
-    order.preferredPaymentMethod === "CASH_ON_PICKUP" ||
-    order.preferredPaymentMethod === "CASH_ON_DELIVERY";
-  const needsPaymentFirst = !isClosed && !isPaid && !isCashOrder;
+  const nextAction = getNextOrderAction(order);
+  const isOpenOrder = nextAction !== null;
 
   function computePosition() {
     const trigger = triggerRef.current;
@@ -186,52 +212,52 @@ export function OrderActionsMenu({
                 <span>View Details</span>
               </button>
 
-              <button
-                type="button"
-                role="menuitem"
-                disabled={isClosed}
-                onClick={() => {
-                  if (isClosed) return;
-                  setOpen(false);
-                  onComplete(order);
-                }}
-                className={cn(
-                  "flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium transition-colors",
-                  isClosed
-                    ? "cursor-not-allowed text-muted-foreground/50"
-                    : "text-[#1F4E37] hover:bg-emerald-50"
-                )}
-              >
-                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span className="min-w-0">
-                  <span className="block">Complete</span>
-                  {needsPaymentFirst ? (
-                    <span className="block text-[10px] font-normal text-amber-700">
-                      Verify payment first
-                    </span>
-                  ) : null}
-                </span>
-              </button>
+              {nextAction ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    onNextAction(order, nextAction);
+                  }}
+                  className={cn(
+                    "flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium transition-colors",
+                    nextAction.kind === "open_quote" ||
+                      nextAction.kind === "open_payment"
+                      ? "text-amber-800 hover:bg-amber-50"
+                      : "text-[#1F4E37] hover:bg-emerald-50"
+                  )}
+                >
+                  <NextActionIcon
+                    action={nextAction}
+                    deliveryMethod={order.deliveryMethod}
+                  />
+                  <span className="min-w-0">
+                    <span className="block">{nextAction.label}</span>
+                    {nextAction.kind === "transition" &&
+                    nextAction.autoVerifiesCash ? (
+                      <span className="block text-[10px] font-normal text-muted-foreground">
+                        Collects &amp; verifies cash
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              ) : null}
 
-              <button
-                type="button"
-                role="menuitem"
-                disabled={isClosed}
-                onClick={() => {
-                  if (isClosed) return;
-                  setOpen(false);
-                  onCancel(order);
-                }}
-                className={cn(
-                  "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium transition-colors",
-                  isClosed
-                    ? "cursor-not-allowed text-muted-foreground/50"
-                    : "text-amber-800 hover:bg-amber-50"
-                )}
-              >
-                <XCircle className="h-3.5 w-3.5 shrink-0" />
-                <span>Cancel</span>
-              </button>
+              {isOpenOrder ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    onCancel(order);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium text-amber-800 transition-colors hover:bg-amber-50"
+                >
+                  <XCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>Cancel</span>
+                </button>
+              ) : null}
 
               <div className="my-1 border-t border-border" />
 

@@ -19,6 +19,7 @@ import {
   getAdminOrderTotal,
 } from "@/features/admin/utils/order-display.utils";
 import type { Category } from "@/features/categories/types/category.types";
+import { normalizeOrderStage } from "@/features/orders/utils/order-workflow.utils";
 import type { Product } from "@/features/products/types/product.types";
 import { formatKes } from "@/lib/format";
 
@@ -99,9 +100,10 @@ export function AdminDashboardTabs({
   const pendingOrders = orders.filter(
     (o) => !["DELIVERED", "CANCELLED"].includes(o.status)
   );
-  const needsVerificationOrders = orders.filter((o) =>
-    ["PENDING", "REVIEWING_DELIVERY", "AWAITING_PAYMENT"].includes(o.status)
-  );
+  const needsVerificationOrders = orders.filter((o) => {
+    const stage = normalizeOrderStage(o);
+    return stage === "REVIEWING_DELIVERY" || stage === "AWAITING_PAYMENT";
+  });
 
   const verifiedPayments = orders
     .flatMap((o) => o.payments ?? [])

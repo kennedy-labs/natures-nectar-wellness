@@ -294,8 +294,13 @@ async function markGatewayPaymentVerified(args: {
       "PENDING",
       "REVIEWING_DELIVERY",
       "AWAITING_PAYMENT",
+      "PAID",
     ].includes(args.orderStatus)
-      ? "PAID"
+      ? current?.order.status === "REVIEWING_DELIVERY" &&
+        current.order.deliveryMethod === "COUNTRYWIDE_DELIVERY" &&
+        current.order.deliveryFee == null
+        ? "REVIEWING_DELIVERY"
+        : "PROCESSING"
       : args.orderStatus;
 
     const order = await tx.order.update({
@@ -313,11 +318,17 @@ async function markGatewayPaymentVerified(args: {
       },
     });
 
-    if (nextOrderStatus === "PAID" && args.orderStatus !== "PAID") {
+    if (nextOrderStatus !== args.orderStatus) {
       await tx.orderStatusHistory.create({
         data: {
           orderId: args.orderId,
-          status: "PAID",
+          status: nextOrderStatus as
+            | "REVIEWING_DELIVERY"
+            | "AWAITING_PAYMENT"
+            | "PROCESSING"
+            | "OUT_FOR_DELIVERY"
+            | "DELIVERED"
+            | "CANCELLED",
         },
       });
     }
@@ -629,7 +640,7 @@ export async function queryOrderPaymentStatus(rawInput: unknown) {
           const expectedAmount =
             latest.amount ?? order.totalAmount ?? order.subtotalAmount;
           const fallbackRef = latest.transactionRef;
-          await markGatewayPaymentVerified({
+          const verified = await markGatewayPaymentVerified({
             paymentId: latest.id,
             orderId: order.id,
             orderStatus: order.status,
@@ -639,7 +650,7 @@ export async function queryOrderPaymentStatus(rawInput: unknown) {
           });
 
           return {
-            orderStatus: "PAID",
+            orderStatus: verified.order.status,
             paymentStatus: "VERIFIED" as const,
             transactionRef: fallbackRef,
             amount: expectedAmount,

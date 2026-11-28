@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import {
+  UNIFIED_ORDER_STAGES,
+  type UnifiedOrderStage,
+} from "@/features/orders/utils/order-workflow.utils";
+
 export const orderItemInputSchema = z.object({
   productId: z.string().min(1),
   quantity: z.number().int().positive(),
@@ -41,17 +46,6 @@ export const submitOrderSchema = z
 
 export type SubmitOrderInput = z.infer<typeof submitOrderSchema>;
 
-/**
- * ORDER STATUS TYPES (FINALIZED)
- * REFUNDED added
- */
-export const ORDER_STATUSES = [
-  "PENDING",
-  "PROCESSING",
-  "PAID",
-  "COMPLETED",
-  "CANCELLED",
-  "REFUNDED",
-] as const;
+export const ORDER_STATUSES = UNIFIED_ORDER_STAGES;
 
-export type OrderStatus = (typeof ORDER_STATUSES)[number];
+export type OrderStatus = UnifiedOrderStage;

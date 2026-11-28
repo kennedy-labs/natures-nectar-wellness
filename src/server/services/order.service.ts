@@ -5,6 +5,13 @@ import {
   createOrderNumber,
   createWhatsappOrderMessage,
 } from "@/features/orders/utils/order.utils";
+import {
+  canTransitionOrderStatus,
+  getInitialOrderStatus,
+  getQuoteNextStatus,
+  hasVerifiedPayment,
+  isCashPaymentMethod,
+} from "@/features/orders/utils/order-workflow.utils";
 import { submitOrderSchema } from "@/features/orders/validations/order.validation";
 import { db } from "@/server/db/prisma";
 import { ApiError } from "@/server/http/api-error";
@@ -170,13 +177,18 @@ export async function submitOrder(input: unknown) {
     isPaid: false,
   });
 
+  const initialStatus = getInitialOrderStatus({
+    deliveryMethod: data.delivery.method,
+    preferredPaymentMethod: data.preferredPaymentMethod,
+  });
+
   const order = await createOrderRequest({
     orderNumber,
     customer: data.customer,
     delivery: data.delivery,
     subtotalAmount,
     preferredPaymentMethod: data.preferredPaymentMethod,
-    initialStatus: isMpesaCheckout ? "AWAITING_PAYMENT" : "PENDING",
+    initialStatus,
     customerNotes: data.customerNotes,
     whatsappMessage,
     items: orderItems,
@@ -197,23 +209,6 @@ export async function submitOrder(input: unknown) {
 /**
  * ORDER STATUS + PAYMENT SAFETY
  */
-const ALLOWED_ORDER_STATUSES = [
-  "PENDING",
-  "REVIEWING_DELIVERY",
-  "AWAITING_PAYMENT",
-  "PAID",
-  "PROCESSING",
-  "OUT_FOR_DELIVERY",
-  "DELIVERED",
-  "CANCELLED",
-] as const;
-
-const FULFILLMENT_STATUSES = [
-  "PROCESSING",
-  "OUT_FOR_DELIVERY",
-  "DELIVERED",
-] as const;
-
 type OrderStatus = PrismaOrderStatus;
 
 export async function updateOrderStatus(orderId: string, status: string) {
@@ -221,92 +216,86 @@ export async function updateOrderStatus(orderId: string, status: string) {
     throw new ApiError(400, "INVALID_ORDER_ID", "Missing order ID.");
   }
 
-  if (!ALLOWED_ORDER_STATUSES.includes(status as OrderStatus)) {
-    throw new ApiError(
-      400,
-      "INVALID_STATUS",
-      "Order status is not allowed."
-    );
-  }
-
   if (status === "CANCELLED") {
     return cancelOrder(orderId);
   }
 
-  const validStatus = status as OrderStatus;
-
   const order = await db.order.findUnique({
     where: { id: orderId },
-    include: { payments: true },
+    include: { payments: { orderBy: { createdAt: "desc" } } },
   });
 
   if (!order) {
     throw new ApiError(404, "ORDER_NOT_FOUND", "Order not found.");
   }
 
-  if (order.status === "CANCELLED") {
-    throw new ApiError(
-      400,
-      "ORDER_CANCELLED",
-      "Cancelled orders cannot be transitioned to another status."
-    );
+  const transition = canTransitionOrderStatus(order, status);
+  if (!transition.ok) {
+    throw new ApiError(400, transition.code, transition.message);
   }
 
-  if (order.status === "DELIVERED" && validStatus !== "DELIVERED") {
-    throw new ApiError(
-      400,
-      "ORDER_ALREADY_DELIVERED",
-      "Delivered orders cannot be moved backward."
-    );
-  }
+  const nextStatus = transition.nextStatus as OrderStatus;
+  const shouldAutoVerifyCash =
+    nextStatus === "DELIVERED" &&
+    isCashPaymentMethod(order.preferredPaymentMethod) &&
+    !hasVerifiedPayment(order);
 
-  const isPaid = order.payments?.some((p) => p.status === "VERIFIED");
-  const isCashOnFulfillment =
-    order.preferredPaymentMethod === "CASH_ON_PICKUP" ||
-    order.preferredPaymentMethod === "CASH_ON_DELIVERY";
+  return db.$transaction(async (tx) => {
+    if (shouldAutoVerifyCash) {
+      const cashAmount = order.totalAmount ?? order.subtotalAmount;
+      const cashPayment = order.payments.find(
+        (p) => p.status === "PENDING" || p.status === "AWAITING_VERIFICATION"
+      );
 
-  if (validStatus === "PAID" && !isPaid) {
-    throw new ApiError(
-      400,
-      "PAYMENT_NOT_VERIFIED",
-      "Cannot mark order as PAID without a verified payment."
-    );
-  }
+      if (cashPayment) {
+        await tx.payment.update({
+          where: { id: cashPayment.id },
+          data: {
+            status: "VERIFIED",
+            transactionRef:
+              cashPayment.transactionRef || `CASH-${order.orderNumber}`,
+            amount: cashPayment.amount ?? cashAmount,
+            notes:
+              cashPayment.notes ||
+              "Cash payment automatically verified upon delivery.",
+            verifiedAt: new Date(),
+          },
+        });
+      } else {
+        await tx.payment.create({
+          data: {
+            orderId,
+            method: order.preferredPaymentMethod ?? "CASH_ON_PICKUP",
+            status: "VERIFIED",
+            transactionRef: `CASH-${order.orderNumber}`,
+            amount: cashAmount,
+            notes: "Cash payment automatically verified upon delivery.",
+            verifiedAt: new Date(),
+          },
+        });
+      }
+    }
 
-  if (
-    (FULFILLMENT_STATUSES as readonly string[]).includes(validStatus) &&
-    !isPaid &&
-    !isCashOnFulfillment
-  ) {
-    throw new ApiError(
-      400,
-      "PAYMENT_REQUIRED",
-      "Payment must be verified before processing or delivering this order."
-    );
-  }
+    if (order.status !== nextStatus) {
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId,
+          status: nextStatus,
+        },
+      });
+    }
 
-  const normalizedStatus: OrderStatus =
-    isPaid && validStatus === "PENDING"
-      ? ("PROCESSING" as OrderStatus)
-      : validStatus;
-
-  await db.orderStatusHistory.create({
-    data: {
-      orderId,
-      status: normalizedStatus,
-    },
-  });
-
-  return db.order.update({
-    where: { id: orderId },
-    data: {
-      status: normalizedStatus,
-    },
-    include: {
-      customer: true,
-      items: true,
-      payments: true,
-    },
+    return tx.order.update({
+      where: { id: orderId },
+      data: {
+        status: nextStatus,
+      },
+      include: {
+        customer: true,
+        items: true,
+        payments: true,
+      },
+    });
   });
 }
 
@@ -537,6 +526,7 @@ export async function confirmDeliveryQuote(
 
   const order = await db.order.findUnique({
     where: { id: orderId },
+    include: { payments: true },
   });
 
   if (!order) {
@@ -551,6 +541,8 @@ export async function confirmDeliveryQuote(
     );
   }
 
+  const nextStatus = getQuoteNextStatus(order);
+
   return db.$transaction(async (tx) => {
     const updatedOrder = await tx.order.update({
       where: { id: orderId },
@@ -559,7 +551,7 @@ export async function confirmDeliveryQuote(
         deliveryQuoteNotes: notes,
         deliveryConfirmedAt: new Date(),
         totalAmount: order.subtotalAmount + fee,
-        status: "AWAITING_PAYMENT",
+        status: nextStatus,
       },
       include: {
         customer: true,
@@ -568,12 +560,14 @@ export async function confirmDeliveryQuote(
       },
     });
 
-    await tx.orderStatusHistory.create({
-      data: {
-        orderId,
-        status: "AWAITING_PAYMENT",
-      },
-    });
+    if (order.status !== nextStatus) {
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId,
+          status: nextStatus,
+        },
+      });
+    }
 
     return updatedOrder;
   });
@@ -666,11 +660,18 @@ export async function verifyPaymentAndMarkPaid(
       },
     });
 
-    const nextOrderStatus = ["PENDING", "REVIEWING_DELIVERY", "AWAITING_PAYMENT"].includes(
-      existingPayment.order.status
-    )
-      ? "PAID"
-      : existingPayment.order.status;
+    const needsCountrywideQuote =
+      existingPayment.order.status === "REVIEWING_DELIVERY" &&
+      existingPayment.order.deliveryMethod === "COUNTRYWIDE_DELIVERY" &&
+      existingPayment.order.deliveryFee == null;
+
+    const nextOrderStatus: OrderStatus = needsCountrywideQuote
+      ? "REVIEWING_DELIVERY"
+      : ["PENDING", "REVIEWING_DELIVERY", "AWAITING_PAYMENT", "PAID"].includes(
+            existingPayment.order.status
+          )
+        ? "PROCESSING"
+        : existingPayment.order.status;
 
     const order = await tx.order.update({
       where: { id: existingPayment.orderId },
@@ -682,11 +683,11 @@ export async function verifyPaymentAndMarkPaid(
       },
     });
 
-    if (nextOrderStatus === "PAID" && existingPayment.order.status !== "PAID") {
+    if (nextOrderStatus !== existingPayment.order.status) {
       await tx.orderStatusHistory.create({
         data: {
           orderId: existingPayment.orderId,
-          status: "PAID",
+          status: nextOrderStatus,
         },
       });
     }
