@@ -45,7 +45,14 @@ export type AdminOrder = {
   payments?: AdminOrderPayment[];
 };
 
-export type OrderTone = "attention" | "active" | "success" | "danger";
+export type OrderTone =
+  | "attention"
+  | "packing"
+  | "dispatch"
+  | "paid"
+  | "success"
+  | "danger"
+  | "active";
 
 export type AdminOrderStatusMeta = {
   label: string;
@@ -185,7 +192,7 @@ export function getAdminOrderStatusMeta(
         nextActionHint: "Mark completed on handover",
         guidance:
           "With the rider or courier. Confirm completion once the customer receives their items.",
-        tone: "active",
+        tone: "dispatch",
         stepIndex: 2,
       };
     case "PROCESSING":
@@ -194,7 +201,7 @@ export function getAdminOrderStatusMeta(
         nextActionHint: "Dispatch order",
         guidance:
           "Items are being packed. Move to Out for Delivery once handed to the rider or courier.",
-        tone: "active",
+        tone: "packing",
         stepIndex: 2,
       };
     case "PAID":
@@ -203,12 +210,12 @@ export function getAdminOrderStatusMeta(
         nextActionHint: "Start packing",
         guidance:
           "Payment is confirmed. Start packing the items and prepare dispatch.",
-        tone: "success",
+        tone: "paid",
         stepIndex: 1,
       };
     case "AWAITING_PAYMENT":
       return {
-        label: "Waiting for Payment",
+        label: "Waiting Payment",
         nextActionHint: "Verify M-Pesa / ref",
         guidance: isCash
           ? "Ready to pack. Collect cash on handover and verify payment."
@@ -218,7 +225,7 @@ export function getAdminOrderStatusMeta(
       };
     case "REVIEWING_DELIVERY":
       return {
-        label: "Needs Delivery Quote",
+        label: "Needs Quote",
         nextActionHint: "Set courier fee",
         guidance:
           "Countrywide courier selected. Set the delivery fee so the customer gets their final total.",
@@ -229,7 +236,7 @@ export function getAdminOrderStatusMeta(
     default:
       if (needsQuote) {
         return {
-          label: "Needs Delivery Quote",
+          label: "Needs Quote",
           nextActionHint: "Set courier fee",
           guidance:
             "Countrywide courier selected. Set the delivery fee so the customer gets their final total.",
@@ -272,22 +279,45 @@ export function getToneClasses(tone: OrderTone) {
     case "success":
       return {
         text: "text-[#1F4E37]",
+        badgeClass:
+          "border-[#1F4E37]/25 bg-[#1F4E37]/10 text-[#1F4E37]",
         subtleBg: "bg-[#1F4E37]/[0.07] border-[#1F4E37]/20",
+      };
+    case "paid":
+      return {
+        text: "text-emerald-800",
+        badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-800",
+        subtleBg: "bg-emerald-50/80 border-emerald-200/80",
+      };
+    case "packing":
+      return {
+        text: "text-sky-800",
+        badgeClass: "border-sky-200 bg-sky-50 text-sky-800",
+        subtleBg: "bg-sky-50/80 border-sky-200/80",
+      };
+    case "dispatch":
+      return {
+        text: "text-indigo-800",
+        badgeClass: "border-indigo-200 bg-indigo-50 text-indigo-800",
+        subtleBg: "bg-indigo-50/80 border-indigo-200/80",
       };
     case "attention":
       return {
         text: "text-amber-800",
+        badgeClass: "border-amber-200 bg-amber-50 text-amber-800",
         subtleBg: "bg-amber-50/90 border-amber-200/80",
       };
     case "danger":
       return {
-        text: "text-destructive",
-        subtleBg: "bg-destructive/[0.06] border-destructive/20",
+        text: "text-rose-700",
+        badgeClass: "border-rose-200 bg-rose-50 text-rose-700",
+        subtleBg: "bg-rose-50/80 border-rose-200/80",
       };
     case "active":
     default:
       return {
-        text: "text-slate-800",
+        text: "text-slate-700",
+        badgeClass: "border-slate-200 bg-slate-100 text-slate-700",
         subtleBg: "bg-[#F7F5F0] border-border",
       };
   }

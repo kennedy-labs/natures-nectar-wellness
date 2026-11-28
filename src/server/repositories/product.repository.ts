@@ -77,6 +77,9 @@ export async function findPopularProducts(limit = 6) {
   const rankedDemand = await db.orderItem.groupBy({
     by: ["productId"],
     where: {
+      productId: {
+        not: null,
+      },
       order: {
         status: {
           not: "CANCELLED",
@@ -100,7 +103,9 @@ export async function findPopularProducts(limit = 6) {
     take: safeLimit * 2,
   });
 
-  const orderedIds = rankedDemand.map((item) => item.productId);
+  const orderedIds = rankedDemand
+    .map((item) => item.productId)
+    .filter((id): id is string => Boolean(id));
   const demandProducts = orderedIds.length
     ? await db.product.findMany({
         include: {
@@ -385,37 +390,48 @@ export async function deleteProduct(id: string) {
 }
 
 export async function permanentlyDeleteProduct(id: string) {
-  const existing = await db.product.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      _count: {
-        select: {
-          orderItems: true,
+  return db.$transaction(async (tx) => {
+    const existing = await tx.product.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+      },
+    });
+
+    if (!existing) {
+      return null;
+    }
+
+    const activeOrderItemCount = await tx.orderItem.count({
+      where: {
+        productId: id,
+        order: {
+          status: {
+            notIn: ["DELIVERED", "CANCELLED"],
+          },
         },
       },
-    },
-  });
+    });
 
-  if (!existing) {
-    return null;
-  }
+    if (activeOrderItemCount > 0) {
+      throw new Error("PRODUCT_HAS_ACTIVE_ORDERS");
+    }
 
-  if (existing._count.orderItems > 0) {
-    throw new Error(
-      "PRODUCT_HAS_ORDERS"
-    );
-  }
+    await tx.orderItem.updateMany({
+      where: { productId: id },
+      data: { productId: null },
+    });
 
-  return db.product.delete({
-    where: { id },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-    },
+    return tx.product.delete({
+      where: { id },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+      },
+    });
   });
 }
 

@@ -123,8 +123,9 @@ export function AdminProductActionDialog({
                   Delete &ldquo;{product.name}&rdquo; permanently?
                 </DialogTitle>
                 <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-                  This will completely erase the product and its saved photo
-                  from your database. This cannot be undone.
+                  This completely erases the product and its saved photo from
+                  your catalog while keeping completed or cancelled order
+                  records intact. Products with active orders cannot be deleted.
                 </DialogDescription>
               </DialogHeader>
 

@@ -1,0 +1,256 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Eye,
+  Loader2,
+  Trash2,
+  XCircle,
+} from "lucide-react";
+
+import { type AdminOrder } from "@/features/admin/utils/order-display.utils";
+import { cn } from "@/lib/utils";
+
+type OrderActionsMenuProps = {
+  order: AdminOrder;
+  busy?: boolean;
+  onViewDetails: (order: AdminOrder) => void;
+  onComplete: (order: AdminOrder) => void;
+  onCancel: (order: AdminOrder) => void;
+  onDelete: (order: AdminOrder) => void;
+};
+
+type MenuPosition = {
+  top: number;
+  left: number;
+  openUpward: boolean;
+};
+
+const MENU_WIDTH = 208;
+const ESTIMATED_MENU_HEIGHT = 188;
+
+export function OrderActionsMenu({
+  order,
+  busy = false,
+  onViewDetails,
+  onComplete,
+  onCancel,
+  onDelete,
+}: OrderActionsMenuProps) {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState<MenuPosition | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const isClosed =
+    order.status === "DELIVERED" || order.status === "CANCELLED";
+  const isPaid = order.payments?.some((p) => p.status === "VERIFIED") ?? false;
+  const isCashOrder =
+    order.preferredPaymentMethod === "CASH_ON_PICKUP" ||
+    order.preferredPaymentMethod === "CASH_ON_DELIVERY";
+  const needsPaymentFirst = !isClosed && !isPaid && !isCashOrder;
+
+  function computePosition() {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUpward =
+      spaceBelow < ESTIMATED_MENU_HEIGHT + 12 &&
+      rect.top > ESTIMATED_MENU_HEIGHT + 12;
+
+    const top = openUpward ? rect.top - 6 : rect.bottom + 6;
+    const left = Math.max(
+      12,
+      Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 12)
+    );
+
+    setPosition({ top, left, openUpward });
+  }
+
+  function toggleMenu() {
+    if (busy) return;
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    computePosition();
+    setOpen(true);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (
+        triggerRef.current?.contains(target) ||
+        menuRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
+
+    function handleViewportChange() {
+      setOpen(false);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", handleViewportChange, true);
+    window.addEventListener("resize", handleViewportChange);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", handleViewportChange, true);
+      window.removeEventListener("resize", handleViewportChange);
+    };
+  }, [open]);
+
+  return (
+    <div
+      className="inline-flex items-center"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        disabled={busy}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Actions for order ${order.orderNumber}`}
+        onClick={toggleMenu}
+        className={cn(
+          "inline-flex h-8.5 min-w-[92px] items-center justify-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F4E37]/30",
+          open
+            ? "border-[#1F4E37]/40 bg-[#1F4E37]/8 text-[#1F4E37]"
+            : "border-border bg-white text-foreground hover:border-foreground/25 hover:bg-[#F6F7F5]",
+          busy && "cursor-not-allowed opacity-60"
+        )}
+      >
+        {busy ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-[#1F4E37]" />
+            <span>Working</span>
+          </>
+        ) : (
+          <>
+            <span>Actions</span>
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 text-muted-foreground transition-transform duration-150",
+                open && "rotate-180 text-[#1F4E37]"
+              )}
+            />
+          </>
+        )}
+      </button>
+
+      {open && position && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              aria-label={`Order ${order.orderNumber} actions`}
+              style={{
+                position: "fixed",
+                top: position.top,
+                left: position.left,
+                width: MENU_WIDTH,
+                transform: position.openUpward ? "translateY(-100%)" : undefined,
+              }}
+              className="z-50 rounded-lg border border-border bg-white p-1.5 shadow-lg ring-1 ring-black/5"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onViewDetails(order);
+                }}
+                className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium text-foreground transition-colors hover:bg-[#F6F7F5]"
+              >
+                <Eye className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+                <span>View Details</span>
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
+                disabled={isClosed}
+                onClick={() => {
+                  if (isClosed) return;
+                  setOpen(false);
+                  onComplete(order);
+                }}
+                className={cn(
+                  "flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium transition-colors",
+                  isClosed
+                    ? "cursor-not-allowed text-muted-foreground/50"
+                    : "text-[#1F4E37] hover:bg-emerald-50"
+                )}
+              >
+                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0">
+                  <span className="block">Complete</span>
+                  {needsPaymentFirst ? (
+                    <span className="block text-[10px] font-normal text-amber-700">
+                      Verify payment first
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
+                disabled={isClosed}
+                onClick={() => {
+                  if (isClosed) return;
+                  setOpen(false);
+                  onCancel(order);
+                }}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium transition-colors",
+                  isClosed
+                    ? "cursor-not-allowed text-muted-foreground/50"
+                    : "text-amber-800 hover:bg-amber-50"
+                )}
+              >
+                <XCircle className="h-3.5 w-3.5 shrink-0" />
+                <span>Cancel</span>
+              </button>
+
+              <div className="my-1 border-t border-border" />
+
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  onDelete(order);
+                }}
+                className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium text-rose-700 transition-colors hover:bg-rose-50"
+              >
+                <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                <span>Delete</span>
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
+    </div>
+  );
+}

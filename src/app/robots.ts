@@ -19,7 +19,7 @@ export default function robots(): MetadataRoute.Robots {
           "/terms",
           "/delivery-refund-policy",
         ],
-        disallow: ["/admin", "/admin2", "/checkout", "/orders", "/api/"],
+        disallow: ["/admin", "/checkout", "/orders", "/api/"],
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,

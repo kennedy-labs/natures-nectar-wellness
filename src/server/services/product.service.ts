@@ -163,14 +163,16 @@ export async function permanentlyDeleteProduct(id: string) {
       throw error;
     }
     if (
-      (error instanceof Error && error.message === "PRODUCT_HAS_ORDERS") ||
+      (error instanceof Error &&
+        (error.message === "PRODUCT_HAS_ACTIVE_ORDERS" ||
+          error.message === "PRODUCT_HAS_ORDERS")) ||
       (error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2003")
     ) {
       throw new ApiError(
         409,
-        "PRODUCT_HAS_ORDERS",
-        "This product is linked to existing customer orders and cannot be permanently erased. Archive it instead to hide it from the storefront."
+        "PRODUCT_HAS_ACTIVE_ORDERS",
+        "This product is part of an active customer order and cannot be permanently deleted until that order is completed or cancelled. Archive it instead to hide it from the storefront."
       );
     }
     throw error;

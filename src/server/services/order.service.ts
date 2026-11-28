@@ -337,7 +337,8 @@ export async function cancelOrder(orderId: string) {
 
   return db.$transaction(async (tx) => {
     for (const item of order.items) {
-      await tx.product.update({
+      if (!item.productId) continue;
+      await tx.product.updateMany({
         where: { id: item.productId },
         data: {
           stockQuantity: {
@@ -405,6 +406,7 @@ export async function deleteOrder(orderId: string) {
   return db.$transaction(async (tx) => {
     if (shouldRestoreStock) {
       for (const item of order.items) {
+        if (!item.productId) continue;
         await tx.product.updateMany({
           where: { id: item.productId },
           data: {
@@ -939,7 +941,8 @@ export async function cancelCustomerOrder(rawInput: unknown) {
     }
 
     for (const item of order.items) {
-      await tx.product.update({
+      if (!item.productId) continue;
+      await tx.product.updateMany({
         where: { id: item.productId },
         data: {
           stockQuantity: {

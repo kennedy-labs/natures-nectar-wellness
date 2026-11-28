@@ -98,58 +98,58 @@ export function AdminOverviewSkeleton() {
 
 export function AdminOrdersListSkeleton() {
   return (
-    <div aria-label="Loading admin orders" className="space-y-5">
+    <div aria-label="Loading admin orders" className="space-y-4">
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-4">
         {[1, 2, 3, 4].map((cell) => (
-          <div key={cell} className="space-y-2 bg-[#FCFBF8] p-4">
-            <Skeleton className="h-3.5 w-24" />
-            <Skeleton className="h-7 w-12" />
-            <Skeleton className="h-3 w-28" />
+          <div
+            key={cell}
+            className="flex items-center justify-between gap-3 bg-white px-4 py-3"
+          >
+            <div className="space-y-1.5">
+              <Skeleton className="h-3.5 w-24" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <Skeleton className="h-7 w-10" />
           </div>
         ))}
       </div>
 
-      <div className="space-y-3 rounded-xl border border-border bg-[#FCFBF8] p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Skeleton className="h-10 w-full sm:max-w-sm" />
-          <div className="flex gap-2">
-            <Skeleton className="h-10 w-24 rounded-md" />
-            <Skeleton className="h-10 w-36 rounded-md" />
-          </div>
-        </div>
-        <div className="flex gap-2 overflow-hidden border-t border-border/80 pt-3">
+      <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-white p-3 sm:p-3.5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex gap-1.5 overflow-hidden">
           {[1, 2, 3, 4, 5].map((tab) => (
             <Skeleton key={tab} className="h-9 w-24 shrink-0 rounded-md" />
           ))}
         </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Skeleton className="h-9 w-full rounded-md sm:w-64" />
+          <div className="flex gap-1.5">
+            <Skeleton className="h-9 w-24 rounded-md" />
+            <Skeleton className="h-9 w-28 rounded-md" />
+          </div>
+        </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-[#FCFBF8]">
+      <div className="overflow-hidden rounded-xl border border-border bg-white">
         <div className="divide-y divide-border/80">
-          {[1, 2, 3, 4, 5].map((row) => (
+          {[1, 2, 3, 4, 5, 6].map((row) => (
             <div
               key={row}
-              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-2.5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex items-center gap-6">
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <Skeleton className="h-3.5 w-24" />
                   <Skeleton className="h-3 w-20" />
                 </div>
-                <div className="space-y-1.5">
-                  <Skeleton className="h-4 w-32" />
+                <div className="space-y-1">
+                  <Skeleton className="h-3.5 w-32" />
                   <Skeleton className="h-3 w-40" />
                 </div>
               </div>
               <div className="flex items-center justify-between gap-4 sm:justify-end">
-                <div className="space-y-1.5 sm:text-right">
-                  <Skeleton className="h-4 w-24 sm:ml-auto" />
-                  <Skeleton className="h-3 w-20 sm:ml-auto" />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Skeleton className="h-9 w-28 rounded-md" />
-                  <Skeleton className="h-9 w-9 rounded-md" />
-                </div>
+                <Skeleton className="h-6 w-24 rounded-md" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-8.5 w-24 rounded-md" />
               </div>
             </div>
           ))}
@@ -211,48 +211,6 @@ export function AdminLoginSkeleton() {
           </div>
         </div>
       </div>
-    </main>
-  );
-}
-
-export function AdminV2DashboardSkeleton() {
-  return (
-    <main aria-label="Loading dashboard" className="space-y-8 p-8">
-      <header className="space-y-2">
-        <Skeleton className="h-9 w-40" />
-        <Skeleton className="h-5 w-32" />
-      </header>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {[1, 2, 3, 4].map((card) => (
-          <div key={card} className="space-y-3 rounded-xl border bg-card p-6">
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-8 w-16" />
-            <Skeleton className="h-3.5 w-40" />
-          </div>
-        ))}
-      </section>
-
-      <section className="space-y-4 rounded-xl border bg-card p-6">
-        <Skeleton className="h-6 w-36" />
-        <div className="space-y-4">
-          {[1, 2, 3].map((row) => (
-            <div
-              key={row}
-              className="flex items-center justify-between border-b pb-3 last:border-0"
-            >
-              <div className="space-y-1.5">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-3.5 w-32" />
-              </div>
-              <div className="space-y-1.5 text-right">
-                <Skeleton className="ml-auto h-4 w-28" />
-                <Skeleton className="ml-auto h-3.5 w-14" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
     </main>
   );
 }

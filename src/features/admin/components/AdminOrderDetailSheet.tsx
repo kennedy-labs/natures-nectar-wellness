@@ -208,8 +208,8 @@ function OrderDetailContent({
           </SheetTitle>
           <span
             className={cn(
-              "inline-flex items-center gap-1.5 text-xs font-semibold",
-              tone.text
+              "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium",
+              tone.badgeClass
             )}
           >
             <StatusIcon status={order.status} />
