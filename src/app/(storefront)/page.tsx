@@ -55,8 +55,6 @@ export default async function HomePage() {
     (product) => !featuredIds.has(product.id)
   );
 
-  // Admin-curated featured formulations lead Apothecary Selection (up to 6),
-  // with popular formulations backfilling any remaining slots.
   const showcaseProducts = [...featuredProducts, ...popularBackfill].slice(
     0,
     6
@@ -64,9 +62,9 @@ export default async function HomePage() {
 
   return (
     <section className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-8 sm:gap-14 sm:px-6 sm:py-12 md:gap-16 md:py-14">
-      {/* Band 1: 55/45 Asymmetric Hero Split */}
-      <div className="grid items-stretch gap-8 lg:grid-cols-12 lg:gap-12">
-        <div className="flex flex-col justify-center space-y-6 lg:col-span-6">
+      {/* Band 1: Asymmetric Hero Split (Copy leads; compact quiet scroller on right) */}
+      <div className="grid items-center gap-8 lg:grid-cols-12 lg:gap-12">
+        <div className="flex flex-col justify-center space-y-6 lg:col-span-7">
           <div className="space-y-4">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
               Kenyan Botanical Apothecary
@@ -112,7 +110,7 @@ export default async function HomePage() {
           </div>
         </div>
 
-        <div className="min-w-0 lg:col-span-6">
+        <div className="mx-auto w-full max-w-md min-w-0 lg:col-span-5 lg:max-w-none">
           <HeroProductCarousel
             products={
               allProducts.length > 0 ? allProducts : showcaseProducts
