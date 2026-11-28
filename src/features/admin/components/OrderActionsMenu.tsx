@@ -9,6 +9,7 @@ import {
   Eye,
   Loader2,
   MapPin,
+  MoreHorizontal,
   PackageCheck,
   Trash2,
   Truck,
@@ -25,6 +26,7 @@ import { cn } from "@/lib/utils";
 type OrderActionsMenuProps = {
   order: AdminOrder;
   busy?: boolean;
+  variant?: "default" | "overflow";
   onViewDetails: (order: AdminOrder) => void;
   onNextAction: (order: AdminOrder, action: OrderNextAction) => void;
   onCancel: (order: AdminOrder) => void;
@@ -66,6 +68,7 @@ function NextActionIcon({
 export function OrderActionsMenu({
   order,
   busy = false,
+  variant = "default",
   onViewDetails,
   onNextAction,
   onCancel,
@@ -145,6 +148,8 @@ export function OrderActionsMenu({
     };
   }, [open]);
 
+  const isOverflow = variant === "overflow";
+
   return (
     <div
       className="inline-flex items-center"
@@ -156,27 +161,31 @@ export function OrderActionsMenu({
         disabled={busy}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Actions for order ${order.orderNumber}`}
+        aria-label={
+          isOverflow
+            ? `More options for order ${order.orderNumber}`
+            : `Actions for order ${order.orderNumber}`
+        }
         onClick={toggleMenu}
         className={cn(
-          "inline-flex h-8.5 min-w-[92px] items-center justify-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F4E37]/30",
+          "inline-flex h-9 items-center justify-center rounded-md border text-xs font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F4E37]/30",
+          isOverflow ? "w-9 px-0" : "min-w-[92px] gap-1.5 px-2.5",
           open
-            ? "border-[#1F4E37]/40 bg-[#1F4E37]/8 text-[#1F4E37]"
-            : "border-border bg-white text-foreground hover:border-foreground/25 hover:bg-[#F6F7F5]",
+            ? "border-[#1F4E37]/40 bg-[#1F4E37]/10 text-[#1F4E37]"
+            : "border-[#E3DFD6] bg-[#FCFBF8] text-[#14221B] hover:border-[#14221B]/25 hover:bg-[#F7F5F0]",
           busy && "cursor-not-allowed opacity-60"
         )}
       >
         {busy ? (
-          <>
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-[#1F4E37]" />
-            <span>Working</span>
-          </>
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-[#1F4E37]" />
+        ) : isOverflow ? (
+          <MoreHorizontal className="h-4 w-4 text-[#55635C]" />
         ) : (
           <>
             <span>Actions</span>
             <ChevronDown
               className={cn(
-                "h-3.5 w-3.5 text-muted-foreground transition-transform duration-150",
+                "h-3.5 w-3.5 text-[#55635C] transition-transform duration-150",
                 open && "rotate-180 text-[#1F4E37]"
               )}
             />
@@ -197,7 +206,7 @@ export function OrderActionsMenu({
                 width: MENU_WIDTH,
                 transform: position.openUpward ? "translateY(-100%)" : undefined,
               }}
-              className="z-50 rounded-lg border border-border bg-white p-1.5 shadow-lg ring-1 ring-black/5"
+              className="z-50 rounded-lg border border-[#E3DFD6] bg-[#FCFBF8] p-1.5 shadow-lg ring-1 ring-black/5"
             >
               <button
                 type="button"
@@ -206,13 +215,13 @@ export function OrderActionsMenu({
                   setOpen(false);
                   onViewDetails(order);
                 }}
-                className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium text-foreground transition-colors hover:bg-[#F6F7F5]"
+                className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium text-[#14221B] transition-colors hover:bg-[#F7F5F0]"
               >
-                <Eye className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+                <Eye className="h-3.5 w-3.5 shrink-0 text-[#55635C]" />
                 <span>View Details</span>
               </button>
 
-              {nextAction ? (
+              {!isOverflow && nextAction ? (
                 <button
                   type="button"
                   role="menuitem"
@@ -224,8 +233,8 @@ export function OrderActionsMenu({
                     "flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium transition-colors",
                     nextAction.kind === "open_quote" ||
                       nextAction.kind === "open_payment"
-                      ? "text-amber-800 hover:bg-amber-50"
-                      : "text-[#1F4E37] hover:bg-emerald-50"
+                      ? "text-[#92400E] hover:bg-[#FFFBEB]"
+                      : "text-[#1F4E37] hover:bg-[#1F4E37]/10"
                   )}
                 >
                   <NextActionIcon
@@ -236,7 +245,7 @@ export function OrderActionsMenu({
                     <span className="block">{nextAction.label}</span>
                     {nextAction.kind === "transition" &&
                     nextAction.autoVerifiesCash ? (
-                      <span className="block text-[10px] font-normal text-muted-foreground">
+                      <span className="block text-[10px] font-normal text-[#55635C]">
                         Collects &amp; verifies cash
                       </span>
                     ) : null}
@@ -252,14 +261,14 @@ export function OrderActionsMenu({
                     setOpen(false);
                     onCancel(order);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium text-amber-800 transition-colors hover:bg-amber-50"
+                  className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium text-[#92400E] transition-colors hover:bg-[#FFFBEB]"
                 >
                   <XCircle className="h-3.5 w-3.5 shrink-0" />
-                  <span>Cancel</span>
+                  <span>Cancel order</span>
                 </button>
               ) : null}
 
-              <div className="my-1 border-t border-border" />
+              <div className="my-1 border-t border-[#E3DFD6]" />
 
               <button
                 type="button"
@@ -268,10 +277,10 @@ export function OrderActionsMenu({
                   setOpen(false);
                   onDelete(order);
                 }}
-                className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium text-rose-700 transition-colors hover:bg-rose-50"
+                className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-xs font-medium text-[#991B1B] transition-colors hover:bg-[#FEF2F2]"
               >
                 <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                <span>Delete</span>
+                <span>Delete order</span>
               </button>
             </div>,
             document.body

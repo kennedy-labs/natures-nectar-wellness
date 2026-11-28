@@ -1,0 +1,6 @@
+{
+  "summary":  "Implementation plan to re-engineer the Nature's Nectar Admin workspace around an Action Queue landing view, Undone vs Completed 1-to-1 database order stage framing, warm porcelain/pine/amber color hierarchy, inline next-step actions, and row completion highlight + floating toast feedback.",
+  "updatedAt":  "2026-11-28T12:39:30.359622092Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

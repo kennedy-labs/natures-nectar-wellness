@@ -6,6 +6,10 @@ export async function submitCheckout(
   values: CheckoutFormValues,
   cartItems: CartItem[]
 ) {
+  if (!cartItems || cartItems.length === 0) {
+    throw new Error("You cannot proceed to checkout when your cart is empty.");
+  }
+
   const items = cartItems.map((item) => ({
     productId: item.productId,
     quantity: item.quantity,

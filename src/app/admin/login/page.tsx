@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function AdminLoginPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F6F7F5] px-4 py-10 sm:px-6">
+    <main className="flex min-h-screen items-center justify-center bg-[#F7F5F0] px-4 py-10 sm:px-6">
       <AdminLoginForm />
     </main>
   );

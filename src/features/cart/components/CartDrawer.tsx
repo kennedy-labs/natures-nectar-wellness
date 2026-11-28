@@ -152,25 +152,36 @@ export function CartDrawer() {
           </div>
 
           <div className="grid gap-2">
-            <Button
-              asChild
-              className="min-h-11 w-full"
-              disabled={items.length === 0}
-            >
-              <Link href="/checkout" onClick={() => setOpen(false)}>
-                Proceed to checkout
-              </Link>
-            </Button>
-            {items.length > 0 ? (
-              <Button
-                className="min-h-10 w-full text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => clearCart()}
-                type="button"
-                variant="ghost"
-              >
-                Clear bag
-              </Button>
-            ) : null}
+            {items.length === 0 ? (
+              <>
+                <Button
+                  type="button"
+                  disabled
+                  className="min-h-11 w-full"
+                >
+                  Proceed to checkout
+                </Button>
+                <p className="text-center text-xs text-muted-foreground">
+                  Add at least one item to proceed to checkout.
+                </p>
+              </>
+            ) : (
+              <>
+                <Button asChild className="min-h-11 w-full">
+                  <Link href="/checkout" onClick={() => setOpen(false)}>
+                    Proceed to checkout
+                  </Link>
+                </Button>
+                <Button
+                  className="min-h-10 w-full text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => clearCart()}
+                  type="button"
+                  variant="ghost"
+                >
+                  Clear bag
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </SheetContent>

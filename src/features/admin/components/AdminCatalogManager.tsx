@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AdminBulkDraftUploader } from "@/features/admin/components/AdminBulkDraftUploader";
 import { AdminImageDropzone } from "@/features/admin/components/AdminImageDropzone";
 import { AdminProductActionDialog } from "@/features/admin/components/AdminProductActionDialog";
+import type { AdminToastInput } from "@/features/admin/components/AdminToastViewport";
 import {
   createCategoryFromClient,
   deleteCategoryFromClient,
@@ -37,11 +38,27 @@ import type { Product } from "@/features/products/types/product.types";
 import { formatKes } from "@/lib/format";
 import { ApiClientError } from "@/lib/api-client";
 
+export type CatalogProductFilter =
+  | "all"
+  | "active"
+  | "featured"
+  | "missing_photo"
+  | "low_stock"
+  | "inactive";
+
+export type CatalogFocusRequest = {
+  filter?: CatalogProductFilter;
+  productId?: string;
+  nonce: number;
+};
+
 type AdminCatalogManagerProps = {
   initialCategories: Category[];
   initialProducts: Product[];
   onCategoriesChange?: (categories: Category[]) => void;
   onProductsChange?: (products: Product[]) => void;
+  requestedFocus?: CatalogFocusRequest | null;
+  onToast?: (toast: AdminToastInput) => void;
 };
 
 const ADMIN_PRODUCTS_PAGE_SIZE = 24;
@@ -257,17 +274,26 @@ export function AdminCatalogManager({
   initialProducts,
   onCategoriesChange,
   onProductsChange,
+  requestedFocus = null,
+  onToast,
 }: AdminCatalogManagerProps) {
+  const initialFocusProduct = requestedFocus?.productId
+    ? initialProducts.find((p) => p.id === requestedFocus.productId) ?? null
+    : null;
+
   const [section, setSection] = useState<CatalogSection>("products");
   const [categories, setCategories] = useState(initialCategories);
   const [products, setProducts] = useState(initialProducts);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [productFilter, setProductFilter] = useState<ProductFilter>("all");
+  const [productFilter, setProductFilter] = useState<ProductFilter>(
+    requestedFocus?.filter ?? "all"
+  );
   const [currentPage, setCurrentPage] = useState(1);
 
   const onCategoriesChangeRef = useRef(onCategoriesChange);
   const onProductsChangeRef = useRef(onProductsChange);
+  const onToastRef = useRef(onToast);
   const didMountCategoriesSyncRef = useRef(false);
   const didMountProductsSyncRef = useRef(false);
 
@@ -278,6 +304,10 @@ export function AdminCatalogManager({
   useEffect(() => {
     onProductsChangeRef.current = onProductsChange;
   }, [onProductsChange]);
+
+  useEffect(() => {
+    onToastRef.current = onToast;
+  }, [onToast]);
 
   useEffect(() => {
     if (!didMountProductsSyncRef.current) {
@@ -303,11 +333,16 @@ export function AdminCatalogManager({
     setCategories(updater);
   }
 
-  const [isProductEditorOpen, setIsProductEditorOpen] = useState(false);
+  const [isProductEditorOpen, setIsProductEditorOpen] = useState(
+    Boolean(initialFocusProduct)
+  );
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
-  const [editingProductId, setEditingProductId] = useState<string | null>(null);
-  const [productForm, setProductForm] =
-    useState<ProductFormState>(emptyProductForm);
+  const [editingProductId, setEditingProductId] = useState<string | null>(
+    initialFocusProduct?.id ?? null
+  );
+  const [productForm, setProductForm] = useState<ProductFormState>(
+    initialFocusProduct ? toProductForm(initialFocusProduct) : emptyProductForm
+  );
   const [productFieldErrors, setProductFieldErrors] = useState<FieldErrors>({});
 
   const [isCategoryEditorOpen, setIsCategoryEditorOpen] = useState(false);
@@ -554,11 +589,17 @@ export function AdminCatalogManager({
       );
 
       closeProductEditor();
+      const message = wasEdit
+        ? "Product changes saved."
+        : "New product added to catalog.";
       setFeedback({
         type: "success",
-        text: wasEdit
-          ? "Product changes saved."
-          : "New product added to catalog.",
+        text: message,
+      });
+      onToastRef.current?.({
+        tone: "success",
+        title: `${savedProduct.name} saved`,
+        description: message,
       });
     } catch (error) {
       const parsed = extractErrorFeedback(
@@ -583,9 +624,15 @@ export function AdminCatalogManager({
     updateProductsState((prev) =>
       prev.map((item) => (item.id === updated.id ? updated : item))
     );
+    const message = `${product.name} moved to Archived.`;
     setFeedback({
       type: "success",
-      text: `${product.name} moved to Archived.`,
+      text: message,
+    });
+    onToastRef.current?.({
+      tone: "info",
+      title: `${product.name} archived`,
+      description: "Hidden from storefront shoppers.",
     });
   }
 
@@ -600,9 +647,15 @@ export function AdminCatalogManager({
       updateProductsState((prev) =>
         prev.map((item) => (item.id === updated.id ? updated : item))
       );
+      const message = `${product.name} restored to your active storefront.`;
       setFeedback({
         type: "success",
-        text: `${product.name} restored to your active storefront.`,
+        text: message,
+      });
+      onToastRef.current?.({
+        tone: "success",
+        title: `${product.name} restored`,
+        description: "Now visible on the storefront.",
       });
     } catch (error) {
       setFeedback({
@@ -629,6 +682,11 @@ export function AdminCatalogManager({
       type: "success",
       text: `${product.name} was permanently deleted.`,
     });
+    onToastRef.current?.({
+      tone: "info",
+      title: `${product.name} deleted`,
+      description: "Product removed permanently from catalog.",
+    });
   }
 
   async function handleToggleFeaturedProduct(product: Product) {
@@ -646,11 +704,21 @@ export function AdminCatalogManager({
         prev.map((item) => (item.id === updated.id ? updated : item))
       );
 
+      const message = nextFeatured
+        ? `${product.name} added to homepage Apothecary Selection (up to 6 featured items show).`
+        : `${product.name} removed from homepage Apothecary Selection.`;
       setFeedback({
         type: "success",
-        text: nextFeatured
-          ? `${product.name} added to homepage Apothecary Selection (up to 6 featured items show).`
-          : `${product.name} removed from homepage Apothecary Selection.`,
+        text: message,
+      });
+      onToastRef.current?.({
+        tone: "success",
+        title: nextFeatured
+          ? `${product.name} featured`
+          : `${product.name} unfeatured`,
+        description: nextFeatured
+          ? "Added to homepage Apothecary Selection."
+          : "Removed from homepage Apothecary Selection.",
       });
     } catch (error) {
       setFeedback({
@@ -788,9 +856,15 @@ export function AdminCatalogManager({
       });
 
       closeCategoryEditor();
+      const catMessage = wasEdit ? "Category updated." : "Category created.";
       setFeedback({
         type: "success",
-        text: wasEdit ? "Category updated." : "Category created.",
+        text: catMessage,
+      });
+      onToastRef.current?.({
+        tone: "success",
+        title: savedCategory.name,
+        description: catMessage,
       });
     } catch (error) {
       const parsed = extractErrorFeedback(error, "Could not save category.");
@@ -817,6 +891,11 @@ export function AdminCatalogManager({
       setFeedback({
         type: "success",
         text: `${category.name} deleted.`,
+      });
+      onToastRef.current?.({
+        tone: "info",
+        title: `${category.name} deleted`,
+        description: "Category removed from storefront.",
       });
     } catch (error) {
       setFeedback({
@@ -1336,10 +1415,10 @@ export function AdminCatalogManager({
           ) : null}
 
           {/* Search & Filters */}
-          <div className="space-y-3 rounded-xl border border-border bg-white p-4">
+          <div className="space-y-3 rounded-xl border border-[#E3DFD6] bg-[#FCFBF8] p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="relative flex-1 sm:max-w-xs">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#55635C]" />
                 <Input
                   type="search"
                   value={searchQuery}
@@ -1348,37 +1427,46 @@ export function AdminCatalogManager({
                     setCurrentPage(1);
                   }}
                   placeholder="Search products..."
-                  className="h-10 bg-white pl-9"
+                  className="h-10 border-[#E3DFD6] bg-white pl-9"
                 />
               </div>
 
               <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {(
                   [
-                    { key: "all", label: "All" },
-                    { key: "active", label: "Active" },
-                    { key: "featured", label: "Featured" },
-                    { key: "missing_photo", label: "No photo" },
-                    { key: "low_stock", label: "Low stock" },
-                    { key: "inactive", label: "Archived" },
+                    { key: "all", label: "All", attention: false },
+                    { key: "active", label: "Active", attention: false },
+                    { key: "featured", label: "Featured", attention: false },
+                    { key: "missing_photo", label: "No photo", attention: true },
+                    { key: "low_stock", label: "Low stock", attention: true },
+                    { key: "inactive", label: "Archived", attention: false },
                   ] as const
-                ).map((tab) => (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => {
-                      setProductFilter(tab.key);
-                      setCurrentPage(1);
-                    }}
-                    className={`min-h-9 shrink-0 rounded-md px-3 text-xs font-medium tabular-nums transition-colors whitespace-nowrap ${
-                      productFilter === tab.key
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-[#F6F7F5] hover:text-foreground"
-                    }`}
-                  >
-                    {tab.label} ({filterCounts[tab.key]})
-                  </button>
-                ))}
+                ).map((tab) => {
+                  const count = filterCounts[tab.key];
+                  const isActive = productFilter === tab.key;
+                  const isUrgent = tab.attention && count > 0;
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => {
+                        setProductFilter(tab.key);
+                        setCurrentPage(1);
+                      }}
+                      className={`min-h-9 shrink-0 rounded-md px-3 text-xs font-medium tabular-nums transition-colors whitespace-nowrap ${
+                        isActive
+                          ? isUrgent
+                            ? "bg-[#B45309] text-white"
+                            : "bg-[#1F4E37] text-[#FCFBF8]"
+                          : isUrgent
+                            ? "bg-[#FFFBEB] text-[#92400E] hover:bg-[#FEF3C7]"
+                            : "text-[#55635C] hover:bg-[#F7F5F0] hover:text-[#14221B]"
+                      }`}
+                    >
+                      {tab.label} ({count})
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -1437,7 +1525,7 @@ export function AdminCatalogManager({
                         setActionProduct(product);
                       }}
                       className={`flex select-none touch-pan-y flex-col gap-4 p-4 transition-colors sm:flex-row sm:items-center sm:justify-between ${
-                        isPressing ? "bg-muted/50" : "hover:bg-[#F6F7F5]/60"
+                        isPressing ? "bg-muted/50" : "hover:bg-[#F7F5F0]/60"
                       }`}
                     >
                       <div className="flex min-w-0 items-start gap-3.5 sm:items-center">

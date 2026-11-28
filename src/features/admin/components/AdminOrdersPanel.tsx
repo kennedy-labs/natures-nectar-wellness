@@ -5,8 +5,10 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
+  Loader2,
   MapPin,
   Package,
+  PackageCheck,
   RefreshCw,
   Search,
   ShoppingBag,
@@ -21,20 +23,29 @@ import { Input } from "@/components/ui/input";
 import { AdminCancelOrderDialog } from "@/features/admin/components/AdminCancelOrderDialog";
 import { AdminDeleteOrderDialog } from "@/features/admin/components/AdminDeleteOrderDialog";
 import { AdminOrderDetailSheet } from "@/features/admin/components/AdminOrderDetailSheet";
+import {
+  type AdminToastInput,
+  AdminToastViewport,
+  useAdminToastQueue,
+} from "@/features/admin/components/AdminToastViewport";
 import { OrderActionsMenu } from "@/features/admin/components/OrderActionsMenu";
+import { useAdminOrderActions } from "@/features/admin/hooks/useAdminOrderActions";
 import {
   type AdminOrder,
   type AdminOrderCategory,
-  type AdminOrderPayment,
   formatAdminOrderDate,
   getAdminDeliveryLabel,
   getAdminOrderCategory,
   getAdminOrderStatusMeta,
   getAdminOrderTotal,
   getAdminPaymentMethodLabel,
+  getPrimaryActionButtonClasses,
   getToneClasses,
+  isUndoneOrderStage,
+  ORDER_STAGE_DEFINITIONS,
 } from "@/features/admin/utils/order-display.utils";
 import {
+  getNextOrderAction,
   normalizeOrderStage,
   type OrderNextAction,
   type UnifiedOrderStage,
@@ -44,14 +55,18 @@ import { cn } from "@/lib/utils";
 
 export type { AdminOrder };
 
+export type OrderViewFilter = "undone" | "completed" | "all" | UnifiedOrderStage;
+
 type AdminOrdersPanelProps = {
   initialOrders?: AdminOrder[];
   onOrdersChange?: (orders: AdminOrder[]) => void;
   selectedOrderId?: string | null;
   onSelectedOrderIdChange?: (orderId: string | null) => void;
+  filter?: OrderViewFilter;
+  onFilterChange?: (filter: OrderViewFilter) => void;
+  sharedActions?: ReturnType<typeof useAdminOrderActions>;
+  onToast?: (toast: AdminToastInput) => void;
 };
-
-type OrderFilter = "all" | AdminOrderCategory;
 
 function StatusGlyph({ stage }: { stage: UnifiedOrderStage }) {
   if (stage === "CANCELLED") {
@@ -75,6 +90,29 @@ function StatusGlyph({ stage }: { stage: UnifiedOrderStage }) {
   return <Clock className="h-3.5 w-3.5 shrink-0" />;
 }
 
+function PrimaryActionIcon({
+  action,
+  deliveryMethod,
+}: {
+  action: OrderNextAction;
+  deliveryMethod: string;
+}) {
+  if (action.kind === "open_quote") {
+    return <MapPin className="h-3.5 w-3.5 shrink-0" />;
+  }
+  if (action.kind === "open_payment") {
+    return <CreditCard className="h-3.5 w-3.5 shrink-0" />;
+  }
+  if (action.targetStatus === "OUT_FOR_DELIVERY") {
+    return deliveryMethod === "PICKUP" ? (
+      <PackageCheck className="h-3.5 w-3.5 shrink-0" />
+    ) : (
+      <Truck className="h-3.5 w-3.5 shrink-0" />
+    );
+  }
+  return <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />;
+}
+
 function summarizeItems(order: AdminOrder): string {
   const items = order.items ?? [];
   if (items.length === 0) return "No items";
@@ -91,59 +129,60 @@ export function AdminOrdersPanel({
   onOrdersChange,
   selectedOrderId: controlledOrderId,
   onSelectedOrderIdChange,
+  filter: controlledFilter,
+  onFilterChange,
+  sharedActions,
+  onToast,
 }: AdminOrdersPanelProps = {}) {
-  const [orders, setOrders] = useState<AdminOrder[]>(initialOrders ?? []);
+  const [internalOrders, setInternalOrders] = useState<AdminOrder[]>(
+    initialOrders ?? []
+  );
   const [loading, setLoading] = useState(initialOrders === undefined);
-  const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<OrderFilter>("all");
+  const [internalFilter, setInternalFilter] =
+    useState<OrderViewFilter>("undone");
   const [searchQuery, setSearchQuery] = useState("");
-  const [panelNotice, setPanelNotice] = useState<{
-    tone: "info" | "error";
-    text: string;
-  } | null>(null);
-  const [expiring, setExpiring] = useState(false);
-  const [busyOrderId, setBusyOrderId] = useState<string | null>(null);
 
-  const [internalSelectedOrderId, setInternalSelectedOrderId] = useState<
-    string | null
-  >(null);
-  const [drawerFocusSection, setDrawerFocusSection] = useState<
-    "quote" | "payment" | null
-  >(null);
-  const [orderToCancel, setOrderToCancel] = useState<AdminOrder | null>(null);
-  const [orderToDelete, setOrderToDelete] = useState<AdminOrder | null>(null);
-
-  const activeOrderId =
-    controlledOrderId !== undefined
-      ? controlledOrderId
-      : internalSelectedOrderId;
-
-  function setActiveOrderId(nextId: string | null) {
-    if (onSelectedOrderIdChange) {
-      onSelectedOrderIdChange(nextId);
-    } else {
-      setInternalSelectedOrderId(nextId);
-    }
-  }
-
-  const activeOrder = useMemo(
-    () => orders.find((order) => order.id === activeOrderId) ?? null,
-    [orders, activeOrderId]
+  const orders = initialOrders !== undefined ? initialOrders : internalOrders;
+  const handleOrdersUpdate = useCallback(
+    (next: AdminOrder[]) => {
+      if (onOrdersChange) {
+        onOrdersChange(next);
+      } else {
+        setInternalOrders(next);
+      }
+    },
+    [onOrdersChange]
   );
 
-  const load = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      const res = await fetch("/api/orders");
-      const data = await res.json();
-      const nextOrders: AdminOrder[] = data?.data ?? data ?? [];
-      setOrders(nextOrders);
-      onOrdersChange?.(nextOrders);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+  const localToastQueue = useAdminToastQueue();
+  const emitToast = useCallback(
+    (input: AdminToastInput) => {
+      if (onToast) {
+        onToast(input);
+      } else {
+        localToastQueue.pushToast(input);
+      }
+    },
+    [onToast, localToastQueue]
+  );
+
+  const fallbackActions = useAdminOrderActions({
+    orders,
+    onOrdersChange: handleOrdersUpdate,
+    onToast: emitToast,
+  });
+
+  const actions = sharedActions ?? fallbackActions;
+
+  const filter =
+    controlledFilter !== undefined ? controlledFilter : internalFilter;
+  function setFilter(nextFilter: OrderViewFilter) {
+    if (onFilterChange) {
+      onFilterChange(nextFilter);
+    } else {
+      setInternalFilter(nextFilter);
     }
-  }, [onOrdersChange]);
+  }
 
   useEffect(() => {
     if (initialOrders !== undefined) return;
@@ -154,7 +193,7 @@ export function AdminOrdersPanel({
       .then((data) => {
         if (cancelled) return;
         const nextOrders: AdminOrder[] = data?.data ?? data ?? [];
-        setOrders(nextOrders);
+        setInternalOrders(nextOrders);
         onOrdersChange?.(nextOrders);
       })
       .finally(() => {
@@ -168,228 +207,32 @@ export function AdminOrdersPanel({
     };
   }, [initialOrders, onOrdersChange]);
 
-  async function confirmDeliveryQuote(
+  const activeOrderId =
+    controlledOrderId !== undefined
+      ? controlledOrderId
+      : actions.activeOrderId;
+
+  function openOrderDetails(
     orderId: string,
-    fee: number,
-    notes: string
+    focusSection: "quote" | "payment" | null = null
   ) {
-    const res = await fetch(`/api/orders/${orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fee, notes }),
-    });
-
-    const payload = await res.json().catch(() => null);
-    if (!res.ok) {
-      throw new Error(
-        payload?.error?.message ??
-          payload?.message ??
-          "Failed to confirm delivery quote."
-      );
-    }
-
-    setPanelNotice({
-      tone: "info",
-      text: `Delivery quote saved (${formatKes(fee)}).`,
-    });
-    await load();
-  }
-
-  async function updateStatus(
-    orderId: string,
-    status: string,
-    noticeText?: string
-  ) {
-    const res = await fetch(`/api/orders/${orderId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-
-    const payload = await res.json().catch(() => null);
-    if (!res.ok) {
-      const err = new Error(
-        payload?.error?.message ??
-          payload?.message ??
-          "Failed to update order status."
-      ) as Error & { code?: string };
-      err.code = payload?.code ?? payload?.error?.code;
-      throw err;
-    }
-
-    setPanelNotice({
-      tone: "info",
-      text:
-        noticeText ??
-        (status === "DELIVERED"
-          ? "Order marked as delivered."
-          : "Order progress updated."),
-    });
-    await load();
-  }
-
-  async function handleNextAction(order: AdminOrder, action: OrderNextAction) {
-    if (action.kind === "open_quote" || action.kind === "open_payment") {
-      setDrawerFocusSection(action.focusSection);
-      setActiveOrderId(order.id);
-      return;
-    }
-
-    if (busyOrderId) return;
-    setBusyOrderId(order.id);
-    setPanelNotice(null);
-
-    const noticeText =
-      action.targetStatus === "DELIVERED"
-        ? action.autoVerifiesCash
-          ? `Order ${order.orderNumber} marked Delivered and cash payment verified.`
-          : `Order ${order.orderNumber} marked Delivered.`
-        : `Order ${order.orderNumber} moved to ${action.label}.`;
-
-    try {
-      await updateStatus(order.id, action.targetStatus, noticeText);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Could not advance order.";
-      const code =
-        err && typeof err === "object" && "code" in err
-          ? String((err as { code?: unknown }).code ?? "")
-          : "";
-
-      if (code === "PAYMENT_REQUIRED") {
-        setPanelNotice({
-          tone: "error",
-          text: `Verify payment for ${order.orderNumber} before continuing.`,
-        });
-        setDrawerFocusSection("payment");
-        setActiveOrderId(order.id);
-      } else if (code === "DELIVERY_QUOTE_REQUIRED") {
-        setPanelNotice({
-          tone: "error",
-          text: `Set the delivery quote for ${order.orderNumber} before continuing.`,
-        });
-        setDrawerFocusSection("quote");
-        setActiveOrderId(order.id);
-      } else {
-        setPanelNotice({
-          tone: "error",
-          text: message,
-        });
-      }
-    } finally {
-      setBusyOrderId(null);
+    actions.openOrder(orderId, focusSection);
+    if (onSelectedOrderIdChange) {
+      onSelectedOrderIdChange(orderId);
     }
   }
 
-  async function verifyPayment(
-    payment: AdminOrderPayment,
-    order: AdminOrder,
-    transactionRef: string,
-    amount: number
-  ) {
-    const res = await fetch(`/api/payments/${payment.id}/verify`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        transactionRef,
-        amount,
-      }),
-    });
-
-    const payload = await res.json().catch(() => null);
-    if (!res.ok) {
-      throw new Error(
-        payload?.error?.message ??
-          payload?.message ??
-          "Payment verification failed."
-      );
-    }
-
-    setPanelNotice({
-      tone: "info",
-      text: `Payment confirmed for ${order.orderNumber}.`,
-    });
-    await load();
-  }
-
-  async function cancelOrder(orderId: string) {
-    const res = await fetch(`/api/orders/${orderId}/cancel`, {
-      method: "POST",
-    });
-
-    const payload = await res.json().catch(() => null);
-    if (!res.ok) {
-      throw new Error(
-        payload?.error?.message ?? payload?.message ?? "Failed to cancel order."
-      );
-    }
-
-    setPanelNotice({
-      tone: "info",
-      text: "Order cancelled and item stock restored.",
-    });
-    await load();
-  }
-
-  async function deleteOrder(order: AdminOrder) {
-    const res = await fetch(`/api/orders/${order.id}`, {
-      method: "DELETE",
-    });
-
-    const payload = await res.json().catch(() => null);
-    if (!res.ok) {
-      throw new Error(
-        payload?.error?.message ??
-          payload?.message ??
-          "Failed to delete order."
-      );
-    }
-
-    if (activeOrderId === order.id) {
-      setActiveOrderId(null);
-    }
-
-    const restored = Boolean(payload?.data?.restoredStock);
-    setPanelNotice({
-      tone: "info",
-      text: restored
-        ? `Order ${order.orderNumber} deleted and reserved stock restored.`
-        : `Order ${order.orderNumber} permanently deleted.`,
-    });
-    await load();
-  }
-
-  async function expireOldUnpaidOrders() {
-    setExpiring(true);
-    setPanelNotice(null);
-
-    try {
-      const res = await fetch("/api/orders/expire", { method: "POST" });
-      const payload = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        setPanelNotice({
-          tone: "error",
-          text:
-            payload?.error?.message ??
-            "Could not expire unpaid orders right now.",
-        });
-        return;
-      }
-
-      const count = payload?.data?.cancelledCount ?? 0;
-      setPanelNotice({
-        tone: "info",
-        text:
-          count > 0
-            ? `Expired ${count} unpaid order(s) older than 24h and restored their stock.`
-            : "No unpaid orders older than 24 hours were found.",
-      });
-      await load();
-    } finally {
-      setExpiring(false);
+  function closeOrderDetails() {
+    actions.closeOrder();
+    if (onSelectedOrderIdChange) {
+      onSelectedOrderIdChange(null);
     }
   }
+
+  const activeOrder = useMemo(
+    () => orders.find((order) => order.id === activeOrderId) ?? null,
+    [orders, activeOrderId]
+  );
 
   const summary = useMemo(() => {
     const counts: Record<AdminOrderCategory, number> = {
@@ -410,8 +253,17 @@ export function AdminOrdersPanel({
       }
     }
 
+    const undoneCount =
+      counts.REVIEWING_DELIVERY +
+      counts.AWAITING_PAYMENT +
+      counts.PROCESSING +
+      counts.OUT_FOR_DELIVERY;
+    const completedCount = counts.DELIVERED + counts.CANCELLED;
+
     return {
       ...counts,
+      undoneCount,
+      completedCount,
       deliveredRevenue,
     };
   }, [orders]);
@@ -419,8 +271,24 @@ export function AdminOrdersPanel({
   const filteredOrders = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return orders.filter((order) => {
-      if (filter !== "all" && getAdminOrderCategory(order) !== filter) {
-        return false;
+      const stage = getAdminOrderCategory(order);
+      const keepForFlash = Boolean(actions.recentlyCompleted[order.id]);
+
+      if (!keepForFlash) {
+        if (filter === "undone" && !isUndoneOrderStage(stage)) {
+          return false;
+        }
+        if (filter === "completed" && isUndoneOrderStage(stage)) {
+          return false;
+        }
+        if (
+          filter !== "undone" &&
+          filter !== "completed" &&
+          filter !== "all" &&
+          stage !== filter
+        ) {
+          return false;
+        }
       }
 
       if (!query) return true;
@@ -437,203 +305,147 @@ export function AdminOrdersPanel({
         itemMatch
       );
     });
-  }, [orders, filter, searchQuery]);
+  }, [orders, filter, searchQuery, actions.recentlyCompleted]);
 
-  function toggleCategoryFilter(category: AdminOrderCategory) {
-    setFilter((current) => (current === category ? "all" : category));
+  function toggleStageFilter(stage: UnifiedOrderStage) {
+    if (filter === stage) {
+      setFilter(isUndoneOrderStage(stage) ? "undone" : "completed");
+      return;
+    }
+    setFilter(stage);
   }
 
   if (loading) {
     return <AdminOrdersListSkeleton />;
   }
 
-  const stageCards: Array<{
-    key: AdminOrderCategory;
-    title: string;
-    count: number;
-    subtext: string;
-    countClass: string;
-    activeClass: string;
-  }> = [
-    {
-      key: "REVIEWING_DELIVERY",
-      title: "Quote Needed",
-      count: summary.REVIEWING_DELIVERY,
-      subtext: "Courier fee pending",
-      countClass:
-        summary.REVIEWING_DELIVERY > 0 ? "text-amber-700" : "text-foreground",
-      activeClass: "bg-amber-50/75 ring-1 ring-inset ring-amber-300/70",
-    },
-    {
-      key: "AWAITING_PAYMENT",
-      title: "Awaiting Payment",
-      count: summary.AWAITING_PAYMENT,
-      subtext: "Verify M-Pesa / Bank",
-      countClass:
-        summary.AWAITING_PAYMENT > 0 ? "text-amber-700" : "text-foreground",
-      activeClass: "bg-amber-50/75 ring-1 ring-inset ring-amber-300/70",
-    },
-    {
-      key: "PROCESSING",
-      title: "Preparing",
-      count: summary.PROCESSING,
-      subtext: "Ready to pack",
-      countClass: summary.PROCESSING > 0 ? "text-sky-700" : "text-foreground",
-      activeClass: "bg-sky-50/75 ring-1 ring-inset ring-sky-300/70",
-    },
-    {
-      key: "OUT_FOR_DELIVERY",
-      title: "Ready / Dispatched",
-      count: summary.OUT_FOR_DELIVERY,
-      subtext: "Pickup & riders",
-      countClass:
-        summary.OUT_FOR_DELIVERY > 0 ? "text-indigo-700" : "text-foreground",
-      activeClass: "bg-indigo-50/75 ring-1 ring-inset ring-indigo-300/70",
-    },
-    {
-      key: "DELIVERED",
-      title: "Delivered",
-      count: summary.DELIVERED,
-      subtext:
-        summary.deliveredRevenue > 0
-          ? formatKes(summary.deliveredRevenue)
-          : "Completed",
-      countClass: "text-[#1F4E37]",
-      activeClass: "bg-[#1F4E37]/[0.08] ring-1 ring-inset ring-[#1F4E37]/30",
-    },
-  ];
+  const undoneStages = ORDER_STAGE_DEFINITIONS.filter(
+    (s) => s.bucket === "undone"
+  );
+  const completedStages = ORDER_STAGE_DEFINITIONS.filter(
+    (s) => s.bucket === "completed"
+  );
+
+  const isUndoneScopeActive =
+    filter === "undone" ||
+    (filter !== "all" &&
+      filter !== "completed" &&
+      isUndoneOrderStage(filter));
+  const isCompletedScopeActive =
+    filter === "completed" ||
+    (filter !== "all" &&
+      filter !== "undone" &&
+      !isUndoneOrderStage(filter));
 
   return (
     <div className="space-y-4">
-      {/* 5-Stage Order Lifecycle Summary Strip */}
-      <section
-        aria-label="Order queue stages"
-        className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3 lg:grid-cols-5"
-      >
-        {stageCards.map((card) => {
-          const active = filter === card.key;
-          return (
-            <button
-              key={card.key}
-              type="button"
-              onClick={() => toggleCategoryFilter(card.key)}
-              className={cn(
-                "flex flex-col justify-between bg-white px-3.5 py-3 text-left transition-colors hover:bg-[#F6F7F5]",
-                active && card.activeClass
-              )}
+      {/* Primary Framing: Undone vs Completed + Search & Maintenance */}
+      <div className="flex flex-col gap-3 rounded-xl border border-[#E3DFD6] bg-[#FCFBF8] p-3.5 sm:p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              role="tablist"
+              aria-label="Order completion filter"
+              className="inline-flex rounded-lg border border-[#E3DFD6] bg-[#F7F5F0] p-1"
             >
-              <span className="truncate text-xs font-medium text-muted-foreground">
-                {card.title}
-              </span>
-              <span
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isUndoneScopeActive}
+                onClick={() => setFilter("undone")}
                 className={cn(
-                  "mt-1 font-display text-2xl font-medium tabular-nums",
-                  card.countClass
+                  "inline-flex min-h-9 items-center gap-2 rounded-md px-3.5 text-xs font-semibold tabular-nums transition-colors whitespace-nowrap",
+                  filter === "undone"
+                    ? "bg-[#1F4E37] text-[#FCFBF8] shadow-xs"
+                    : isUndoneScopeActive
+                      ? "bg-[#FCFBF8] text-[#14221B]"
+                      : "text-[#55635C] hover:text-[#14221B]"
                 )}
               >
-                {card.count}
-              </span>
-              <span className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                {card.subtext}
-              </span>
-            </button>
-          );
-        })}
-      </section>
-
-      {/* Unified Compact Toolbar: 1-to-1 State Tabs + Search + Maintenance */}
-      <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-white p-3 sm:p-3.5">
-        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {(
-              [
-                {
-                  key: "all",
-                  label: "All",
-                  count: orders.length,
-                  activeClass: "bg-slate-900 text-white",
-                },
-                {
-                  key: "REVIEWING_DELIVERY",
-                  label: "Quote Needed",
-                  count: summary.REVIEWING_DELIVERY,
-                  activeClass: "bg-amber-600 text-white",
-                },
-                {
-                  key: "AWAITING_PAYMENT",
-                  label: "Awaiting Payment",
-                  count: summary.AWAITING_PAYMENT,
-                  activeClass: "bg-amber-700 text-white",
-                },
-                {
-                  key: "PROCESSING",
-                  label: "Preparing",
-                  count: summary.PROCESSING,
-                  activeClass: "bg-sky-700 text-white",
-                },
-                {
-                  key: "OUT_FOR_DELIVERY",
-                  label: "Ready / Dispatched",
-                  count: summary.OUT_FOR_DELIVERY,
-                  activeClass: "bg-indigo-700 text-white",
-                },
-                {
-                  key: "DELIVERED",
-                  label: "Delivered",
-                  count: summary.DELIVERED,
-                  activeClass: "bg-[#1F4E37] text-white",
-                },
-                {
-                  key: "CANCELLED",
-                  label: "Cancelled",
-                  count: summary.CANCELLED,
-                  activeClass: "bg-rose-700 text-white",
-                },
-              ] as const
-            ).map((item) => {
-              const active = filter === item.key;
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setFilter(item.key)}
+                <span>Undone</span>
+                <span
                   className={cn(
-                    "inline-flex min-h-8.5 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium tabular-nums transition-colors whitespace-nowrap",
-                    active
-                      ? item.activeClass
-                      : "bg-[#F6F7F5] text-muted-foreground hover:bg-muted hover:text-foreground"
+                    "rounded px-1.5 py-0.5 text-[11px]",
+                    filter === "undone"
+                      ? "bg-white/15 text-[#FCFBF8]"
+                      : summary.undoneCount > 0
+                        ? "bg-[#FFFBEB] text-[#B45309]"
+                        : "bg-black/5 text-[#55635C]"
                   )}
                 >
-                  <span>{item.label}</span>
-                  <span
-                    className={cn(
-                      "text-[11px]",
-                      active ? "opacity-85" : "text-muted-foreground/80"
-                    )}
-                  >
-                    {item.count}
-                  </span>
-                </button>
-              );
-            })}
+                  {summary.undoneCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isCompletedScopeActive}
+                onClick={() => setFilter("completed")}
+                className={cn(
+                  "inline-flex min-h-9 items-center gap-2 rounded-md px-3.5 text-xs font-semibold tabular-nums transition-colors whitespace-nowrap",
+                  filter === "completed"
+                    ? "bg-[#14221B] text-[#FCFBF8] shadow-xs"
+                    : isCompletedScopeActive
+                      ? "bg-[#FCFBF8] text-[#14221B]"
+                      : "text-[#55635C] hover:text-[#14221B]"
+                )}
+              >
+                <span>Completed</span>
+                <span
+                  className={cn(
+                    "rounded px-1.5 py-0.5 text-[11px]",
+                    filter === "completed"
+                      ? "bg-white/15 text-[#FCFBF8]"
+                      : "bg-black/5 text-[#55635C]"
+                  )}
+                >
+                  {summary.completedCount}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                role="tab"
+                aria-selected={filter === "all"}
+                onClick={() => setFilter("all")}
+                className={cn(
+                  "inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-medium tabular-nums transition-colors whitespace-nowrap",
+                  filter === "all"
+                    ? "bg-[#14221B] text-[#FCFBF8] shadow-xs"
+                    : "text-[#55635C] hover:text-[#14221B]"
+                )}
+              >
+                <span>All</span>
+                <span className="text-[11px] opacity-80">{orders.length}</span>
+              </button>
+            </div>
+
+            <span className="text-xs text-[#55635C]">
+              {isUndoneScopeActive
+                ? "Open orders requiring quote, verification, packing, or delivery."
+                : isCompletedScopeActive
+                  ? "Delivered & cancelled archive."
+                  : "All orders across every database status."}
+            </span>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:shrink-0">
             <div className="relative flex-1 sm:w-56">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#55635C]" />
               <Input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search #, customer, item..."
-                className="h-9 bg-[#F6F7F5]/60 pl-8 pr-8 text-xs"
+                className="h-9 border-[#E3DFD6] bg-[#F7F5F0]/70 pl-8 pr-8 text-xs text-[#14221B] placeholder:text-[#55635C]"
               />
               {searchQuery ? (
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
                   aria-label="Clear search"
-                  className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+                  className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-[#55635C] hover:text-[#14221B]"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -642,198 +454,339 @@ export function AdminOrdersPanel({
 
             <div className="flex shrink-0 items-center gap-1.5">
               <Button
-                disabled={refreshing}
-                onClick={() => void load()}
+                disabled={actions.refreshing}
+                onClick={() => void actions.load()}
                 size="sm"
                 type="button"
                 variant="outline"
-                className="h-9 flex-1 bg-white px-2.5 text-xs sm:flex-initial"
+                className="h-9 flex-1 border-[#E3DFD6] bg-[#FCFBF8] px-2.5 text-xs text-[#14221B] hover:bg-[#F7F5F0] sm:flex-initial"
               >
                 <RefreshCw
                   className={cn(
                     "mr-1.5 h-3.5 w-3.5",
-                    refreshing && "animate-spin"
+                    actions.refreshing && "animate-spin"
                   )}
                 />
-                {refreshing ? "Refreshing" : "Refresh"}
+                {actions.refreshing ? "Refreshing" : "Refresh"}
               </Button>
 
               <Button
-                disabled={expiring}
-                onClick={expireOldUnpaidOrders}
+                disabled={actions.expiring}
+                onClick={() => void actions.expireOldUnpaidOrders()}
                 size="sm"
                 type="button"
                 variant="outline"
-                className="h-9 flex-1 bg-white px-2.5 text-xs sm:flex-initial"
+                className="h-9 flex-1 border-[#E3DFD6] bg-[#FCFBF8] px-2.5 text-xs text-[#14221B] hover:bg-[#F7F5F0] sm:flex-initial"
               >
                 <Clock className="mr-1.5 h-3.5 w-3.5" />
-                {expiring ? "Checking..." : "Expire >24h"}
+                {actions.expiring ? "Checking..." : "Expire >24h"}
               </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* 1-to-1 Database Status Strip Grouped into Undone (4) & Completed (2) */}
+        <div className="grid gap-3 border-t border-[#E3DFD6] pt-3 lg:grid-cols-[2fr_1fr]">
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-semibold text-[#55635C]">
+              Undone workflow (database stages 1–4)
+            </p>
+            <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-[#E3DFD6] bg-[#E3DFD6] sm:grid-cols-4">
+              {undoneStages.map((stageDef) => {
+                const count = summary[stageDef.key];
+                const tone = getToneClasses(stageDef.tone);
+                const active = filter === stageDef.key;
+
+                return (
+                  <button
+                    key={stageDef.key}
+                    type="button"
+                    onClick={() => toggleStageFilter(stageDef.key)}
+                    className={cn(
+                      "flex flex-col justify-between bg-[#FCFBF8] px-3 py-2.5 text-left transition-colors hover:bg-[#F7F5F0]",
+                      active && tone.activeStageClass
+                    )}
+                  >
+                    <span className="truncate text-xs font-medium text-[#14221B]">
+                      {stageDef.label}
+                    </span>
+                    <span
+                      className={cn(
+                        "mt-1 font-display text-xl font-medium tabular-nums",
+                        count > 0 ? tone.countClass : "text-[#55635C]"
+                      )}
+                    >
+                      {count}
+                    </span>
+                    <span className="mt-0.5 truncate text-[11px] text-[#55635C]">
+                      {stageDef.shortMeaning}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-semibold text-[#55635C]">
+              Completed / Closed (stages 5–6)
+            </p>
+            <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-[#E3DFD6] bg-[#E3DFD6]">
+              {completedStages.map((stageDef) => {
+                const count = summary[stageDef.key];
+                const tone = getToneClasses(stageDef.tone);
+                const active = filter === stageDef.key;
+
+                return (
+                  <button
+                    key={stageDef.key}
+                    type="button"
+                    onClick={() => toggleStageFilter(stageDef.key)}
+                    className={cn(
+                      "flex flex-col justify-between bg-[#FCFBF8] px-3 py-2.5 text-left transition-colors hover:bg-[#F7F5F0]",
+                      active && tone.activeStageClass
+                    )}
+                  >
+                    <span className="truncate text-xs font-medium text-[#14221B]">
+                      {stageDef.label}
+                    </span>
+                    <span
+                      className={cn(
+                        "mt-1 font-display text-xl font-medium tabular-nums",
+                        count > 0 ? tone.countClass : "text-[#55635C]"
+                      )}
+                    >
+                      {count}
+                    </span>
+                    <span className="mt-0.5 truncate text-[11px] text-[#55635C]">
+                      {stageDef.key === "DELIVERED" && summary.deliveredRevenue > 0
+                        ? formatKes(summary.deliveredRevenue)
+                        : stageDef.shortMeaning}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Feedback Banner */}
-      {panelNotice ? (
-        <div
-          role={panelNotice.tone === "error" ? "alert" : "status"}
-          className={cn(
-            "flex items-center justify-between gap-3 rounded-xl border px-4 py-2.5 text-xs font-medium",
-            panelNotice.tone === "error"
-              ? "border-rose-200 bg-rose-50 text-rose-800"
-              : "border-[#1F4E37]/25 bg-[#1F4E37]/[0.07] text-[#1F4E37]"
-          )}
-        >
-          <span>{panelNotice.text}</span>
-          <button
-            type="button"
-            onClick={() => setPanelNotice(null)}
-            aria-label="Dismiss message"
-            className="inline-flex h-6 w-6 items-center justify-center rounded opacity-70 hover:opacity-100"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      ) : null}
-
       {/* Empty State */}
       {filteredOrders.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-white px-6 py-12 text-center">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-[#F6F7F5] text-muted-foreground">
-            <ShoppingBag className="h-5 w-5" />
+        <div className="flex flex-col items-center justify-center rounded-xl border border-[#E3DFD6] bg-[#FCFBF8] px-6 py-12 text-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#E3DFD6] bg-[#F7F5F0] text-[#1F4E37]">
+            {filter === "undone" && orders.length > 0 ? (
+              <CheckCircle2 className="h-5 w-5" />
+            ) : (
+              <ShoppingBag className="h-5 w-5 text-[#55635C]" />
+            )}
           </div>
-          <p className="mt-3 font-display text-lg font-medium text-foreground">
+          <p className="mt-3 font-display text-lg font-medium text-[#14221B]">
             {orders.length === 0
               ? "No customer orders yet"
-              : "No orders match this view"}
+              : filter === "undone" && !searchQuery
+                ? "No undone orders remaining"
+                : "No orders match this view"}
           </p>
-          <p className="mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
+          <p className="mt-1 max-w-sm text-xs leading-relaxed text-[#55635C]">
             {orders.length === 0
               ? "When customers complete checkout on the storefront, their orders will appear here for review and dispatch."
-              : "Try clearing your search or switching to another status category."}
+              : filter === "undone" && !searchQuery
+                ? "Every open order has been fulfilled. Switch to Completed or All to review past orders."
+                : "Try clearing your search or switching to another status category."}
           </p>
-          {filter !== "all" || searchQuery ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setFilter("all");
-                setSearchQuery("");
-              }}
-              className="mt-4 h-9 bg-white text-xs"
-            >
-              Show all orders
-            </Button>
-          ) : null}
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            {filter === "undone" && summary.completedCount > 0 && !searchQuery ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setFilter("completed")}
+                className="h-9 border-[#E3DFD6] bg-[#FCFBF8] text-xs text-[#14221B]"
+              >
+                View completed orders ({summary.completedCount})
+              </Button>
+            ) : null}
+            {filter !== "all" || searchQuery ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setFilter("all");
+                  setSearchQuery("");
+                }}
+                className="h-9 border-[#E3DFD6] bg-[#FCFBF8] text-xs text-[#14221B]"
+              >
+                Show all orders
+              </Button>
+            ) : null}
+          </div>
         </div>
       ) : (
-        <div className="rounded-xl border border-border bg-white">
+        <div className="overflow-hidden rounded-xl border border-[#E3DFD6] bg-[#FCFBF8]">
           {/* Desktop Compact List Table (md+) */}
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-border bg-[#F6F7F5] text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                <tr className="border-b border-[#E3DFD6] bg-[#F7F5F0] text-[11px] font-semibold tracking-wide text-[#55635C]">
                   <th className="py-2.5 pl-4 pr-3">Order</th>
                   <th className="px-3 py-2.5">Customer &amp; Items</th>
                   <th className="px-3 py-2.5">Channel</th>
-                  <th className="px-3 py-2.5">Status</th>
+                  <th className="px-3 py-2.5">Database Status</th>
                   <th className="px-3 py-2.5 text-right">Total</th>
-                  <th className="py-2.5 pl-3 pr-4 text-right">Actions</th>
+                  <th className="py-2.5 pl-3 pr-4 text-right">Next Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/80">
+              <tbody className="divide-y divide-[#E3DFD6]">
                 {filteredOrders.map((order) => {
                   const stage = normalizeOrderStage(order);
                   const total = getAdminOrderTotal(order);
                   const statusMeta = getAdminOrderStatusMeta(order);
                   const tone = getToneClasses(statusMeta.tone);
-                  const isQuotePending = stage === "REVIEWING_DELIVERY";
+                  const nextAction = getNextOrderAction(order);
+                  const flash = actions.recentlyCompleted[order.id];
+                  const isBusy = actions.busyOrderId === order.id;
 
                   return (
                     <tr
                       key={order.id}
-                      onClick={() => {
-                        setDrawerFocusSection(null);
-                        setActiveOrderId(order.id);
-                      }}
-                      className="group cursor-pointer transition-colors hover:bg-[#F6F7F5]/80"
+                      onClick={() => openOrderDetails(order.id, null)}
+                      className={cn(
+                        "group cursor-pointer transition-colors duration-200",
+                        flash
+                          ? "bg-[#1F4E37]/[0.09]"
+                          : "hover:bg-[#F7F5F0]/85"
+                      )}
                     >
-                      <td className="whitespace-nowrap py-2.5 pl-4 pr-3 align-middle">
-                        <p className="font-mono text-xs font-semibold text-foreground">
+                      <td className="whitespace-nowrap py-3 pl-4 pr-3 align-middle">
+                        <p className="font-mono text-xs font-semibold text-[#14221B]">
                           {order.orderNumber}
                         </p>
-                        <p className="text-[11px] text-muted-foreground tabular-nums">
+                        <p className="text-[11px] text-[#55635C] tabular-nums">
                           {formatAdminOrderDate(order.createdAt)}
                         </p>
                       </td>
 
-                      <td className="max-w-[260px] px-3 py-2.5 align-middle">
-                        <p className="truncate text-[13px] font-medium text-foreground">
+                      <td className="max-w-[260px] px-3 py-3 align-middle">
+                        <p className="truncate text-[13px] font-medium text-[#14221B]">
                           {order.customerName}
                         </p>
-                        <p className="truncate text-xs text-muted-foreground">
+                        <p className="truncate text-xs text-[#55635C]">
                           {summarizeItems(order)}
                         </p>
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-2.5 align-middle text-xs">
-                        <p className="font-medium text-foreground">
+                      <td className="whitespace-nowrap px-3 py-3 align-middle text-xs">
+                        <p className="font-medium text-[#14221B]">
                           {getAdminDeliveryLabel(order.deliveryMethod)}
                         </p>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-[11px] text-[#55635C]">
                           {getAdminPaymentMethodLabel(
                             order.preferredPaymentMethod
                           )}
                         </p>
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-2.5 align-middle">
-                        <div className="flex flex-col items-start gap-0.5">
-                          <span
-                            className={cn(
-                              "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium",
-                              tone.badgeClass
-                            )}
-                          >
-                            <StatusGlyph stage={stage} />
-                            <span>{statusMeta.label}</span>
-                          </span>
-                          <span className="text-[11px] text-muted-foreground">
-                            {statusMeta.nextActionHint}
-                          </span>
-                        </div>
+                      <td className="whitespace-nowrap px-3 py-3 align-middle">
+                        {flash ? (
+                          <div className="flex flex-col items-start gap-0.5">
+                            <span className="inline-flex items-center gap-1.5 rounded-md border border-[#1F4E37]/30 bg-[#1F4E37]/12 px-2 py-0.5 text-xs font-semibold text-[#1F4E37]">
+                              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                              <span>{flash.targetLabel}</span>
+                            </span>
+                            <span className="text-[11px] text-[#1F4E37]">
+                              {flash.summary}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-start gap-0.5">
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium",
+                                tone.badgeClass
+                              )}
+                            >
+                              <StatusGlyph stage={stage} />
+                              <span>{statusMeta.label}</span>
+                            </span>
+                            <span className="text-[11px] text-[#55635C]">
+                              {statusMeta.nextActionHint}
+                            </span>
+                          </div>
+                        )}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right align-middle tabular-nums">
-                        <p className="text-[13px] font-semibold text-foreground">
+                      <td className="whitespace-nowrap px-3 py-3 text-right align-middle tabular-nums">
+                        <p className="text-[13px] font-semibold text-[#14221B]">
                           {formatKes(total)}
                         </p>
-                        {isQuotePending ? (
-                          <p className="text-[11px] font-medium text-amber-700">
+                        {stage === "REVIEWING_DELIVERY" ? (
+                          <p className="text-[11px] font-medium text-[#B45309]">
                             Quote needed
                           </p>
                         ) : null}
                       </td>
 
                       <td
-                        className="whitespace-nowrap py-2.5 pl-3 pr-4 text-right align-middle"
+                        className="whitespace-nowrap py-3 pl-3 pr-4 text-right align-middle"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <OrderActionsMenu
-                          order={order}
-                          busy={busyOrderId === order.id}
-                          onViewDetails={(target) => {
-                            setDrawerFocusSection(null);
-                            setActiveOrderId(target.id);
-                          }}
-                          onNextAction={(target, action) =>
-                            void handleNextAction(target, action)
-                          }
-                          onCancel={(target) => setOrderToCancel(target)}
-                          onDelete={(target) => setOrderToDelete(target)}
-                        />
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          {flash ? (
+                            <span className="inline-flex h-9 items-center px-2.5 text-xs font-semibold text-[#1F4E37]">
+                              Done
+                            </span>
+                          ) : nextAction ? (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() =>
+                                void actions.handleNextAction(order, nextAction)
+                              }
+                              className={cn(
+                                "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60",
+                                getPrimaryActionButtonClasses(nextAction)
+                              )}
+                            >
+                              {isBusy ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <PrimaryActionIcon
+                                  action={nextAction}
+                                  deliveryMethod={order.deliveryMethod}
+                                />
+                              )}
+                              <span>{nextAction.label}</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openOrderDetails(order.id, null)}
+                              className="inline-flex h-9 items-center rounded-md border border-[#E3DFD6] bg-[#FCFBF8] px-3 text-xs font-medium text-[#14221B] transition-colors hover:bg-[#F7F5F0]"
+                            >
+                              Details
+                            </button>
+                          )}
+
+                          <OrderActionsMenu
+                            order={order}
+                            busy={isBusy}
+                            variant="overflow"
+                            onViewDetails={(target) =>
+                              openOrderDetails(target.id, null)
+                            }
+                            onNextAction={(target, action) =>
+                              void actions.handleNextAction(target, action)
+                            }
+                            onCancel={(target) =>
+                              actions.setOrderToCancel(target)
+                            }
+                            onDelete={(target) =>
+                              actions.setOrderToDelete(target)
+                            }
+                          />
+                        </div>
                       </td>
                     </tr>
                   );
@@ -842,46 +795,52 @@ export function AdminOrdersPanel({
             </table>
           </div>
 
-          {/* Mobile Compact List Rows (< md) */}
-          <div className="divide-y divide-border md:hidden">
+          {/* Mobile Compact Actionable Rows (< md) */}
+          <div className="divide-y divide-[#E3DFD6] md:hidden">
             {filteredOrders.map((order) => {
               const stage = normalizeOrderStage(order);
               const total = getAdminOrderTotal(order);
               const statusMeta = getAdminOrderStatusMeta(order);
               const tone = getToneClasses(statusMeta.tone);
+              const nextAction = getNextOrderAction(order);
+              const flash = actions.recentlyCompleted[order.id];
+              const isBusy = actions.busyOrderId === order.id;
 
               return (
                 <div
                   key={order.id}
-                  onClick={() => {
-                    setDrawerFocusSection(null);
-                    setActiveOrderId(order.id);
-                  }}
-                  className="cursor-pointer space-y-2 p-3.5 transition-colors hover:bg-[#F6F7F5]/70"
+                  onClick={() => openOrderDetails(order.id, null)}
+                  className={cn(
+                    "cursor-pointer space-y-2.5 p-3.5 transition-colors duration-200",
+                    flash
+                      ? "bg-[#1F4E37]/[0.09]"
+                      : "hover:bg-[#F7F5F0]/80"
+                  )}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <span className="font-mono text-xs font-semibold text-foreground">
+                        <span className="font-mono text-xs font-semibold text-[#14221B]">
                           {order.orderNumber}
                         </span>
-                        <span className="text-[11px] text-muted-foreground tabular-nums">
+                        <span className="text-[11px] text-[#55635C] tabular-nums">
                           · {formatAdminOrderDate(order.createdAt)}
                         </span>
                       </div>
-                      <p className="mt-0.5 truncate text-sm font-medium text-foreground">
+                      <p className="mt-0.5 truncate text-sm font-medium text-[#14221B]">
                         {order.customerName}
                       </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {summarizeItems(order)}
+                      <p className="truncate text-xs text-[#55635C]">
+                        {summarizeItems(order)} ·{" "}
+                        {getAdminDeliveryLabel(order.deliveryMethod)}
                       </p>
                     </div>
 
                     <div className="shrink-0 text-right tabular-nums">
-                      <p className="text-sm font-semibold text-foreground">
+                      <p className="text-sm font-semibold text-[#14221B]">
                         {formatKes(total)}
                       </p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-[11px] text-[#55635C]">
                         {getAdminPaymentMethodLabel(
                           order.preferredPaymentMethod
                         )}
@@ -890,7 +849,12 @@ export function AdminOrdersPanel({
                   </div>
 
                   <div className="flex items-center justify-between gap-2 pt-0.5">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    {flash ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-md border border-[#1F4E37]/30 bg-[#1F4E37]/12 px-2 py-0.5 text-xs font-semibold text-[#1F4E37]">
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                        <span>{flash.targetLabel}</span>
+                      </span>
+                    ) : (
                       <span
                         className={cn(
                           "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium",
@@ -900,27 +864,48 @@ export function AdminOrdersPanel({
                         <StatusGlyph stage={stage} />
                         <span>{statusMeta.label}</span>
                       </span>
-                      <span className="truncate text-[11px] text-muted-foreground">
-                        {getAdminDeliveryLabel(order.deliveryMethod)}
-                      </span>
-                    </div>
+                    )}
 
                     <div
-                      className="shrink-0"
+                      className="flex shrink-0 items-center gap-1.5"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      {!flash && nextAction ? (
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() =>
+                            void actions.handleNextAction(order, nextAction)
+                          }
+                          className={cn(
+                            "inline-flex min-h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors whitespace-nowrap disabled:opacity-60",
+                            getPrimaryActionButtonClasses(nextAction)
+                          )}
+                        >
+                          {isBusy ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <PrimaryActionIcon
+                              action={nextAction}
+                              deliveryMethod={order.deliveryMethod}
+                            />
+                          )}
+                          <span>{nextAction.label}</span>
+                        </button>
+                      ) : null}
+
                       <OrderActionsMenu
                         order={order}
-                        busy={busyOrderId === order.id}
-                        onViewDetails={(target) => {
-                          setDrawerFocusSection(null);
-                          setActiveOrderId(target.id);
-                        }}
-                        onNextAction={(target, action) =>
-                          void handleNextAction(target, action)
+                        busy={isBusy}
+                        variant="overflow"
+                        onViewDetails={(target) =>
+                          openOrderDetails(target.id, null)
                         }
-                        onCancel={(target) => setOrderToCancel(target)}
-                        onDelete={(target) => setOrderToDelete(target)}
+                        onNextAction={(target, action) =>
+                          void actions.handleNextAction(target, action)
+                        }
+                        onCancel={(target) => actions.setOrderToCancel(target)}
+                        onDelete={(target) => actions.setOrderToDelete(target)}
                       />
                     </div>
                   </div>
@@ -931,36 +916,37 @@ export function AdminOrdersPanel({
         </div>
       )}
 
-      {/* Slide-Over Order Details Drawer */}
-      <AdminOrderDetailSheet
-        order={activeOrder}
-        focusSection={drawerFocusSection}
-        onClose={() => {
-          setDrawerFocusSection(null);
-          setActiveOrderId(null);
-        }}
-        onConfirmDeliveryQuote={confirmDeliveryQuote}
-        onUpdateStatus={updateStatus}
-        onVerifyPayment={verifyPayment}
-        onCancelOrder={cancelOrder}
-        onDeleteOrder={deleteOrder}
-      />
-
-      {/* Row Cancel Confirmation Modal */}
-      <AdminCancelOrderDialog
-        order={orderToCancel}
-        onClose={() => setOrderToCancel(null)}
-        onConfirmCancel={async (target) => {
-          await cancelOrder(target.id);
-        }}
-      />
-
-      {/* Row Delete Confirmation Modal */}
-      <AdminDeleteOrderDialog
-        order={orderToDelete}
-        onClose={() => setOrderToDelete(null)}
-        onConfirmDelete={deleteOrder}
-      />
+      {/* Standalone Fallbacks when Panel is used outside AdminDashboardTabs */}
+      {!sharedActions ? (
+        <>
+          <AdminOrderDetailSheet
+            order={activeOrder}
+            focusSection={actions.drawerFocusSection}
+            onClose={closeOrderDetails}
+            onConfirmDeliveryQuote={actions.confirmDeliveryQuote}
+            onUpdateStatus={actions.updateStatus}
+            onVerifyPayment={actions.verifyPayment}
+            onCancelOrder={actions.cancelOrder}
+            onDeleteOrder={actions.deleteOrder}
+          />
+          <AdminCancelOrderDialog
+            order={actions.orderToCancel}
+            onClose={() => actions.setOrderToCancel(null)}
+            onConfirmCancel={async (target) => {
+              await actions.cancelOrder(target.id);
+            }}
+          />
+          <AdminDeleteOrderDialog
+            order={actions.orderToDelete}
+            onClose={() => actions.setOrderToDelete(null)}
+            onConfirmDelete={actions.deleteOrder}
+          />
+          <AdminToastViewport
+            toasts={localToastQueue.toasts}
+            onDismiss={localToastQueue.dismissToast}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

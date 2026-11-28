@@ -24,7 +24,9 @@ export const submitOrderSchema = z
       latitude: z.number().min(-90).max(90).optional(),
       longitude: z.number().min(-180).max(180).optional(),
     }),
-    items: z.array(orderItemInputSchema).min(1),
+    items: z
+      .array(orderItemInputSchema)
+      .min(1, "You cannot proceed to checkout when your cart is empty."),
     preferredPaymentMethod: z
       .enum([
         "MPESA_BUY_GOODS",

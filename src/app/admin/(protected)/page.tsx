@@ -16,7 +16,7 @@ export default async function AdminPage({
   const resolvedSearchParams = await searchParams;
   const rawTab = resolvedSearchParams.tab;
   const tab: AdminTab =
-    rawTab === "orders" || rawTab === "catalog" ? rawTab : "overview";
+    rawTab === "orders" || rawTab === "catalog" ? rawTab : "queue";
 
   const [categories, products, orders] = await Promise.all([
     getAllCategories(),

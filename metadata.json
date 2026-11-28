@@ -1,0 +1,6 @@
+{
+  "name": "Nature's Nectar Wellness",
+  "description": "Storefront and administration portal for Nature's Nectar Wellness.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

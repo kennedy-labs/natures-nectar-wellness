@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useForm } from "react-hook-form";
-import { Loader2 } from "lucide-react";
+import { Loader2, ShoppingBag } from "lucide-react";
 
 import { WhatsAppPageContext } from "@/components/layout/WhatsAppContext";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { verifyPaystackCheckout } from "@/features/checkout/api/checkout-api";
 import { CheckoutCartSummary } from "@/features/checkout/components/CheckoutCartSummary";
@@ -131,6 +133,13 @@ export function CheckoutForm({
     clearErrors();
     setGeneralError(null);
     setVerifiedMpesaReceipt(null);
+
+    if (cartItems.length === 0) {
+      setGeneralError(
+        "You cannot proceed to checkout when your bag is empty."
+      );
+      return;
+    }
 
     if (
       values.preferredPaymentMethod === "MPESA_BUY_GOODS" &&
@@ -265,6 +274,49 @@ export function CheckoutForm({
         preferredPaymentMethod={result.preferredPaymentMethod}
         initialVerified={verifiedMpesaReceipt}
       />
+    );
+  }
+
+  if (!isClient) {
+    return (
+      <div className="grid items-start gap-8 lg:grid-cols-[1fr_380px]">
+        <div className="space-y-4 rounded-xl border border-border bg-card p-6">
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+        </div>
+        <div className="order-first lg:order-last">
+          <CheckoutCartSummary deliveryMethod={selectedDeliveryMethod} />
+        </div>
+      </div>
+    );
+  }
+
+  if (cartItems.length === 0) {
+    return (
+      <section
+        aria-label="Empty bag checkout restriction"
+        className="mx-auto max-w-lg rounded-xl border border-border bg-card p-7 text-center sm:p-10"
+      >
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-background text-primary">
+          <ShoppingBag className="h-5 w-5" />
+        </div>
+        <h2 className="mt-4 font-display text-2xl font-medium tracking-tight text-foreground">
+          Your bag is empty
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          You cannot proceed to checkout when your bag is empty. Add at least
+          one formulation before placing an order.
+        </p>
+        <div className="mt-6 flex flex-col justify-center gap-2.5 sm:flex-row">
+          <Button asChild className="min-h-11">
+            <Link href="/products">Browse products</Link>
+          </Button>
+          <Button asChild variant="outline" className="min-h-11 bg-background">
+            <Link href="/orders">View my orders</Link>
+          </Button>
+        </div>
+      </section>
     );
   }
 

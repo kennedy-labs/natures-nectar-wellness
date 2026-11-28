@@ -3,6 +3,7 @@ import {
   hasVerifiedPayment,
   isCashPaymentMethod,
   normalizeOrderStage,
+  type OrderNextAction,
   type UnifiedOrderStage,
 } from "@/features/orders/utils/order-workflow.utils";
 
@@ -69,6 +70,88 @@ export type AdminOrderStatusMeta = {
   tone: OrderTone;
   stepIndex: number;
 };
+
+export type OrderStageDefinition = {
+  key: UnifiedOrderStage;
+  dbStatus: UnifiedOrderStage;
+  label: string;
+  shortMeaning: string;
+  bucket: "undone" | "completed";
+  urgency: "decision" | "fulfillment" | "done" | "closed";
+  tone: OrderTone;
+};
+
+export const ORDER_STAGE_DEFINITIONS: readonly OrderStageDefinition[] = [
+  {
+    key: "REVIEWING_DELIVERY",
+    dbStatus: "REVIEWING_DELIVERY",
+    label: "Quote Needed",
+    shortMeaning: "Courier fee pending",
+    bucket: "undone",
+    urgency: "decision",
+    tone: "attention",
+  },
+  {
+    key: "AWAITING_PAYMENT",
+    dbStatus: "AWAITING_PAYMENT",
+    label: "Awaiting Payment",
+    shortMeaning: "Verify M-Pesa / Bank",
+    bucket: "undone",
+    urgency: "decision",
+    tone: "attention",
+  },
+  {
+    key: "PROCESSING",
+    dbStatus: "PROCESSING",
+    label: "Preparing",
+    shortMeaning: "Ready to pack",
+    bucket: "undone",
+    urgency: "fulfillment",
+    tone: "packing",
+  },
+  {
+    key: "OUT_FOR_DELIVERY",
+    dbStatus: "OUT_FOR_DELIVERY",
+    label: "Ready / Dispatched",
+    shortMeaning: "Pickup or with rider",
+    bucket: "undone",
+    urgency: "fulfillment",
+    tone: "dispatch",
+  },
+  {
+    key: "DELIVERED",
+    dbStatus: "DELIVERED",
+    label: "Delivered",
+    shortMeaning: "Handed over & done",
+    bucket: "completed",
+    urgency: "done",
+    tone: "success",
+  },
+  {
+    key: "CANCELLED",
+    dbStatus: "CANCELLED",
+    label: "Cancelled",
+    shortMeaning: "Closed & restocked",
+    bucket: "completed",
+    urgency: "closed",
+    tone: "danger",
+  },
+] as const;
+
+export function isUndoneOrderStage(stage: UnifiedOrderStage): boolean {
+  return stage !== "DELIVERED" && stage !== "CANCELLED";
+}
+
+export function isDecisionRequiredStage(stage: UnifiedOrderStage): boolean {
+  return stage === "REVIEWING_DELIVERY" || stage === "AWAITING_PAYMENT";
+}
+
+export function getPrimaryActionButtonClasses(action: OrderNextAction): string {
+  if (action.kind === "open_quote" || action.kind === "open_payment") {
+    return "border-[#B45309] bg-[#B45309] text-white hover:bg-[#92400E] focus-visible:ring-[#B45309]/40";
+  }
+  return "border-[#1F4E37] bg-[#1F4E37] text-[#FCFBF8] hover:bg-[#173B2A] focus-visible:ring-[#1F4E37]/40";
+}
 
 export function toWhatsAppPhone(phone: string) {
   const digits = phone.replace(/\D/g, "");
@@ -253,45 +336,74 @@ export function getToneClasses(tone: OrderTone) {
       return {
         text: "text-[#1F4E37]",
         badgeClass:
-          "border-[#1F4E37]/25 bg-[#1F4E37]/10 text-[#1F4E37]",
-        subtleBg: "bg-[#1F4E37]/[0.07] border-[#1F4E37]/20",
+          "border-[#1F4E37]/30 bg-[#1F4E37]/10 text-[#1F4E37]",
+        subtleBg: "bg-[#1F4E37]/[0.07] border-[#1F4E37]/25",
+        activeStageClass:
+          "bg-[#1F4E37]/[0.09] ring-1 ring-inset ring-[#1F4E37]/40",
+        countClass: "text-[#1F4E37]",
+        tabActiveClass: "bg-[#1F4E37] text-[#FCFBF8]",
       };
     case "paid":
       return {
-        text: "text-emerald-800",
-        badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-800",
-        subtleBg: "bg-emerald-50/80 border-emerald-200/80",
+        text: "text-[#1F4E37]",
+        badgeClass:
+          "border-[#1F4E37]/30 bg-[#1F4E37]/10 text-[#1F4E37]",
+        subtleBg: "bg-[#1F4E37]/[0.07] border-[#1F4E37]/25",
+        activeStageClass:
+          "bg-[#1F4E37]/[0.09] ring-1 ring-inset ring-[#1F4E37]/40",
+        countClass: "text-[#1F4E37]",
+        tabActiveClass: "bg-[#1F4E37] text-[#FCFBF8]",
       };
     case "packing":
       return {
-        text: "text-sky-800",
-        badgeClass: "border-sky-200 bg-sky-50 text-sky-800",
-        subtleBg: "bg-sky-50/80 border-sky-200/80",
+        text: "text-[#075985]",
+        badgeClass: "border-[#0284C7]/30 bg-[#F0F9FF] text-[#075985]",
+        subtleBg: "bg-[#F0F9FF] border-[#0284C7]/25",
+        activeStageClass:
+          "bg-[#F0F9FF] ring-1 ring-inset ring-[#0284C7]/45",
+        countClass: "text-[#0369A1]",
+        tabActiveClass: "bg-[#0369A1] text-white",
       };
     case "dispatch":
       return {
-        text: "text-indigo-800",
-        badgeClass: "border-indigo-200 bg-indigo-50 text-indigo-800",
-        subtleBg: "bg-indigo-50/80 border-indigo-200/80",
+        text: "text-[#3730A3]",
+        badgeClass: "border-[#4F46E5]/30 bg-[#EEF2FF] text-[#3730A3]",
+        subtleBg: "bg-[#EEF2FF] border-[#4F46E5]/25",
+        activeStageClass:
+          "bg-[#EEF2FF] ring-1 ring-inset ring-[#4F46E5]/45",
+        countClass: "text-[#3730A3]",
+        tabActiveClass: "bg-[#3730A3] text-white",
       };
     case "attention":
       return {
-        text: "text-amber-800",
-        badgeClass: "border-amber-200 bg-amber-50 text-amber-800",
-        subtleBg: "bg-amber-50/90 border-amber-200/80",
+        text: "text-[#92400E]",
+        badgeClass: "border-[#F59E0B]/40 bg-[#FFFBEB] text-[#92400E]",
+        subtleBg: "bg-[#FFFBEB] border-[#F59E0B]/30",
+        activeStageClass:
+          "bg-[#FFFBEB] ring-1 ring-inset ring-[#D97706]/50",
+        countClass: "text-[#B45309]",
+        tabActiveClass: "bg-[#B45309] text-white",
       };
     case "danger":
       return {
-        text: "text-rose-700",
-        badgeClass: "border-rose-200 bg-rose-50 text-rose-700",
-        subtleBg: "bg-rose-50/80 border-rose-200/80",
+        text: "text-[#991B1B]",
+        badgeClass: "border-[#DC2626]/25 bg-[#FEF2F2] text-[#991B1B]",
+        subtleBg: "bg-[#FEF2F2] border-[#DC2626]/20",
+        activeStageClass:
+          "bg-[#FEF2F2] ring-1 ring-inset ring-[#DC2626]/40",
+        countClass: "text-[#B91C1C]",
+        tabActiveClass: "bg-[#B91C1C] text-white",
       };
     case "active":
     default:
       return {
-        text: "text-slate-700",
-        badgeClass: "border-slate-200 bg-slate-100 text-slate-700",
-        subtleBg: "bg-[#F7F5F0] border-border",
+        text: "text-[#14221B]",
+        badgeClass: "border-[#E3DFD6] bg-[#F7F5F0] text-[#14221B]",
+        subtleBg: "bg-[#F7F5F0] border-[#E3DFD6]",
+        activeStageClass:
+          "bg-[#F7F5F0] ring-1 ring-inset ring-[#14221B]/25",
+        countClass: "text-[#14221B]",
+        tabActiveClass: "bg-[#14221B] text-[#FCFBF8]",
       };
   }
 }

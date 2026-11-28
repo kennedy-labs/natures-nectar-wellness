@@ -368,7 +368,7 @@ function OrderDetailContent({
                   type="button"
                   disabled={Boolean(busyAction)}
                   onClick={handleSaveQuote}
-                  className="min-h-10 w-full sm:w-auto"
+                  className="min-h-10 w-full bg-[#B45309] text-white hover:bg-[#92400E] sm:w-auto"
                 >
                   {busyAction === "quote" ? (
                     <>
@@ -436,7 +436,7 @@ function OrderDetailContent({
                   type="button"
                   disabled={Boolean(busyAction)}
                   onClick={handleVerifyPayment}
-                  className="min-h-10 w-full gap-1.5 sm:w-auto"
+                  className="min-h-10 w-full gap-1.5 bg-[#B45309] text-white hover:bg-[#92400E] sm:w-auto"
                 >
                   {busyAction === "verify" ? (
                     <>
@@ -500,7 +500,7 @@ function OrderDetailContent({
                       onUpdateStatus(order.id, nextAction.targetStatus)
                     )
                   }
-                  className="min-h-10 w-full gap-1.5 sm:w-auto"
+                  className="min-h-10 w-full gap-1.5 bg-[#1F4E37] text-[#FCFBF8] hover:bg-[#173B2A] sm:w-auto"
                 >
                   {busyAction === `status-${nextAction.targetStatus}` ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
