@@ -62,9 +62,10 @@ export async function findFeaturedProducts() {
       isActive: true,
       isFeatured: true,
     },
-    orderBy: {
-      createdAt: "desc",
-    },
+    orderBy: [
+      { updatedAt: "desc" },
+      { createdAt: "desc" },
+    ],
     take: 6,
   });
 

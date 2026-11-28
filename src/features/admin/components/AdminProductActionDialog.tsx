@@ -7,6 +7,7 @@ import {
   ArchiveRestore,
   ImageOff,
   Loader2,
+  Star,
   Trash2,
 } from "lucide-react";
 
@@ -26,6 +27,7 @@ type AdminProductActionDialogProps = {
   product: Product | null;
   categoryName?: string;
   onClose: () => void;
+  onToggleFeatured?: (product: Product) => Promise<void>;
   onArchive: (product: Product) => Promise<void>;
   onUnarchive: (product: Product) => Promise<void>;
   onPermanentDelete: (product: Product) => Promise<void>;
@@ -35,13 +37,14 @@ export function AdminProductActionDialog({
   product,
   categoryName,
   onClose,
+  onToggleFeatured,
   onArchive,
   onUnarchive,
   onPermanentDelete,
 }: AdminProductActionDialogProps) {
   const [confirmPermanent, setConfirmPermanent] = useState(false);
   const [busyAction, setBusyAction] = useState<
-    "archive" | "unarchive" | "delete" | null
+    "featured" | "archive" | "unarchive" | "delete" | null
   >(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +53,25 @@ export function AdminProductActionDialog({
       setConfirmPermanent(false);
       setError(null);
       onClose();
+    }
+  }
+
+  async function handleToggleFeaturedClick() {
+    if (!product || !onToggleFeatured || busyAction) return;
+    setBusyAction("featured");
+    setError(null);
+    try {
+      await onToggleFeatured(product);
+      setConfirmPermanent(false);
+      onClose();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not update Apothecary Selection status."
+      );
+    } finally {
+      setBusyAction(null);
     }
   }
 
@@ -223,6 +245,7 @@ export function AdminProductActionDialog({
                   <p className="truncate text-xs text-muted-foreground tabular-nums">
                     {categoryName ?? "Uncategorized"} · {formatKes(product.price)}{" "}
                     · {product.isActive ? "Active" : "Archived"}
+                    {product.isActive && product.isFeatured ? " · Featured" : ""}
                   </p>
                 </div>
               </div>
@@ -237,6 +260,35 @@ export function AdminProductActionDialog({
               ) : null}
 
               <div className="grid gap-2.5 pt-1">
+                {product.isActive && onToggleFeatured ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={Boolean(busyAction)}
+                    onClick={handleToggleFeaturedClick}
+                    className="min-h-11 w-full justify-start gap-2.5"
+                  >
+                    {busyAction === "featured" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Star
+                        className={`h-4 w-4 ${
+                          product.isFeatured
+                            ? "fill-primary text-primary"
+                            : "text-muted-foreground"
+                        }`}
+                      />
+                    )}
+                    <span>
+                      {busyAction === "featured"
+                        ? "Updating Apothecary Selection..."
+                        : product.isFeatured
+                          ? "Remove from Apothecary Selection"
+                          : "Show in Apothecary Selection"}
+                    </span>
+                  </Button>
+                ) : null}
+
                 {product.isActive ? (
                   <Button
                     type="button"

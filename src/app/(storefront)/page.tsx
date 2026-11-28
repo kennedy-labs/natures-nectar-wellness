@@ -50,18 +50,17 @@ export default async function HomePage() {
     getFeaturedProducts(),
   ]);
 
-  const popularIds = new Set(popularProducts.map((product) => product.id));
-  const distinctFeatured = featuredProducts.filter(
-    (product) => !popularIds.has(product.id)
+  const featuredIds = new Set(featuredProducts.map((product) => product.id));
+  const popularBackfill = popularProducts.filter(
+    (product) => !featuredIds.has(product.id)
   );
 
-  // Consolidate into one cohesive 3-column showcase grid when overlap leaves sparse rows (max 6)
-  const showcaseProducts =
-    popularProducts.length > 0
-      ? distinctFeatured.length >= 3
-        ? popularProducts.slice(0, 6)
-        : [...popularProducts, ...distinctFeatured].slice(0, 6)
-      : featuredProducts.slice(0, 6);
+  // Admin-curated featured formulations lead Apothecary Selection (up to 6),
+  // with popular formulations backfilling any remaining slots.
+  const showcaseProducts = [...featuredProducts, ...popularBackfill].slice(
+    0,
+    6
+  );
 
   return (
     <section className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-8 sm:gap-14 sm:px-6 sm:py-12 md:gap-16 md:py-14">

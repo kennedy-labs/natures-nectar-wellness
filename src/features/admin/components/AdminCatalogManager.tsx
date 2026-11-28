@@ -10,6 +10,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Star,
   Trash2,
 } from "lucide-react";
 
@@ -46,7 +47,13 @@ type AdminCatalogManagerProps = {
 const ADMIN_PRODUCTS_PAGE_SIZE = 24;
 
 type CatalogSection = "products" | "categories";
-type ProductFilter = "all" | "active" | "missing_photo" | "low_stock" | "inactive";
+type ProductFilter =
+  | "all"
+  | "active"
+  | "featured"
+  | "missing_photo"
+  | "low_stock"
+  | "inactive";
 
 type CategoryFormState = {
   name: string;
@@ -259,20 +266,41 @@ export function AdminCatalogManager({
   const [productFilter, setProductFilter] = useState<ProductFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
 
+  const onCategoriesChangeRef = useRef(onCategoriesChange);
+  const onProductsChangeRef = useRef(onProductsChange);
+  const didMountCategoriesSyncRef = useRef(false);
+  const didMountProductsSyncRef = useRef(false);
+
+  useEffect(() => {
+    onCategoriesChangeRef.current = onCategoriesChange;
+  }, [onCategoriesChange]);
+
+  useEffect(() => {
+    onProductsChangeRef.current = onProductsChange;
+  }, [onProductsChange]);
+
+  useEffect(() => {
+    if (!didMountProductsSyncRef.current) {
+      didMountProductsSyncRef.current = true;
+      return;
+    }
+    onProductsChangeRef.current?.(products);
+  }, [products]);
+
+  useEffect(() => {
+    if (!didMountCategoriesSyncRef.current) {
+      didMountCategoriesSyncRef.current = true;
+      return;
+    }
+    onCategoriesChangeRef.current?.(categories);
+  }, [categories]);
+
   function updateProductsState(updater: (prev: Product[]) => Product[]) {
-    setProducts((prev) => {
-      const next = updater(prev);
-      onProductsChange?.(next);
-      return next;
-    });
+    setProducts(updater);
   }
 
   function updateCategoriesState(updater: (prev: Category[]) => Category[]) {
-    setCategories((prev) => {
-      const next = updater(prev);
-      onCategoriesChange?.(next);
-      return next;
-    });
+    setCategories(updater);
   }
 
   const [isProductEditorOpen, setIsProductEditorOpen] = useState(false);
@@ -293,6 +321,9 @@ export function AdminCatalogManager({
   );
 
   const [isSaving, setIsSaving] = useState(false);
+  const [togglingFeaturedId, setTogglingFeaturedId] = useState<string | null>(
+    null
+  );
   const [isImageProcessing, setIsImageProcessing] = useState(false);
   const [actionProduct, setActionProduct] = useState<Product | null>(null);
   const [pressingProductId, setPressingProductId] = useState<string | null>(
@@ -330,6 +361,7 @@ export function AdminCatalogManager({
 
   const filterCounts = useMemo(() => {
     let active = 0;
+    let featured = 0;
     let missingPhoto = 0;
     let lowStock = 0;
     let inactive = 0;
@@ -337,6 +369,9 @@ export function AdminCatalogManager({
     for (const p of products) {
       if (p.isActive) {
         active += 1;
+        if (p.isFeatured) {
+          featured += 1;
+        }
         if (p.stockQuantity <= 5) {
           lowStock += 1;
         }
@@ -351,6 +386,7 @@ export function AdminCatalogManager({
     return {
       all: products.length,
       active,
+      featured,
       missing_photo: missingPhoto,
       low_stock: lowStock,
       inactive,
@@ -361,6 +397,9 @@ export function AdminCatalogManager({
     const query = searchQuery.trim().toLowerCase();
     return products.filter((p) => {
       if (productFilter === "active" && !p.isActive) return false;
+      if (productFilter === "featured" && (!p.isActive || !p.isFeatured)) {
+        return false;
+      }
       if (productFilter === "inactive" && p.isActive) return false;
       if (productFilter === "missing_photo" && p.image) return false;
       if (
@@ -590,6 +629,41 @@ export function AdminCatalogManager({
       type: "success",
       text: `${product.name} was permanently deleted.`,
     });
+  }
+
+  async function handleToggleFeaturedProduct(product: Product) {
+    if (!product.isActive || togglingFeaturedId) return;
+    setTogglingFeaturedId(product.id);
+    setFeedback(null);
+
+    try {
+      const nextFeatured = !product.isFeatured;
+      const updated = await updateProductFromClient(product.id, {
+        isFeatured: nextFeatured,
+      });
+
+      updateProductsState((prev) =>
+        prev.map((item) => (item.id === updated.id ? updated : item))
+      );
+
+      setFeedback({
+        type: "success",
+        text: nextFeatured
+          ? `${product.name} added to homepage Apothecary Selection (up to 6 featured items show).`
+          : `${product.name} removed from homepage Apothecary Selection.`,
+      });
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Could not update Apothecary Selection status.",
+      });
+      throw error;
+    } finally {
+      setTogglingFeaturedId(null);
+    }
   }
 
   function clearLongPressTimer() {
@@ -1228,7 +1302,7 @@ export function AdminCatalogManager({
                       }
                       className="h-4 w-4 rounded border-border accent-primary"
                     />
-                    Featured product
+                    Show in homepage Apothecary Selection (Featured)
                   </label>
                 </div>
 
@@ -1283,6 +1357,7 @@ export function AdminCatalogManager({
                   [
                     { key: "all", label: "All" },
                     { key: "active", label: "Active" },
+                    { key: "featured", label: "Featured" },
                     { key: "missing_photo", label: "No photo" },
                     { key: "low_stock", label: "Low stock" },
                     { key: "inactive", label: "Archived" },
@@ -1308,8 +1383,10 @@ export function AdminCatalogManager({
             </div>
 
             <p className="border-t border-border/70 pt-2.5 text-xs text-muted-foreground">
-              Press and hold any product row (or right-click) to archive,
-              unarchive, or delete permanently.
+              Click Feature on any active product to place it in homepage
+              Apothecary Selection (up to 6 featured items). Press and hold any
+              row (or right-click) to feature, archive, unarchive, or delete
+              permanently.
             </p>
           </div>
 
@@ -1386,6 +1463,11 @@ export function AdminCatalogManager({
                           <h3 className="truncate font-semibold text-foreground">
                             {product.name}
                           </h3>
+                          {product.isActive && product.isFeatured ? (
+                            <span className="text-xs font-medium text-primary">
+                              · Featured
+                            </span>
+                          ) : null}
                           {!product.isActive ? (
                             <span className="text-xs font-medium text-muted-foreground">
                               · Archived
@@ -1425,7 +1507,40 @@ export function AdminCatalogManager({
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2 sm:pl-4">
-                      {!product.isActive ? (
+                      {product.isActive ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            isSaving || togglingFeaturedId === product.id
+                          }
+                          aria-pressed={product.isFeatured}
+                          className={`min-h-10 flex-1 sm:flex-initial ${
+                            product.isFeatured
+                              ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary"
+                              : ""
+                          }`}
+                          onClick={() => {
+                            void handleToggleFeaturedProduct(product).catch(
+                              () => undefined
+                            );
+                          }}
+                        >
+                          <Star
+                            className={`mr-1.5 h-3.5 w-3.5 ${
+                              product.isFeatured
+                                ? "fill-primary text-primary"
+                                : "text-muted-foreground"
+                            }`}
+                          />
+                          {togglingFeaturedId === product.id
+                            ? "Saving..."
+                            : product.isFeatured
+                              ? "Featured"
+                              : "Feature"}
+                        </Button>
+                      ) : (
                         <Button
                           type="button"
                           variant="outline"
@@ -1441,7 +1556,7 @@ export function AdminCatalogManager({
                           <ArchiveRestore className="mr-1.5 h-3.5 w-3.5 text-primary" />
                           Unarchive
                         </Button>
-                      ) : null}
+                      )}
 
                       <Button
                         type="button"
@@ -1514,6 +1629,7 @@ export function AdminCatalogManager({
                 : undefined
             }
             onClose={() => setActionProduct(null)}
+            onToggleFeatured={handleToggleFeaturedProduct}
             onArchive={handleArchiveProduct}
             onUnarchive={handleUnarchiveProduct}
             onPermanentDelete={handlePermanentDeleteProduct}
