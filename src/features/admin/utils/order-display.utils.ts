@@ -155,6 +155,34 @@ export function getAdminOrderTotal(order: AdminOrder): number {
   return order.totalAmount ?? order.subtotalAmount + (order.deliveryFee ?? 0);
 }
 
+export type AdminOrderCategory =
+  | "new_orders"
+  | "pending_payments"
+  | "delivery_check"
+  | "preparing"
+  | "being_packed"
+  | "ready_for_pickup"
+  | "delivered"
+  | "cancelled";
+
+export function getAdminOrderCategory(order: AdminOrder): AdminOrderCategory {
+  if (order.status === "CANCELLED") return "cancelled";
+  if (order.status === "DELIVERED") return "delivered";
+  if (order.status === "OUT_FOR_DELIVERY") return "ready_for_pickup";
+  if (order.status === "PROCESSING") return "being_packed";
+  if (order.status === "PAID") return "preparing";
+
+  const needsDeliveryCheck =
+    order.status === "REVIEWING_DELIVERY" ||
+    (order.status === "PENDING" &&
+      order.deliveryMethod === "COUNTRYWIDE_DELIVERY" &&
+      order.deliveryFee == null);
+
+  if (needsDeliveryCheck) return "delivery_check";
+  if (order.status === "AWAITING_PAYMENT") return "pending_payments";
+  return "new_orders";
+}
+
 export function getAdminOrderStatusMeta(
   order: AdminOrder
 ): AdminOrderStatusMeta {
@@ -179,8 +207,8 @@ export function getAdminOrderStatusMeta(
       };
     case "DELIVERED":
       return {
-        label: "Completed",
-        nextActionHint: "Delivered",
+        label: "Delivered",
+        nextActionHint: "Completed",
         guidance:
           "This order has been handed over to the customer and is complete.",
         tone: "success",
@@ -188,35 +216,48 @@ export function getAdminOrderStatusMeta(
       };
     case "OUT_FOR_DELIVERY":
       return {
-        label: "Out for Delivery",
-        nextActionHint: "Mark completed on handover",
+        label:
+          order.deliveryMethod === "PICKUP"
+            ? "Ready for Pickup"
+            : "Out for Delivery",
+        nextActionHint:
+          order.deliveryMethod === "PICKUP"
+            ? "Awaiting customer pickup"
+            : "Mark delivered on handover",
         guidance:
-          "With the rider or courier. Confirm completion once the customer receives their items.",
+          order.deliveryMethod === "PICKUP"
+            ? "Packed and ready at the shop counter for customer collection."
+            : "With the rider or courier. Confirm delivery once the customer receives their items.",
         tone: "dispatch",
         stepIndex: 2,
       };
     case "PROCESSING":
       return {
-        label: "Packing",
-        nextActionHint: "Dispatch order",
+        label: "Being Packed",
+        nextActionHint:
+          order.deliveryMethod === "PICKUP"
+            ? "Mark ready for pickup"
+            : "Dispatch order",
         guidance:
-          "Items are being packed. Move to Out for Delivery once handed to the rider or courier.",
+          order.deliveryMethod === "PICKUP"
+            ? "Items are being packed. Move to Ready for Pickup once ready at the counter."
+            : "Items are being packed. Move to Out for Delivery once handed to the rider or courier.",
         tone: "packing",
         stepIndex: 2,
       };
     case "PAID":
       return {
-        label: "Paid",
+        label: "Preparing Order",
         nextActionHint: "Start packing",
         guidance:
-          "Payment is confirmed. Start packing the items and prepare dispatch.",
+          "Payment is confirmed. Start packing the items and prepare for pickup or dispatch.",
         tone: "paid",
         stepIndex: 1,
       };
     case "AWAITING_PAYMENT":
       return {
-        label: "Waiting Payment",
-        nextActionHint: "Verify M-Pesa / ref",
+        label: "Pending Payment",
+        nextActionHint: "Verify payment",
         guidance: isCash
           ? "Ready to pack. Collect cash on handover and verify payment."
           : "Waiting for the customer's payment. Verify the M-Pesa or bank reference once received.",
@@ -225,10 +266,10 @@ export function getAdminOrderStatusMeta(
       };
     case "REVIEWING_DELIVERY":
       return {
-        label: "Needs Quote",
-        nextActionHint: "Set courier fee",
+        label: "Delivery Check",
+        nextActionHint: "Need verification",
         guidance:
-          "Countrywide courier selected. Set the delivery fee so the customer gets their final total.",
+          "Countrywide courier selected. Check the delivery location and set the courier fee.",
         tone: "attention",
         stepIndex: 0,
       };
@@ -236,37 +277,37 @@ export function getAdminOrderStatusMeta(
     default:
       if (needsQuote) {
         return {
-          label: "Needs Quote",
-          nextActionHint: "Set courier fee",
+          label: "Delivery Check",
+          nextActionHint: "Need verification",
           guidance:
-            "Countrywide courier selected. Set the delivery fee so the customer gets their final total.",
+            "Countrywide courier selected. Check the delivery location and set the courier fee.",
           tone: "attention",
           stepIndex: 0,
         };
       }
       if (isCash) {
         return {
-          label: "New Cash Order",
-          nextActionHint: "Start packing",
+          label: "New Order",
+          nextActionHint: "Awaiting review",
           guidance:
-            "Customer will pay cash on pickup or delivery. You can pack and dispatch right away.",
+            "Customer will pay cash on pickup or delivery. Review and start packing when ready.",
           tone: "attention",
-          stepIndex: 1,
+          stepIndex: 0,
         };
       }
       if (!isPaid) {
         return {
           label: "New Order",
-          nextActionHint: "Confirm quote or payment",
+          nextActionHint: "Awaiting review",
           guidance:
-            "Confirm delivery details or verify the customer's payment reference to move forward.",
+            "Review delivery details or verify the customer's payment reference to move forward.",
           tone: "attention",
           stepIndex: 0,
         };
       }
       return {
         label: "New Order",
-        nextActionHint: "Review & pack",
+        nextActionHint: "Awaiting review",
         guidance: "Review the order details and start packing.",
         tone: "active",
         stepIndex: 1,

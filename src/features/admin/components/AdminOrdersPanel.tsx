@@ -23,9 +23,11 @@ import { AdminOrderDetailSheet } from "@/features/admin/components/AdminOrderDet
 import { OrderActionsMenu } from "@/features/admin/components/OrderActionsMenu";
 import {
   type AdminOrder,
+  type AdminOrderCategory,
   type AdminOrderPayment,
   formatAdminOrderDate,
   getAdminDeliveryLabel,
+  getAdminOrderCategory,
   getAdminOrderStatusMeta,
   getAdminOrderTotal,
   getAdminPaymentMethodLabel,
@@ -43,12 +45,7 @@ type AdminOrdersPanelProps = {
   onSelectedOrderIdChange?: (orderId: string | null) => void;
 };
 
-type OrderFilter =
-  | "all"
-  | "needs_action"
-  | "fulfillment"
-  | "delivered"
-  | "cancelled";
+type OrderFilter = "all" | AdminOrderCategory;
 
 function StatusGlyph({ status }: { status: string }) {
   if (status === "CANCELLED") {
@@ -208,7 +205,7 @@ export function AdminOrdersPanel({
       tone: "info",
       text:
         status === "DELIVERED"
-          ? "Order marked as completed."
+          ? "Order marked as delivered."
           : "Order progress updated.",
     });
     await load();
@@ -222,7 +219,7 @@ export function AdminOrdersPanel({
       await updateStatus(order.id, "DELIVERED");
       setPanelNotice({
         tone: "info",
-        text: `Order ${order.orderNumber} marked as completed.`,
+        text: `Order ${order.orderNumber} marked as delivered.`,
       });
     } catch (err) {
       const message =
@@ -360,48 +357,38 @@ export function AdminOrdersPanel({
   }
 
   const summary = useMemo(() => {
-    const needsAction = orders.filter((o) =>
-      ["PENDING", "REVIEWING_DELIVERY", "AWAITING_PAYMENT"].includes(o.status)
-    );
-    const fulfillment = orders.filter((o) =>
-      ["PAID", "PROCESSING", "OUT_FOR_DELIVERY"].includes(o.status)
-    );
-    const delivered = orders.filter((o) => o.status === "DELIVERED");
-    const cancelled = orders.filter((o) => o.status === "CANCELLED");
+    const counts: Record<AdminOrderCategory, number> = {
+      new_orders: 0,
+      pending_payments: 0,
+      delivery_check: 0,
+      preparing: 0,
+      being_packed: 0,
+      ready_for_pickup: 0,
+      delivered: 0,
+      cancelled: 0,
+    };
+    let deliveredRevenue = 0;
 
-    const completedRevenue = delivered.reduce(
-      (sum, o) => sum + getAdminOrderTotal(o),
-      0
-    );
+    for (const order of orders) {
+      const category = getAdminOrderCategory(order);
+      counts[category] += 1;
+      if (category === "delivered") {
+        deliveredRevenue += getAdminOrderTotal(order);
+      }
+    }
 
     return {
-      needsActionCount: needsAction.length,
-      fulfillmentCount: fulfillment.length,
-      deliveredCount: delivered.length,
-      cancelledCount: cancelled.length,
-      completedRevenue,
+      ...counts,
+      deliveredRevenue,
     };
   }, [orders]);
 
   const filteredOrders = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return orders.filter((order) => {
-      if (
-        filter === "needs_action" &&
-        !["PENDING", "REVIEWING_DELIVERY", "AWAITING_PAYMENT"].includes(
-          order.status
-        )
-      ) {
+      if (filter !== "all" && getAdminOrderCategory(order) !== filter) {
         return false;
       }
-      if (
-        filter === "fulfillment" &&
-        !["PAID", "PROCESSING", "OUT_FOR_DELIVERY"].includes(order.status)
-      ) {
-        return false;
-      }
-      if (filter === "delivered" && order.status !== "DELIVERED") return false;
-      if (filter === "cancelled" && order.status !== "CANCELLED") return false;
 
       if (!query) return true;
       const itemMatch =
@@ -419,111 +406,127 @@ export function AdminOrdersPanel({
     });
   }, [orders, filter, searchQuery]);
 
+  function toggleCategoryFilter(category: AdminOrderCategory) {
+    setFilter((current) => (current === category ? "all" : category));
+  }
+
   if (loading) {
     return <AdminOrdersListSkeleton />;
   }
 
+  const stageCards: Array<{
+    key: AdminOrderCategory;
+    title: string;
+    count: number;
+    subtext: string;
+    countClass: string;
+    activeClass: string;
+  }> = [
+    {
+      key: "new_orders",
+      title: "New Orders",
+      count: summary.new_orders,
+      subtext: "Awaiting review",
+      countClass: summary.new_orders > 0 ? "text-amber-700" : "text-foreground",
+      activeClass: "bg-amber-50/75 ring-1 ring-inset ring-amber-300/70",
+    },
+    {
+      key: "pending_payments",
+      title: "Pending Payments",
+      count: summary.pending_payments,
+      subtext: "Awaiting confirmation",
+      countClass:
+        summary.pending_payments > 0 ? "text-amber-700" : "text-foreground",
+      activeClass: "bg-amber-50/75 ring-1 ring-inset ring-amber-300/70",
+    },
+    {
+      key: "delivery_check",
+      title: "Need Verification",
+      count: summary.delivery_check,
+      subtext: "Delivery check action",
+      countClass:
+        summary.delivery_check > 0 ? "text-orange-700" : "text-foreground",
+      activeClass: "bg-orange-50/75 ring-1 ring-inset ring-orange-300/70",
+    },
+    {
+      key: "preparing",
+      title: "Preparing Orders",
+      count: summary.preparing,
+      subtext: "Paid & ready",
+      countClass:
+        summary.preparing > 0 ? "text-emerald-700" : "text-foreground",
+      activeClass: "bg-emerald-50/75 ring-1 ring-inset ring-emerald-300/70",
+    },
+    {
+      key: "being_packed",
+      title: "Being Packed",
+      count: summary.being_packed,
+      subtext: "Packing items",
+      countClass: summary.being_packed > 0 ? "text-sky-700" : "text-foreground",
+      activeClass: "bg-sky-50/75 ring-1 ring-inset ring-sky-300/70",
+    },
+    {
+      key: "ready_for_pickup",
+      title: "Ready for Pickup",
+      count: summary.ready_for_pickup,
+      subtext: "Pickup & dispatch",
+      countClass:
+        summary.ready_for_pickup > 0 ? "text-indigo-700" : "text-foreground",
+      activeClass: "bg-indigo-50/75 ring-1 ring-inset ring-indigo-300/70",
+    },
+    {
+      key: "delivered",
+      title: "Delivered",
+      count: summary.delivered,
+      subtext:
+        summary.deliveredRevenue > 0
+          ? formatKes(summary.deliveredRevenue)
+          : "Completed",
+      countClass: "text-[#1F4E37]",
+      activeClass: "bg-[#1F4E37]/[0.08] ring-1 ring-inset ring-[#1F4E37]/30",
+    },
+  ];
+
   return (
     <div className="space-y-4">
-      {/* Compact 4-Segment Queue Strip */}
+      {/* 7-Stage Order Lifecycle Summary Strip */}
       <section
-        aria-label="Order queue summary"
-        className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-4"
+        aria-label="Order queue stages"
+        className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4 xl:grid-cols-7"
       >
-        <button
-          type="button"
-          onClick={() => setFilter("needs_action")}
-          className={cn(
-            "flex items-center justify-between gap-3 bg-white px-4 py-3 text-left transition-colors hover:bg-amber-50/40",
-            filter === "needs_action" && "bg-amber-50/60"
-          )}
-        >
-          <div className="min-w-0">
-            <span className="block text-xs font-medium text-muted-foreground">
-              Needs attention
-            </span>
-            <span className="mt-0.5 block truncate text-[11px] text-amber-800/80">
-              Quote or payment
-            </span>
-          </div>
-          <span
-            className={cn(
-              "font-display text-2xl font-medium tabular-nums",
-              summary.needsActionCount > 0
-                ? "text-amber-700"
-                : "text-foreground"
-            )}
-          >
-            {summary.needsActionCount}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFilter("fulfillment")}
-          className={cn(
-            "flex items-center justify-between gap-3 bg-white px-4 py-3 text-left transition-colors hover:bg-sky-50/40",
-            filter === "fulfillment" && "bg-sky-50/60"
-          )}
-        >
-          <div className="min-w-0">
-            <span className="block text-xs font-medium text-muted-foreground">
-              In progress
-            </span>
-            <span className="mt-0.5 block truncate text-[11px] text-sky-800/80">
-              Packing &amp; transit
-            </span>
-          </div>
-          <span className="font-display text-2xl font-medium tabular-nums text-sky-700">
-            {summary.fulfillmentCount}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFilter("delivered")}
-          className={cn(
-            "flex items-center justify-between gap-3 bg-white px-4 py-3 text-left transition-colors hover:bg-emerald-50/40",
-            filter === "delivered" && "bg-emerald-50/60"
-          )}
-        >
-          <div className="min-w-0">
-            <span className="block text-xs font-medium text-muted-foreground">
-              Completed
-            </span>
-            <span className="mt-0.5 block truncate text-[11px] tabular-nums text-[#1F4E37]">
-              {formatKes(summary.completedRevenue)}
-            </span>
-          </div>
-          <span className="font-display text-2xl font-medium tabular-nums text-[#1F4E37]">
-            {summary.deliveredCount}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFilter("all")}
-          className={cn(
-            "flex items-center justify-between gap-3 bg-white px-4 py-3 text-left transition-colors hover:bg-[#F6F7F5]",
-            filter === "all" && "bg-[#F6F7F5]"
-          )}
-        >
-          <div className="min-w-0">
-            <span className="block text-xs font-medium text-muted-foreground">
-              All orders
-            </span>
-            <span className="mt-0.5 block truncate text-[11px] tabular-nums text-muted-foreground">
-              {summary.cancelledCount} cancelled
-            </span>
-          </div>
-          <span className="font-display text-2xl font-medium tabular-nums text-foreground">
-            {orders.length}
-          </span>
-        </button>
+        {stageCards.map((card) => {
+          const active = filter === card.key;
+          return (
+            <button
+              key={card.key}
+              type="button"
+              onClick={() => toggleCategoryFilter(card.key)}
+              className={cn(
+                "flex flex-col justify-between bg-white px-3.5 py-3 text-left transition-colors hover:bg-[#F6F7F5]",
+                active && card.activeClass
+              )}
+            >
+              <span className="truncate text-xs font-medium text-muted-foreground">
+                {card.title}
+              </span>
+              <span
+                className={cn(
+                  "mt-1 font-display text-2xl font-medium tabular-nums",
+                  card.countClass
+                )}
+              >
+                {card.count}
+              </span>
+              <span className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                {card.subtext}
+              </span>
+            </button>
+          );
+        })}
       </section>
 
-      {/* Unified Compact Toolbar: Filter Tabs + Search + Maintenance */}
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-white p-3 sm:p-3.5">
+      {/* Unified Compact Toolbar: Quick Tabs + Search + Maintenance */}
+      <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-white p-3 sm:p-3.5">
         <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {(
@@ -535,27 +538,51 @@ export function AdminOrdersPanel({
                   activeClass: "bg-slate-900 text-white",
                 },
                 {
-                  key: "needs_action",
-                  label: "Needs action",
-                  count: summary.needsActionCount,
+                  key: "new_orders",
+                  label: "New Orders",
+                  count: summary.new_orders,
                   activeClass: "bg-amber-600 text-white",
                 },
                 {
-                  key: "fulfillment",
-                  label: "In progress",
-                  count: summary.fulfillmentCount,
+                  key: "pending_payments",
+                  label: "Pending Payments",
+                  count: summary.pending_payments,
+                  activeClass: "bg-amber-700 text-white",
+                },
+                {
+                  key: "delivery_check",
+                  label: "Need Verification",
+                  count: summary.delivery_check,
+                  activeClass: "bg-orange-600 text-white",
+                },
+                {
+                  key: "preparing",
+                  label: "Preparing",
+                  count: summary.preparing,
+                  activeClass: "bg-emerald-700 text-white",
+                },
+                {
+                  key: "being_packed",
+                  label: "Being Packed",
+                  count: summary.being_packed,
                   activeClass: "bg-sky-700 text-white",
                 },
                 {
+                  key: "ready_for_pickup",
+                  label: "Ready for Pickup",
+                  count: summary.ready_for_pickup,
+                  activeClass: "bg-indigo-700 text-white",
+                },
+                {
                   key: "delivered",
-                  label: "Completed",
-                  count: summary.deliveredCount,
+                  label: "Delivered",
+                  count: summary.delivered,
                   activeClass: "bg-[#1F4E37] text-white",
                 },
                 {
                   key: "cancelled",
                   label: "Cancelled",
-                  count: summary.cancelledCount,
+                  count: summary.cancelled,
                   activeClass: "bg-rose-700 text-white",
                 },
               ] as const
@@ -567,7 +594,7 @@ export function AdminOrdersPanel({
                   type="button"
                   onClick={() => setFilter(item.key)}
                   className={cn(
-                    "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-md px-3 text-xs font-medium tabular-nums transition-colors whitespace-nowrap",
+                    "inline-flex min-h-8.5 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium tabular-nums transition-colors whitespace-nowrap",
                     active
                       ? item.activeClass
                       : "bg-[#F6F7F5] text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -587,14 +614,14 @@ export function AdminOrdersPanel({
             })}
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative flex-1 sm:w-64 lg:w-72">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:shrink-0">
+            <div className="relative flex-1 sm:w-56">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search #, customer, phone, item..."
+                placeholder="Search #, customer, item..."
                 className="h-9 bg-[#F6F7F5]/60 pl-8 pr-8 text-xs"
               />
               {searchQuery ? (
@@ -616,7 +643,7 @@ export function AdminOrdersPanel({
                 size="sm"
                 type="button"
                 variant="outline"
-                className="h-9 flex-1 bg-white px-3 text-xs sm:flex-initial"
+                className="h-9 flex-1 bg-white px-2.5 text-xs sm:flex-initial"
               >
                 <RefreshCw
                   className={cn(
@@ -633,7 +660,7 @@ export function AdminOrdersPanel({
                 size="sm"
                 type="button"
                 variant="outline"
-                className="h-9 flex-1 bg-white px-3 text-xs sm:flex-initial"
+                className="h-9 flex-1 bg-white px-2.5 text-xs sm:flex-initial"
               >
                 <Clock className="mr-1.5 h-3.5 w-3.5" />
                 {expiring ? "Checking..." : "Expire >24h"}
@@ -679,8 +706,8 @@ export function AdminOrdersPanel({
           </p>
           <p className="mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
             {orders.length === 0
-              ? "When customers complete checkout on the storefront, their orders will appear here for confirmation and dispatch."
-              : "Try clearing your search or switching to another status tab."}
+              ? "When customers complete checkout on the storefront, their orders will appear here for review and dispatch."
+              : "Try clearing your search or switching to another status category."}
           </p>
           {filter !== "all" || searchQuery ? (
             <Button

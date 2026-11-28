@@ -505,7 +505,9 @@ function OrderDetailContent({
                       ) : (
                         <Truck className="h-3.5 w-3.5 text-[#1F4E37]" />
                       )}
-                      Out for delivery
+                      {order.deliveryMethod === "PICKUP"
+                        ? "Ready for pickup"
+                        : "Out for delivery"}
                     </Button>
                   ) : null}
 
@@ -525,7 +527,7 @@ function OrderDetailContent({
                     ) : (
                       <CheckCircle2 className="h-3.5 w-3.5" />
                     )}
-                    Mark completed
+                    Mark delivered
                   </Button>
                 </div>
               </div>

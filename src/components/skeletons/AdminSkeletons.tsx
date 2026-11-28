@@ -99,17 +99,15 @@ export function AdminOverviewSkeleton() {
 export function AdminOrdersListSkeleton() {
   return (
     <div aria-label="Loading admin orders" className="space-y-4">
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-4">
-        {[1, 2, 3, 4].map((cell) => (
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4 xl:grid-cols-7">
+        {[1, 2, 3, 4, 5, 6, 7].map((cell) => (
           <div
             key={cell}
-            className="flex items-center justify-between gap-3 bg-white px-4 py-3"
+            className="flex flex-col justify-between gap-2 bg-white px-3.5 py-3"
           >
-            <div className="space-y-1.5">
-              <Skeleton className="h-3.5 w-24" />
-              <Skeleton className="h-3 w-20" />
-            </div>
-            <Skeleton className="h-7 w-10" />
+            <Skeleton className="h-3.5 w-20" />
+            <Skeleton className="h-7 w-9" />
+            <Skeleton className="h-3 w-24" />
           </div>
         ))}
       </div>
